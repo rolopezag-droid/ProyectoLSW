@@ -1,0 +1,5 @@
+'use strict';
+const legColumns = { contractSymbol:'contract_symbol', optionType:'option_type', action:'action', strike:'strike', expirationDate:'expiration_date', premium:'premium', bid:'bid', ask:'ask', impliedVolatility:'implied_volatility', delta:'delta', gamma:'gamma', theta:'theta', vega:'vega' };
+const mapLeg = row => ({ id:row.id, spreadId:row.spread_id, legOrder:row.leg_order, ...Object.fromEntries(Object.entries(legColumns).map(([key,col]) => [key,row[col]])), createdAt:row.created_at, updatedAt:row.updated_at });
+const mapSpread = row => ({ id:row.id, userId:row.user_id, strategyType:row.strategy_types?.code, strategyTypeId:row.strategy_type_id, underlyingTicker:row.underlying_ticker, currentStockPrice:row.underlying_price, expirationDate:row.expiration_date, quantity:row.quantity, multiplier:row.multiplier, status:row.status, notes:row.notes, deletedAt:row.deleted_at, createdAt:row.created_at, updatedAt:row.updated_at, legs:(row.spread_legs || []).sort((a,b)=>a.leg_order-b.leg_order).map(mapLeg), evaluations:row.spread_evaluations || [] });
+module.exports = { mapLeg, mapSpread, legColumns };
