@@ -8,7 +8,7 @@
 
 ## 3. Verificación y evidencia
 - [x] 3.1 Ejecutar pruebas de Quant y comprobar que entradas inválidas no llaman al broker.
-- [ ] 3.2 Comparar contrato y estructura antes/después con archivos y resultados.
-- [ ] 3.3 Registrar autor, asistencia IA y commits reales; separar cualquier aporte manual verificable.
+- [x] 3.2 Comparar contrato y estructura antes/después con archivos y resultados.
+- [x] 3.3 Registrar autor, asistencia IA y commits reales; separar cualquier aporte manual verificable.
 - [ ] 3.4 Validar y archivar el cambio únicamente tras completar implementación y verificación.
 

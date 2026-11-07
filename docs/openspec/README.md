@@ -17,12 +17,12 @@ En Codex usar openspec-propose desde Skills; en Copilot /opsx-propose. Reiniciar
 openspec/config.yaml contiene contexto, reglas y el requisito de proponer una estructura propia si la actual no es óptima. Es configuración del flujo; no es una especificación OpenAPI/Swagger.
 
 ## Evidencia IA y manual
-El historial anterior y las mejoras anteriores a esta fecha no se presentan como desarrollo SDD. La configuración y los documentos iniciales fueron preparados por Roberto con asistencia de Codex. El primer cambio está especificado pero NO implementado. No hay optimización manual acreditada en este cambio todavía.
+El historial anterior y las mejoras anteriores a esta fecha no se presentan como desarrollo SDD. La configuración y los documentos iniciales fueron preparados por Roberto con asistencia de Codex. El primer cambio está implementado y probado; ver evidencia-intervalos-velas.md. No hay optimización manual acreditada en este cambio todavía.
 
 Para cada intervención registrar: API, fecha, persona responsable, modalidad (IA asistida o manual verificable), archivos, commit, comparación estructural, comando de prueba y resultado. Los resultados simulados no acreditan integración real con BD o broker. No incluir secretos ni contenido de .env.
 
 ## Primer caso
-openspec/changes/validar-intervalos-de-velas propone rechazar timeframe inválido en la API de velas. Es una mejora nueva, no una reconstrucción retrospectiva de las mejoras de interfaz. Las tareas pendientes se mantienen sin marcar.
+openspec/changes/validar-intervalos-de-velas propone rechazar timeframe inválido en la API de velas. Es una mejora nueva, no una reconstrucción retrospectiva de las mejoras de interfaz. Las tareas completadas se marcan con evidencia real; el archivo final sigue reservado para después de la revisión.
 
 Fuente: https://github.com/Fission-AI/OpenSpec
 
