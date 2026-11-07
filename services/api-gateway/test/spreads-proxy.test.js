@@ -7,6 +7,7 @@ test('Gateway forwards spread path, method, body and user session',async()=>{
  process.env.SPREAD_SERVICE_URL=`http://127.0.0.1:${backend.address().port}`;
  const gateway=require('../src/app').listen(0,'127.0.0.1');await new Promise(resolve=>gateway.once('listening',resolve));
  process.env.GATEWAY_SERVICE_URL=`http://127.0.0.1:${gateway.address().port}`;
+ process.env.QUANT_SERVICE_URL=process.env.SPREAD_SERVICE_URL;
  const gui=require('../../gui-service/src/server').listen(0,'127.0.0.1');await new Promise(resolve=>gui.once('listening',resolve));
  try {
   const response=await fetch(`http://127.0.0.1:${gateway.address().port}/api/v1/spreads/batch`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer test-user'},body:JSON.stringify({operations:[]})});
@@ -16,6 +17,7 @@ test('Gateway forwards spread path, method, body and user session',async()=>{
   const session=await fetch(guiUrl+'/api/supabase/session',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(session.status,400);
   const proxied=await fetch(guiUrl+'/api/v1/spreads',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer test-user'},body:'{"status":"draft"}'});
   assert.equal(proxied.status,200);const forwarded=await proxied.json();assert.equal(forwarded.body,'{"status":"draft"}');assert.equal(forwarded.auth,'Bearer test-user');
+  const quantProxy=await fetch(guiUrl+'/api/v1/strategies/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},body:'{"symbol":"AAPL"}'});assert.equal(quantProxy.status,200);assert.equal((await quantProxy.json()).body,'{"symbol":"AAPL"}');
   const absent=await fetch(`http://127.0.0.1:${gateway.address().port}/api/v1/spreads-other`);assert.equal(absent.status,404);
  } finally {await new Promise(resolve=>gui.close(resolve));await new Promise(resolve=>gateway.close(resolve));await new Promise(resolve=>backend.close(resolve));}
 });

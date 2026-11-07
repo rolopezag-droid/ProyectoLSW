@@ -77,3 +77,35 @@ test('Pagination rejects invalid inputs',async()=>{
  await assert.rejects(s.findAll({}, {limit:1.5}),{status:400});
  await assert.rejects(s.findAll({}, {skip:-1}),{status:400});
 });
+
+test('evaluación de draft actualiza estado solamente después de persistir',async()=>{
+ const db=database(),s=new SpreadService(db,uid),created=await s.create({...payload,status:'draft'});
+ const result=await s.evaluate(created.id);assert.equal(result.spreadStatus,'evaluated');assert.equal(result.statusUpdated,true);assert.equal(db.tables.spreads[0].status,'evaluated');assert.ok(db.tables.spreads[0].updated_at);
+ const insert=db.calls.findIndex(c=>c.table==='spread_evaluations'&&c.action==='insert'),update=db.calls.findIndex(c=>c.table==='spreads'&&c.action==='update');assert.ok(update>insert);
+});
+test('evaluación fallida deja draft y evaluación de archivado no lo reabre',async()=>{
+ const db=database(),s=new SpreadService(db,uid),created=await s.create({...payload,status:'draft'});db.failOn('spread_evaluations');await assert.rejects(s.evaluate(created.id),{status:403});assert.equal(db.tables.spreads[0].status,'draft');assert.equal(db.calls.some(c=>c.table==='spreads'&&c.action==='update'),false);
+ db.failOn(null);await s.updateById(created.id,{status:'archived'});const evaluation=await s.evaluate(created.id);assert.equal(evaluation.spreadStatus,'archived');assert.equal(db.tables.spreads[0].status,'archived');
+});
+test('fallo de cambio de estado devuelve evaluación guardada y advertencia',async()=>{
+ const db=database(),s=new SpreadService(db,uid),created=await s.create({...payload,status:'draft'});db.failOn('spreads');const result=await s.evaluate(created.id);assert.equal(db.tables.spread_evaluations.length,1);assert.equal(result.statusUpdated,false);assert.match(result.warning,/se guardó/);assert.equal(db.tables.spreads[0].status,'draft');
+});
+
+test('estados canónicos y alias respetan el contrato documentado',async()=>{
+ const db=database(),s=new SpreadService(db,uid);const p=await s.create(payload);
+ assert.equal(db.tables.spreads[0].status,'evaluated');
+ await s.updateById(p.id,{status:'closed'});assert.equal(db.tables.spreads[0].status,'archived');
+ await s.updateById(p.id,{status:'draft'});assert.equal(db.tables.spreads[0].status,'draft');
+ await assert.rejects(s.updateById(p.id,{status:'invalid'}),{status:400});
+});
+
+test('setup client guarda y consulta por HTTP con sesión aislada',async()=>{
+ const db=database();db.auth={getUser:async()=>({data:{user:{id:uid}},error:null})};
+ const {createApp}=require('../src/app');
+ const server=createApp(()=>db).listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ try{
+  const client=require('../../quant-service/src/services/setup-client').createSetupClient(fetch,'http://127.0.0.1:'+server.address().port);
+  const req={get:()=> 'Bearer fake-test-session',query:{}};
+  const saved=await client.create(req,payload);assert.equal(saved.userId,uid);assert.equal((await client.list(req)).total,1);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});

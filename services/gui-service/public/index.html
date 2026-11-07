@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <script src="/auth/return.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Trading Dashboard — Estrategias de Opciones</title>
   <style>
@@ -356,6 +357,10 @@
     .alert-dismiss { position:absolute; right:6px; top:5px; width:30px; height:30px; border:0; background:transparent; color:inherit; cursor:pointer; font-size:20px; }
     .alert-dismiss:focus-visible { outline:2px solid currentColor; outline-offset:-3px; }
     @media(max-width:650px) { #alertContainer { right:16px; bottom:16px; } }
+    .password-control { display:flex; align-items:stretch; }
+    .password-control input { min-width:0; border-radius:4px 0 0 4px; }
+    .password-control button { flex:0 0 auto; border-radius:0 4px 4px 0; margin:0; }
+    .password-recovery { display:inline-block; margin-top:7px; color:var(--accent); font-size:12px; text-decoration:underline; text-underline-offset:3px; }
   </style>
 </head>
 <body>
@@ -389,6 +394,7 @@
       <button class="tab-btn" id="tab-btn-greeks" onclick="showTab('greeks')"> Griegas</button>
       <button class="tab-btn" id="tab-btn-iv" onclick="showTab('iv')"> Volatilidad Implícita</button>
       <button class="tab-btn" id="tab-btn-candles" onclick="showTab('candles')"> Gráfica</button>
+      <a class="password-recovery" href="/auth/recuperar.html" target="_blank" rel="noopener noreferrer">Recuperar acceso</a>
     </div>
 
     <!-- ── Estrategia ── -->
@@ -465,8 +471,8 @@
         <div class="card">
           <h2>Automatización (opcional)</h2>
           <label style="display:flex; gap:0.5rem; align-items:center; font-size:0.9rem;">
-            <input type="checkbox" id="chkStopLoss" style="width:auto;" />
-            Stop loss automático en las órdenes
+            <input type="checkbox" id="chkStopLoss" disabled title="Alpaca no admite stops por pata en esta orden multileg" style="width:auto;" />
+            Stop por pata no disponible en órdenes multileg
           </label>
           <label style="display:flex; gap:0.5rem; align-items:center; font-size:0.9rem;">
             <input type="checkbox" id="chkAutoStrikes" style="width:auto;" />
@@ -474,7 +480,7 @@
           </label>
           <label style="display:flex; gap:0.5rem; align-items:center; font-size:0.9rem;">
             <input type="checkbox" id="chkAutoCycle" style="width:auto;" />
-            Ciclo automático de re-evaluación y ejecución
+            Ciclo automático de ejecución Paper (solo mientras esta pestaña esté abierta)
           </label>
           <div id="optCycleContainer" style="display:none;">
             <label>Intervalo del ciclo (horas)</label>
@@ -487,11 +493,11 @@
       <div class="card" id="resultsCard" style="display:none;">
         <h2>Resultado</h2>
         <div class="row" style="margin-bottom:1rem;">
-          <div><label>Precio del subyacente para guardar</label><input id="saveSpot" type="number" min="0.01" step="0.01" placeholder="Ej. 190" /></div>
-          <div><label>Correo de tu cuenta de Supabase</label><input id="saveEmail" type="email" autocomplete="username" /></div>
-          <div><label>Contraseña de tu cuenta de Supabase</label><input id="savePassword" type="password" autocomplete="current-password" /></div>
-          <div><button type="button" class="btn btn-primary" id="btnSaveSpread">Guardar en Supabase</button></div>
-          <p id="saveStatus" role="status"></p>
+          <div><label for="saveSpot">Precio de la acción para guardar (USD)</label><input id="saveSpot" type="number" min="0.01" step="0.01" placeholder="Se completa al consultar Alpaca" /><small id="saveSpotSource">También puedes ingresar un precio de referencia manual.</small></div>
+          <div><label for="saveEmail">Correo de tu cuenta de la aplicación</label><input id="saveEmail" type="email" autocomplete="username" /></div>
+          <div><label for="savePassword">Contraseña de tu cuenta de la aplicación</label><div class="password-control"><input id="savePassword" type="password" autocomplete="current-password" /><button type="button" class="btn btn-secondary" id="toggleSavePassword" aria-controls="savePassword" aria-pressed="false">Mostrar</button></div><a class="password-recovery" href="/auth/recuperar.html" target="_blank" rel="noopener noreferrer">Olvidé mi contraseña</a></div>
+          <div><button type="button" class="btn btn-primary" id="btnSaveSpread">Guardar en Supabase</button> <button type="button" class="btn btn-secondary" id="btnRegisterAccount">Crear cuenta</button></div>
+          <p id="saveStatus" role="status" aria-live="polite" aria-atomic="true"></p>
         </div>
         <div class="results-grid" id="resultsGrid"></div>
         <div style="margin-top:1rem;">
@@ -766,13 +772,19 @@ layout.append(analysisColumn, orderPanel); strategyView.append(layout);
 </script>
 <script>
 const API_BASE = '';
-const QUANT_SERVICE_URL = 'http://localhost:3002';
+const QUANT_SERVICE_URL = ''; // Proxy del mismo origen; respeta QUANT_SERVICE_URL del servidor.
 let selectedStrategy = 'BULL_CALL_SPREAD';
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 let lastEvaluatedInput = null;
 let savedSpreadId = null;
 let saveAccessToken = null;
-let history = JSON.parse(localStorage.getItem('td_history') || '[]');
+document.getElementById('toggleSavePassword').addEventListener('click',()=>{
+  const input=document.getElementById('savePassword'),button=document.getElementById('toggleSavePassword'),visible=input.type==='password';
+  input.type=visible?'text':'password';button.textContent=visible?'Ocultar':'Mostrar';button.setAttribute('aria-pressed',String(visible));
+});
+let quoteContextVersion = 0;
+let history = [];
+try { history = JSON.parse(localStorage.getItem('td_history') || '[]'); if(!Array.isArray(history)) history=[]; } catch { history=[]; }
 
 // ── Tabs ──
 function showTab(tabName) {
@@ -860,7 +872,7 @@ document.querySelectorAll('.strategy-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.strategy-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    if(selectedStrategy !== chip.dataset.strategy) clearStrategyQuotes();
+    if(selectedStrategy !== chip.dataset.strategy) {clearStrategyQuotes();stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;}
     selectedStrategy = chip.dataset.strategy;
     document.body.dataset.direction = selectedStrategy.startsWith('BEAR') ? 'bear' : 'bull';
   });
@@ -868,16 +880,20 @@ document.querySelectorAll('.strategy-chip').forEach(chip => {
 
 // Selección compartida para cotizar, evaluar y preparar Paper.
 function clearStrategyQuotes() {
+  quoteContextVersion++;
+  document.getElementById('saveSpot').value='';
+  document.getElementById('saveSpotSource').textContent='Consulta Alpaca o ingresa un precio de referencia manual.';
   for(const id of ['strikeLong','strikeShort','priceLong','priceShort']) document.getElementById(id).value='';
   lastEvaluatedInput=null; savedSpreadId=null;
   document.getElementById('resultsCard').style.display='none';
 }
-for(const id of ['symbol','chSymbol','expiration']) document.getElementById(id).addEventListener('change',clearStrategyQuotes);
+for(const id of ['symbol','chSymbol','expiration']) document.getElementById(id).addEventListener('change',()=>{clearStrategyQuotes();stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;});
 async function fetchAutomaticSelection() {
   const strategy=selectedStrategy;
   const symbol=document.getElementById('symbol').value.trim().toUpperCase();
   const expiration=document.getElementById('expiration').value.trim();
   clearStrategyQuotes();
+  const contextVersion=quoteContextVersion;
   if(!symbol||!expiration) throw new Error('Ingresa símbolo y vencimiento.');
   const type=strategy.includes('CALL')?'call':'put';
   const contracts=await selectVertical.collectOptionChain(async pageToken=>{
@@ -888,8 +904,31 @@ async function fetchAutomaticSelection() {
     if(!res.ok) throw new Error(data.detail||data.message||'No se pudo consultar Alpaca.');
     return data;
   });
-  if(strategy!==selectedStrategy||symbol!==document.getElementById('symbol').value||expiration!==document.getElementById('expiration').value.trim()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
+  const stillCurrent=()=>contextVersion===quoteContextVersion && strategy===selectedStrategy && symbol===document.getElementById('symbol').value && expiration===document.getElementById('expiration').value.trim();
+  if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
   const result=selectVertical(contracts,strategy,symbol,expiration);
+  let stockQuote;
+  try {
+    const response=await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/quotes?${new URLSearchParams({symbol})}`,{signal:AbortSignal.timeout(10000)});
+    const quote=await response.json();
+    const validMidpoint=typeof quote.bid==='number' && typeof quote.ask==='number' && Number.isFinite(quote.bid) && Number.isFinite(quote.ask) && quote.bid>0 && quote.ask>=quote.bid;
+    const validTrade=quote.referenceSource==='latest_trade' && typeof quote.referencePrice==='number' && Number.isFinite(quote.referencePrice) && quote.referencePrice>0 && Number.isFinite(Date.parse(quote.referenceTimestamp));
+    if(!response.ok || quote.symbol!==symbol || (!validMidpoint && !validTrade))throw new Error('Cotización de la acción no disponible.');
+    stockQuote=quote;
+  }catch{
+    if(stillCurrent()){
+      document.getElementById('saveSpot').value='';
+      document.getElementById('saveSpotSource').textContent='No se obtuvo el precio de la acción. Ingresa una referencia manual para guardar.';
+      showAlert('Se consultaron las opciones, pero no se obtuvo una cotización válida de la acción. Para guardar, ingresa su precio de referencia manual.','warning');
+    }
+  }
+  if(!stillCurrent())throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
+  if(stockQuote){
+    const isTrade=stockQuote.referenceSource==='latest_trade';
+    const price=Math.round((isTrade?stockQuote.referencePrice:(stockQuote.bid+stockQuote.ask)/2)*100)/100;
+    const date=isTrade?stockQuote.referenceTimestamp:stockQuote.timestamp;
+    if(price>0){document.getElementById('saveSpot').value=price.toFixed(2);document.getElementById('saveSpotSource').textContent=`Referencia Alpaca · ${symbol} · ${isTrade?'última operación disponible; no implica tiempo real':'promedio Bid/Ask'}${date?' · '+date:''}.`;result.underlyingPrice=price;}
+  }
   document.getElementById('strikeLong').value=result.long.strike;
   document.getElementById('strikeShort').value=result.short.strike;
   document.getElementById('priceLong').value=result.long.ask;
@@ -897,6 +936,7 @@ async function fetchAutomaticSelection() {
   log(strategy+': compra '+result.long.contractSymbol+' Ask '+result.long.ask+'; venta '+result.short.contractSymbol+' Bid '+result.short.bid);
   return result;
 }
+document.getElementById('saveSpot').addEventListener('input',()=>{document.getElementById('saveSpotSource').textContent='Precio de referencia ingresado manualmente.';});
 document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
   const btn=document.getElementById('btnFetchQuotes'); btn.disabled=true;
   try { const result=await fetchAutomaticSelection();showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'.','info'); }
@@ -906,8 +946,9 @@ document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
 
 // ── Evaluar estrategia ──
 document.getElementById('btnEvaluate').addEventListener('click', async () => {
+  let automaticSelection;
   if(document.getElementById('chkAutoStrikes').checked) {
-    try { await fetchAutomaticSelection(); } catch(error) { showAlert(error.message,'error'); return; }
+    try { automaticSelection=await fetchAutomaticSelection(); } catch(error) { showAlert(error.message,'error'); return; }
   }
   const symbol = document.getElementById('symbol').value.trim().toUpperCase();
   const expiration = document.getElementById('expiration').value.trim();
@@ -953,6 +994,8 @@ document.getElementById('btnEvaluate').addEventListener('click', async () => {
     ],
   };
 
+  if(automaticSelection) body.legs=automaticSelection.legs;
+
   // Validación previa de débito/crédito neto vs width
   const width = Math.abs(strikeShort - strikeLong);
   if (selectedStrategy === 'BULL_CALL_SPREAD' || selectedStrategy === 'BEAR_PUT_SPREAD') {
@@ -988,7 +1031,7 @@ document.getElementById('btnEvaluate').addEventListener('click', async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
+      if (!res.ok) {const error=await res.json().catch(()=>({}));throw new Error(error.detail||error.message||`quant-service respondió ${res.status}`);}
       result = await res.json();
       result.source = 'quant-service';
     } catch (e) {
@@ -1020,37 +1063,80 @@ document.getElementById('btnEvaluate').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('btnRegisterAccount').addEventListener('click',async()=>{
+  const btn=document.getElementById('btnRegisterAccount');
+  if(btn.disabled)return;
+  const password=document.getElementById('savePassword');
+  const email=document.getElementById('saveEmail');
+  const status=document.getElementById('saveStatus');
+  const notify=(message,type='info')=>{status.textContent=message;status.dataset.state=type;showAlert(message,type);};
+  if(!email.value.trim() || !email.checkValidity() || password.value.length<8 || password.value.length>256){
+    notify('Ingresa un correo válido y una contraseña de 8 a 256 caracteres para crear tu cuenta de la aplicación.','error');return;
+  }
+  btn.disabled=true;btn.textContent='Creando cuenta…';btn.setAttribute('aria-busy','true');
+  status.textContent='Registrando tu cuenta en Supabase. Espera un momento…';status.dataset.state='loading';
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+    const res=await fetch('/api/supabase/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value.trim(),password:password.value}),signal:controller.signal});
+    if(res.status===404)throw new Error('El servidor abierto no tiene la ruta de registro. Reinicia los servicios desde ProyectoLSW con npm start y recarga la página.');
+    const data=await res.json().catch(()=>{throw new Error('El servidor devolvió una respuesta inesperada. Reinicia los servicios desde ProyectoLSW y recarga la página.');});
+    if(!res.ok)throw new Error(data.message || 'No se pudo completar la solicitud de registro.');
+    if(!['registered','confirmation_required'].includes(data.status) || typeof data.message!=='string')throw new Error('El servidor no confirmó el resultado del registro. Reinicia los servicios desde ProyectoLSW y recarga la página.');
+    saveAccessToken=data.accessToken||null;
+    notify(data.message,data.status==='registered'?'info':'warning');
+    password.value='';
+  }catch(error){notify(error.name==='AbortError'?'Se agotó el tiempo de espera. No se pudo confirmar el registro; revisa tu correo antes de reintentar.':error.name==='TypeError'?'No se pudo conectar con el servidor. Verifica que los servicios estén encendidos. No se pudo confirmar el registro.':error.message,'error');}
+  finally{clearTimeout(timeout);btn.disabled=false;btn.textContent='Crear cuenta';btn.removeAttribute('aria-busy');}
+});
 document.getElementById('btnSaveSpread').addEventListener('click', async () => {
   const status = document.getElementById('saveStatus');
   const btn = document.getElementById('btnSaveSpread');
-  if (!lastEvaluatedInput) return;
+  const notify=(message,type='info')=>{status.textContent=message;status.dataset.state=type;showAlert(message,type);};
+  if (btn.disabled) return;
+  if (!lastEvaluatedInput) {notify('Primero evalúa una estrategia antes de guardarla.','error');return;}
+  const spot = Number(document.getElementById('saveSpot').value);
+  if (!savedSpreadId && (!Number.isFinite(spot) || spot <= 0)) {notify('Ingresa el precio del subyacente para guardar. Es el precio de la acción, no la prima de la opción.','error');return;}
+  if(!saveAccessToken && (!document.getElementById('saveEmail').value.trim() || !document.getElementById('savePassword').value)){notify('Ingresa tu correo y la contraseña de la aplicación para guardar.','error');return;}
   btn.disabled = true;
+  btn.textContent='Guardando…';btn.setAttribute('aria-busy','true');let completed=false;
+  const request=async(url,options)=>{
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+    try{
+      const response=await fetch(url,{...options,signal:controller.signal});
+      const data=await response.json().catch(()=>{throw new Error('Respuesta inesperada del servidor. Reinicia los servicios desde ProyectoLSW y recarga la página.');});
+      return {response,data};
+    }finally{clearTimeout(timeout);}
+  };
   try {
     if (!saveAccessToken) {
-      const response = await fetch('/api/supabase/session', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('saveEmail').value.trim(),password:document.getElementById('savePassword').value})});
+      status.textContent='Comprobando correo y contraseña…';status.dataset.state='loading';
+      const {response,data:session} = await request('/api/supabase/session', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('saveEmail').value.trim(),password:document.getElementById('savePassword').value})});
       document.getElementById('savePassword').value = '';
-      const session = await response.json();
-      if (!response.ok) throw new Error(session.message);
+      if (!response.ok) throw new Error(session.message || 'No se pudo iniciar sesión.');
+      if(!session.accessToken)throw new Error('El servidor no devolvió una sesión válida. No se guardó la estrategia.');
       saveAccessToken = session.accessToken;
     }
+    status.textContent='Sesión válida. Guardando la estrategia y sus patas…';status.dataset.state='loading';
     const call = async (path,body) => {
-      const response = await fetch('/api/v1/spreads'+path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+saveAccessToken},body:JSON.stringify(body)});
-      const data = await response.json();
+      const {response,data} = await request('/api/v1/spreads'+path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+saveAccessToken},body:JSON.stringify(body)});
       if (!response.ok) { if(response.status===401) saveAccessToken=null; if(data.spreadId) { status.textContent='Revisa el spread '+data.spreadId+' antes de reintentar.'; } throw new Error((data.spreadId?'Spread '+data.spreadId+'. ':'')+data.message); }
       return data;
     };
     if (!savedSpreadId) {
-      const spot = Number(document.getElementById('saveSpot').value);
-      if (!Number.isFinite(spot) || spot <= 0) throw new Error('Ingresa el precio del subyacente.');
       const input = lastEvaluatedInput;
-      const spread = await call('',{strategyType:input.strategyType,underlyingTicker:input.symbol,currentStockPrice:spot,expirationDate:input.expiration,quantity:input.quantity,multiplier:input.multiplier,status:'active',notes:document.getElementById('label').value.trim() || null,legs:input.legs.map(leg=>({optionType:leg.type,action:leg.side,strike:leg.strike,premium:leg.price,expirationDate:input.expiration,contractSymbol:input.symbol+input.expiration.slice(2).replaceAll('-','')+leg.type[0].toUpperCase()+String(Math.round(leg.strike*1000)).padStart(8,'0')}))});
+      const spread = await call('',{strategyType:input.strategyType,underlyingTicker:input.symbol,currentStockPrice:spot,expirationDate:input.expiration,quantity:input.quantity,multiplier:input.multiplier,status:'draft',notes:document.getElementById('label').value.trim() || null,legs:input.legs.map(leg=>({optionType:leg.type,action:leg.side,strike:leg.strike,premium:leg.price,...(leg.bid!==undefined?{bid:leg.bid}:{}),...(leg.ask!==undefined?{ask:leg.ask}:{}),expirationDate:input.expiration,contractSymbol:leg.contractSymbol || input.symbol+input.expiration.slice(2).replaceAll('-','')+leg.type[0].toUpperCase()+String(Math.round(leg.strike*1000)).padStart(8,'0')}))});
       savedSpreadId=spread.id;
+      if(!savedSpreadId)throw new Error('El servidor no devolvió el ID del spread. Revisa los registros antes de reintentar.');
     }
-    await call('/'+savedSpreadId+'/evaluations',{});
-    status.textContent = 'Spread y evaluación guardados en Supabase. ID: '+savedSpreadId;
+    status.textContent='Estrategia guardada. Guardando la evaluación…';
+    const evaluationResult=await call('/'+savedSpreadId+'/evaluations',{});
+    completed=true;
+    notify('Spread y evaluación guardados en Supabase. ID: '+savedSpreadId+(evaluationResult.warning?' · '+evaluationResult.warning:evaluationResult.spreadStatus?' · Estado: '+evaluationResult.spreadStatus:''),evaluationResult.warning?'warning':'info');
   } catch(error) {
-    status.textContent = (savedSpreadId ? 'Spread ID '+savedSpreadId+'. ' : '')+error.message;
-    btn.disabled = false;
+    const message=error.name==='AbortError'?'Se agotó el tiempo de espera. No se pudo confirmar el guardado; revisa los registros antes de reintentar.':error.name==='TypeError'?'No se pudo conectar con el servidor. Comprueba que los servicios estén encendidos; revisa los registros antes de reintentar.':error.message;
+    notify((savedSpreadId ? 'La estrategia tiene ID '+savedSpreadId+', pero no se confirmó su evaluación. ' : '')+message,'error');
+  } finally {
+    document.getElementById('savePassword').value='';btn.disabled=completed;btn.textContent=completed?'Guardado en Supabase':'Guardar en Supabase';btn.removeAttribute('aria-busy');
   }
 });
 
@@ -1107,14 +1193,15 @@ function addToHistory(input, result) {
   };
   history.unshift(entry);
   if (history.length > 50) history.pop();
-  localStorage.setItem('td_history', JSON.stringify(history));
+  history=history.slice(-200);
+  try{localStorage.setItem('td_history',JSON.stringify(history));}catch{showAlert('No se pudo persistir el historial local del navegador.','error');}
   renderHistory();
 }
 
 function renderHistory() {
   const tbody = document.getElementById('historyTable');
   tbody.innerHTML = '';
-  history.forEach(h => {
+  history.filter(h=>h&&['net','maxLoss','maxProfit','breakEven'].every(key=>typeof h[key]==='number'&&Number.isFinite(h[key]))).forEach(h => {
     const tr = document.createElement('tr');
     const isDebit = h.net < 0;
     tr.innerHTML = `
@@ -1278,6 +1365,7 @@ document.getElementById('btnCalcIV').addEventListener('click', async () => {
     const data = await res.json();
 
     // Si no converge (422), igual mostramos lo que el servidor devolvió y advertimos
+    if(res.status===422 && !Number.isFinite(data.impliedVolatility)) throw new Error(data.message||'El modelo no pudo resolver ese precio.');
     if (res.status === 422) {
       const grid = document.getElementById('ivGrid');
       grid.innerHTML = '';
@@ -1316,7 +1404,7 @@ document.getElementById('btnCalcIV').addEventListener('click', async () => {
         tbody.appendChild(tr);
       });
 
-      document.getElementById('ivNote').textContent = `IV NO convergió. El precio de mercado ($${body.marketPrice}) no es alcanzable con los parámetros dados. Intenta con un precio de mercado más cercano a $${data.modelPrice?.toFixed(2)} o ajusta el vencimiento/strike.`;
+      document.getElementById('ivNote').textContent = 'El cálculo no convergió dentro del límite de iteraciones. Esto no demuestra que el precio sea imposible.';
       document.getElementById('ivResult').style.display = 'block';
       showAlert('IV no convergió (422). Revisa los detalles arriba.', 'warning');
       btn.disabled = false;
@@ -1369,10 +1457,8 @@ document.getElementById('btnCalcIV').addEventListener('click', async () => {
   } catch (e) {
     showAlert('Error calculando IV: ' + e.message, 'error');
   } finally {
-    if (res.status !== 422) {
-      btn.disabled = false;
-      btn.textContent = ' Calcular volatilidad implícita';
-    }
+    btn.disabled = false;
+    btn.textContent = 'Calcular volatilidad implícita';
   }
 });
 
@@ -1630,13 +1716,21 @@ function renderExecutionSummary(result, orders) {
   orders.forEach((o) => {
     const el = document.createElement('div');
     el.className = 'metric-card';
-    el.innerHTML = `<div class="label">Orden ${o.id || ''}</div><div class="value neutral">${o.side.toUpperCase()} ${o.qty} ${o.symbol} ${o.type.toUpperCase()} · Strike ${o.strike}</div><div class="value neutral" style="font-size:1rem;">${o.status}</div>`;
+    el.innerHTML = `<div class="label">Orden ${escapeHtml(o.id || '')}</div><div class="value neutral">${escapeHtml(o.side.toUpperCase())} ${escapeHtml(o.qty)} ${escapeHtml(o.symbol)} ${escapeHtml(o.type.toUpperCase())} · Strike ${o.strike}</div><div class="value neutral" style="font-size:1rem;">${escapeHtml(o.status)}</div>`;
     grid.appendChild(el);
   });
   container.style.display = 'block';
 }
 
+let paperInFlight = false;
+let paperClientOrderId = null;
+let paperOrderFingerprint = null;
 async function runPaperExecution() {
+  if (paperInFlight) return;
+  paperInFlight=true;
+  try { await executePaperOnce(); } finally { paperInFlight=false; }
+}
+async function executePaperOnce() {
   const symbol = document.getElementById('symbol').value.trim().toUpperCase();
   const expiration = document.getElementById('expiration').value.trim();
   const strikeLong = Number(document.getElementById('strikeLong').value);
@@ -1670,7 +1764,7 @@ async function runPaperExecution() {
 
   if (document.getElementById('chkAutoStrikes').checked) {
     try { legs = (await fetchAutomaticSelection()).legs; }
-    catch(error) { showAlert(error.message,'error'); return; }
+    catch(error) { stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;showAlert(error.message,'error');return; }
   }
 
   const body = {
@@ -1695,33 +1789,24 @@ async function runPaperExecution() {
     const result = await res.json();
     if (!res.ok) throw new Error(result.message || `quant-service respondió ${res.status}`);
 
-    // Ejecutar la estrategia: colocar una orden por cada pata en la cuenta paper.
-    const useStopLoss = document.getElementById('chkStopLoss').checked;
-    const stopLossPerShare = (result.maxLoss || 0) / (result.quantity || 1);
-    const optionLetter = (optionType) => (optionType === 'put' ? 'P' : 'C');
-    const buildContractSymbol = (leg) => `${result.symbol}${String(result.expiration || '').replaceAll('-', '')}${optionLetter(leg.type)}${String(Math.round(leg.strike * 1000)).padStart(8, '0')}`;
+    const buildContractSymbol = leg => leg.contractSymbol || result.symbol+result.expiration.slice(2).replaceAll('-','')+(leg.type==='put'?'P':'C')+String(Math.round(leg.strike*1000)).padStart(8,'0');
+    const orderLegs=result.legs.map(leg=>({symbol:buildContractSymbol(leg),qty:result.quantity,side:leg.side,type:'limit',limitPrice:leg.price}));
+    const fingerprint=JSON.stringify({symbol:result.symbol,legs:orderLegs});
+    if(fingerprint!==paperOrderFingerprint || !paperClientOrderId) {
+      paperOrderFingerprint=fingerprint;
+      paperClientOrderId='lsw-'+crypto.randomUUID();
+    }
     const spreadRes = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/spreads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        symbol: result.symbol,
-        legs: (result.legs || []).map((leg) => ({
-          symbol: buildContractSymbol(leg),
-          qty: result.quantity,
-          side: leg.side,
-          type: useStopLoss ? 'stop_limit' : 'limit',
-          timeInForce: 'day',
-          limitPrice: leg.price,
-          ...(useStopLoss ? { stopLossPrice: leg.side === 'buy' ? leg.price - stopLossPerShare : leg.price + stopLossPerShare } : {}),
-        })),
-      }),
+      body: JSON.stringify({symbol:result.symbol,qty:result.quantity,type:'limit',clientOrderId:paperClientOrderId,legs:orderLegs}),
     });
     const spreadData = await spreadRes.json().catch(() => ({}));
     if (!spreadRes.ok) throw new Error(spreadData.detail || spreadData.message || `No se pudo crear el spread (${result.strategyType}).`);
     const orders = (result.legs || []).map((leg) => ({
       ...leg,
       qty: result.quantity,
-      type: useStopLoss ? 'stop_limit' : 'limit',
+      type: 'limit',
       strike: leg.strike,
       symbol: buildContractSymbol(leg),
       id: spreadData.id,
@@ -1742,17 +1827,20 @@ async function runPaperExecution() {
     };
     const friendlyStrategyName = strategyNames[result.strategyType] || result.strategyType;
 
-    const recommendation = `Se recomienda mantener la posición hasta el vencimiento (${result.expiration}) o hasta alcanzar el objetivo (break even: $${result.breakEven}).`;
+    const recommendation = 'Consulta el estado de la orden en Alpaca Paper. La aceptación no confirma el llenado.';
 
     document.getElementById('executionNote').textContent =
-      `Acción ejecutada: ${friendlyStrategyName} sobre ${result.symbol}. ${friendlyText[result.strategyType] || ''} Break even: $${result.breakEven}. Máx. pérdida: $${result.maxLoss}. Máx. ganancia: $${result.maxProfit}. Recomendación: ${recommendation}`;
+      `Orden enviada: ${friendlyStrategyName} sobre ${result.symbol}. ${friendlyText[result.strategyType] || ''} Break even: $${result.breakEven}. Máx. pérdida: $${result.maxLoss}. Máx. ganancia: $${result.maxProfit}. Recomendación: ${recommendation}`;
 
     renderExecutionSummary(result, orders);
 
-    showAlert(`Spread ${result.strategyType} evaluado y enviado a la cuenta paper de Alpaca.`, 'info');
+    paperClientOrderId=null;
+    showAlert('Orden recibida por Alpaca Paper. Estado: '+spreadData.status+'. No equivale a llenado confirmado.', 'info');
     log(`Spread enviado a paper: ${orders.map((o) => `${o.side.toUpperCase()} ${o.qty} ${o.symbol} (${o.type} ${o.strike}) — status=${o.status}`).join(' | ')}`);
   } catch (e) {
-    showAlert('Error ejecutando en paper: ' + e.message, 'error');
+    stopAutoCycle();
+    document.getElementById('chkAutoCycle').checked=false;
+    showAlert('Error Paper: '+e.message+'. Revisa las órdenes en Alpaca antes de reintentar si el envío quedó incierto.', 'error');
     log('Error execute paper: ' + e.message);
   } finally {
     btn.disabled = false;
@@ -1791,11 +1879,15 @@ for (const [source, target] of [['symbol', 'chSymbol'], ['chSymbol', 'symbol']])
     savedSpreadId = null;
   });
 }
+for(const id of ['strikeLong','strikeShort','priceLong','priceShort','quantity','multiplier']) document.getElementById(id).addEventListener('input',()=>{
+ lastEvaluatedInput=null;savedSpreadId=null;document.getElementById('resultsCard').style.display='none';
+ stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;
+});
 // ── Init ──
 refreshServices();
 setInterval(refreshServices, 10000);
 renderHistory();
-log('Dashboard listo. Inicia los servicios desde el panel izquierdo.');
+log('Dashboard listo. Estado de servicios comprobado mediante health checks.');
 </script>
 
 </body>

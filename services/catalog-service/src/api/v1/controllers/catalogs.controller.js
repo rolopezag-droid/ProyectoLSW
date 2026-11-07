@@ -42,7 +42,7 @@ const putCatalog = async (req, res, next) => {
     const updatedCatalog = await catalogsService.putCatalogService(key, req.body);
 
     if (!updatedCatalog) {
-      return res.status(400).json({ message: 'No se pudo actualizar el catálogo.' });
+      return res.status(404).json({ message: 'Catálogo no encontrado.' });
     }
     res.status(200).json(updatedCatalog);
   } catch (error) {

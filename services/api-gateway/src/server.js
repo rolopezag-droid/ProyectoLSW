@@ -2,6 +2,6 @@
 const app = require('./app');
 const { port } = require('./config/env');
 
-app.listen(port, () => {
+app.listen(port, '127.0.0.1', () => {
   console.log(`api-gateway listening on port ${port}`);
 });

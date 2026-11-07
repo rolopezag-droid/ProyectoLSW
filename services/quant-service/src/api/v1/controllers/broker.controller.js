@@ -130,11 +130,11 @@ const createOrder = async (request, response) => {
 
 const createSpread = async (request, response) => {
   try {
-    const { symbol, legs } = request.body || {};
-    if (!symbol || !Array.isArray(legs) || legs.length < 2) {
-      return response.status(400).json({ message: 'Se requiere symbol y legs con al menos dos patas para crear el spread.' });
+    const { symbol, legs, qty, quantity, type, limitPrice, clientOrderId } = request.body || {};
+    if (!symbol || !Array.isArray(legs) || legs.length !== 2) {
+      return response.status(400).json({ message: 'Se requiere symbol y legs con exactamente dos patas para crear el spread F3.' });
     }
-    const spread = await broker.createSpread({ symbol, legs });
+    const spread = await broker.createSpread({ symbol, legs, qty, quantity, type, limitPrice, clientOrderId });
     return response.status(201).json(spread);
   } catch (error) {
     return response.status(error.status || 502).json({
@@ -144,4 +144,7 @@ const createSpread = async (request, response) => {
   }
 };
 
-module.exports = { getAccount, getQuote, getOptionChain, getCandles, createOrder, createSpread };
+const ingestor=require('../../../services/ingestion').createIngestor(broker);
+const ingestOptions=async(req,res)=>{try{return res.status(201).json(await ingestor.run(req.body));}catch(error){return res.status(error.status||502).json({message:'No se pudo completar la ingestión.',detail:error.message});}};
+const readIngestion=async(req,res)=>{try{return res.json(await ingestor.read(req.params.id));}catch(error){return res.status(error.status||502).json({message:error.message});}};
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getCandles, createOrder, createSpread };

@@ -1,3 +1,8 @@
+const validatePricing = ({spot,strike,rate=0,dividendYield=0,volatility,timeToMaturity,optionType}) => {
+  for(const [name,value] of Object.entries({spot,strike,volatility,timeToMaturity})) if(!Number.isFinite(Number(value))||Number(value)<=0) throw new Error(name+' debe ser un número finito mayor que cero.');
+  for(const [name,value] of Object.entries({rate,dividendYield})) if(!Number.isFinite(Number(value))) throw new Error(name+' debe ser un número finito.');
+  if(!['call','put'].includes(optionType)) throw new Error('optionType debe ser call o put.');
+};
 const erf = (x) => {
   const sign = x < 0 ? -1 : 1;
   const absX = Math.abs(x);
@@ -21,11 +26,13 @@ const getTimeToMaturity = (expiration) => {
     return 0.25;
   }
 
+  if(typeof expiration!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(expiration)||!Number.isFinite(Date.parse(expiration))||new Date(expiration).toISOString().slice(0,10)!==expiration) throw new Error('expiration debe usar una fecha válida YYYY-MM-DD.');
   const target = new Date(expiration);
   const now = new Date();
   const diff = target.getTime() - now.getTime();
   const years = diff / (1000 * 60 * 60 * 24 * 365.25);
-  return Math.max(years, 0.01);
+  if (!Number.isFinite(years) || years <= 0) throw new Error('expiration debe ser una fecha futura válida.');
+  return years;
 };
 
 const blackScholesPrice = ({
@@ -37,6 +44,7 @@ const blackScholesPrice = ({
   timeToMaturity,
   optionType,
 }) => {
+  validatePricing({spot,strike,rate,dividendYield,volatility,timeToMaturity,optionType});
   if (!spot || !strike || !volatility || !timeToMaturity || !optionType) {
     throw new Error('Faltan parámetros obligatorios para Black-Scholes.');
   }
@@ -57,7 +65,9 @@ const blackScholesPrice = ({
   const callValue = discountedSpot * normalCdf(d1) - discountedStrike * normalCdf(d2);
   const putValue = discountedStrike * normalCdf(-d2) - discountedSpot * normalCdf(-d1);
 
-  return optionType === 'call' ? callValue : putValue;
+  const value=optionType === 'call' ? callValue : putValue;
+  if(!Number.isFinite(value))throw new Error('Los parámetros producen un resultado fuera del rango numérico.');
+  return value;
 };
 
 const blackScholesGreeks = ({
@@ -69,6 +79,7 @@ const blackScholesGreeks = ({
   timeToMaturity,
   optionType,
 }) => {
+  validatePricing({spot,strike,rate,dividendYield,volatility,timeToMaturity,optionType});
   const t = Number(timeToMaturity);
   const sigma = Number(volatility);
   const s = Number(spot);
@@ -98,6 +109,7 @@ const blackScholesGreeks = ({
     ? k * t * discount * normalCdf(d2)
     : -k * t * discount * normalCdf(-d2);
 
+  if(![delta,gamma,theta,vega,rho].every(Number.isFinite))throw new Error('Los parámetros producen griegas fuera del rango numérico.');
   return {
     delta: Number(delta.toFixed(6)),
     gamma: Number(gamma.toFixed(6)),

@@ -8,14 +8,22 @@ const createResponse = (body, ok = true, status = 200) => ({
   json: async () => body,
 });
 
+for(const [name,trade,valid] of [['válida',{p:328.5,t:'2026-11-06T20:59:00Z'},true],['precio cero',{p:0,t:'2026-11-06T20:59:00Z'},false],['sin fecha',{p:328.5},false],['error',null,false]])test('cotización sin Ask consulta última operación: '+name,async()=>{
+ const urls=[];const adapter=new AlpacaAdapter({keyId:'key',secretKey:'secret',tradingBaseUrl:'https://paper.example',dataBaseUrl:'https://data.example',fetchImplementation:async url=>{
+  urls.push(url);if(url.endsWith('/quotes/latest'))return createResponse({quote:{bp:328.06,ap:0,t:'2026-11-06T21:00:00Z'}});
+  return trade?createResponse({trade}):createResponse({message:'Unavailable'},false,403);
+ }});
+ const result=await adapter.getQuote('AAPL');assert.equal(urls.length,2);assert.match(urls[1],/\/trades\/latest$/);assert.equal(result.referencePrice,valid?328.5:null);assert.equal(result.referenceSource,valid?'latest_trade':null);assert.equal(result.ask,0);
+});
+
 test('normaliza la cuenta de Alpaca sin exponer credenciales', async () => {
   const adapter = new AlpacaAdapter({
     keyId: 'key',
     secretKey: 'secret',
-    tradingBaseUrl: 'https://paper.example/',
+    tradingBaseUrl: 'https://paper-api.alpaca.markets/',
     dataBaseUrl: 'https://data.example/',
     fetchImplementation: async (url, options) => {
-      assert.equal(url, 'https://paper.example/v2/account');
+      assert.equal(url, 'https://paper-api.alpaca.markets/v2/account');
       assert.equal(options.headers['APCA-API-KEY-ID'], 'key');
       assert.equal(options.headers['APCA-API-SECRET-KEY'], 'secret');
       return createResponse({
@@ -44,7 +52,7 @@ test('normaliza la última cotización de Alpaca', async () => {
   const adapter = new AlpacaAdapter({
     keyId: 'key',
     secretKey: 'secret',
-    tradingBaseUrl: 'https://paper.example',
+    tradingBaseUrl: 'https://paper-api.alpaca.markets',
     dataBaseUrl: 'https://data.example',
     fetchImplementation: async (url) => {
       assert.equal(url, 'https://data.example/v2/stocks/AAPL/quotes/latest');
@@ -60,6 +68,9 @@ test('normaliza la última cotización de Alpaca', async () => {
     bidSize: 2,
     askSize: 3,
     timestamp: 'timestamp',
+    referencePrice: 100.5,
+    referenceSource: 'quote_midpoint',
+    referenceTimestamp: 'timestamp',
   });
 });
 
@@ -68,11 +79,11 @@ test('obtiene contratos y cotizaciones reales de una cadena de opciones', async 
   const adapter = new AlpacaAdapter({
     keyId: 'key',
     secretKey: 'secret',
-    tradingBaseUrl: 'https://paper.example',
+    tradingBaseUrl: 'https://paper-api.alpaca.markets',
     dataBaseUrl: 'https://data.example',
     fetchImplementation: async (url) => {
       requests.push(url);
-      if (url.startsWith('https://paper.example/v2/options/contracts?')) {
+      if (url.startsWith('https://paper-api.alpaca.markets/v2/options/contracts?')) {
         return createResponse({
           option_contracts: [{
             symbol: 'AAPL261218C00100000',
@@ -111,7 +122,7 @@ test('obtiene velas (candles) historicas de Alpaca para un ticker', async () => 
   const adapter = new AlpacaAdapter({
     keyId: 'key',
     secretKey: 'secret',
-    tradingBaseUrl: 'https://paper.example',
+    tradingBaseUrl: 'https://paper-api.alpaca.markets',
     dataBaseUrl: 'https://data.example',
     fetchImplementation: async (url) => {
       requests.push(url);
@@ -149,10 +160,10 @@ test('crea una orden de mercado en la cuenta paper de Alpaca', async () => {
   const adapter = new AlpacaAdapter({
     keyId: 'key',
     secretKey: 'secret',
-    tradingBaseUrl: 'https://paper.example',
+    tradingBaseUrl: 'https://paper-api.alpaca.markets',
     dataBaseUrl: 'https://data.example',
     fetchImplementation: async (url, options = {}) => {
-      assert.equal(url, 'https://paper.example/v2/orders');
+      assert.equal(url, 'https://paper-api.alpaca.markets/v2/orders');
       assert.equal(options.method, 'POST');
       assert.equal(options.body, JSON.stringify({ symbol: 'AAPL', qty: '1', side: 'buy', type: 'market', time_in_force: 'day' }));
       return createResponse({ id: 'order-id', status: 'pending_new', symbol: 'AAPL', qty: '1', side: 'buy', type: 'market', time_in_force: 'day' });
@@ -166,49 +177,19 @@ test('crea una orden de mercado en la cuenta paper de Alpaca', async () => {
   assert.equal(order.status, 'pending_new');
 });
 
-test('crea una orden compleja (spread) con dos patas en la cuenta paper de Alpaca', async () => {
-  const adapter = new AlpacaAdapter({
-    keyId: 'key',
-    secretKey: 'secret',
-    tradingBaseUrl: 'https://paper.example',
-    dataBaseUrl: 'https://data.example',
-    fetchImplementation: async (url, options = {}) => {
-      assert.equal(url, 'https://paper.example/v2/orders');
-      assert.equal(options.method, 'POST');
-      const body = JSON.parse(options.body);
-      assert.equal(body.symbol, 'AAPL');
-      assert.equal(body.qty, '2');
-      assert.equal(body.side, 'buy');
-      assert.equal(body.position_intent, 'buy_to_open');
-      assert.equal(body.type, 'market');
-      assert.equal(body.time_in_force, 'day');
-      assert.equal(body.legs.length, 2);
-      assert.equal(body.legs[0].symbol, 'AAPL261218C00005000');
-      assert.equal(body.legs[0].side, 'buy');
-      assert.equal(body.legs[0].type, 'limit');
-      assert.equal(body.legs[0].limit_price, '5.5');
-      assert.equal(body.legs[1].symbol, 'AAPL261218C00010000');
-      assert.equal(body.legs[1].side, 'sell');
-      return createResponse({ id: 'spread-order-id', status: 'pending_new', symbol: 'AAPL', legs: [{ symbol: 'AAPL261218C00005000', side: 'buy', type: 'limit' }, { symbol: 'AAPL261218C00010000', side: 'sell', type: 'limit' }] });
-    },
-  });
-
-  const spread = await adapter.createSpread({
-    symbol: 'aapl',
-    legs: [
-      { symbol: 'AAPL261218C00005000', qty: 1, side: 'buy', type: 'limit', limitPrice: 5.5 },
-      { symbol: 'AAPL261218C00010000', qty: 1, side: 'sell', type: 'limit', limitPrice: 6.2 },
-    ],
-  });
-
-  assert.equal(spread.provider, 'alpaca');
-  assert.equal(spread.id, 'spread-order-id');
-  assert.equal(spread.legs.length, 2);
+test('envía una orden multileg límite con cantidad del spread y ratios',async()=>{
+ const adapter=new AlpacaAdapter({keyId:'key',secretKey:'secret',tradingBaseUrl:'https://paper-api.alpaca.markets',dataBaseUrl:'https://data.example',fetchImplementation:async(url,options)=>{
+  const body=JSON.parse(options.body);
+  assert.equal(body.order_class,'mleg');assert.equal(body.qty,'1');assert.equal(body.limit_price,'2.00');assert.equal(body.type,'limit');assert.equal(body.legs[0].ratio_qty,'1');assert.equal(body.legs[0].position_intent,'buy_to_open');assert.equal(body.legs[1].position_intent,'sell_to_open');assert.equal(body.symbol,undefined);
+  return createResponse({id:'spread-order-id',status:'accepted',legs:body.legs});
+ }});
+ const result=await adapter.createSpread({symbol:'AAPL',legs:[{symbol:'AAPL261218C00190000',qty:1,side:'buy',type:'limit',limitPrice:4},{symbol:'AAPL261218C00195000',qty:1,side:'sell',type:'limit',limitPrice:2}]});
+ assert.equal(result.id,'spread-order-id');
 });
 
 test('pagina filtrada consulta 201 contratos en tres lotes y preserva token', async()=>{
  const sizes=[];
- const adapter=new AlpacaAdapter({keyId:'key',secretKey:'secret',tradingBaseUrl:'https://paper.example',dataBaseUrl:'https://data.example',fetchImplementation:async(url)=>{
+ const adapter=new AlpacaAdapter({keyId:'key',secretKey:'secret',tradingBaseUrl:'https://paper-api.alpaca.markets',dataBaseUrl:'https://data.example',fetchImplementation:async(url)=>{
   const u=new URL(url);
   if(u.pathname==='/v2/options/contracts') {
    assert.equal(u.searchParams.get('type'),'put');assert.equal(u.searchParams.get('page_token'),'pagina 2');

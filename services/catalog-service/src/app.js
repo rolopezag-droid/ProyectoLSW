@@ -22,10 +22,8 @@ app.use((req, res) => {
 
 // FIC: Middleware para el manejo de errores (siempre al final)
 app.use((error, req, res, next) => {
-  console.error('❌ ERROR:', error);
-  res.status(error.status || 500).json({
-    message: error.message || 'Error interno del servidor.',
-  });
+  const status=error.code===11000?409:error.name==='ValidationError'||error.name==='CastError'?400:error.status||500;
+  res.status(status).json({message:status===409?'La key del catálogo ya existe.':status>=500?'No se pudo completar la operación de catálogo.':error.message});
 });
 
 module.exports = app;

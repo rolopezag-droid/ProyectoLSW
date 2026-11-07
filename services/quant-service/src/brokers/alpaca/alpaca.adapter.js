@@ -1,3 +1,4 @@
+const { buildSpreadOrder } = require('./order-builder');
 const BrokerAdapter = require('../broker-adapter');
 
 class AlpacaAdapter extends BrokerAdapter {
@@ -21,6 +22,7 @@ class AlpacaAdapter extends BrokerAdapter {
   async request(baseUrl, path, options = {}) {
     const response = await this.fetch(`${baseUrl}${path}`, {
       method: options.method || 'GET',
+      signal: AbortSignal.timeout(30000),
       headers: {
         'APCA-API-KEY-ID': this.keyId,
         'APCA-API-SECRET-KEY': this.secretKey,
@@ -60,15 +62,27 @@ class AlpacaAdapter extends BrokerAdapter {
       this.dataBaseUrl,
       `/v2/stocks/${encodeURIComponent(symbol.toUpperCase())}/quotes/latest`,
     );
-    return {
-      provider: 'alpaca',
-      symbol: symbol.toUpperCase(),
-      bid: quote.quote?.bp ?? null,
-      ask: quote.quote?.ap ?? null,
-      bidSize: quote.quote?.bs ?? null,
-      askSize: quote.quote?.as ?? null,
+    const result = {
+      provider: 'alpaca', symbol: symbol.toUpperCase(),
+      bid: quote.quote?.bp ?? null, ask: quote.quote?.ap ?? null,
+      bidSize: quote.quote?.bs ?? null, askSize: quote.quote?.as ?? null,
       timestamp: quote.quote?.t ?? null,
+      referencePrice: null, referenceSource: null, referenceTimestamp: null,
     };
+    const positive = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
+    if (positive(result.bid) && positive(result.ask) && result.ask >= result.bid) {
+      result.referencePrice = (result.bid + result.ask) / 2;
+      result.referenceSource = 'quote_midpoint';
+      result.referenceTimestamp = result.timestamp;
+    } else {
+      try {
+        const { trade } = await this.request(this.dataBaseUrl, `/v2/stocks/${encodeURIComponent(symbol.toUpperCase())}/trades/latest`);
+        if (positive(trade?.p) && typeof trade.t === 'string' && Number.isFinite(Date.parse(trade.t))) {
+          result.referencePrice = trade.p; result.referenceSource = 'latest_trade'; result.referenceTimestamp = trade.t;
+        }
+      } catch { /* Conservar cotización incompleta; el cliente informa ausencia de referencia. */ }
+    }
+    return result;
   }
 
   async getCandles({ symbol, timeframe = '1Day', limit = 100, start, end, sort } = {}) {
@@ -110,6 +124,9 @@ class AlpacaAdapter extends BrokerAdapter {
   }
 
   async createOrder({ symbol, qty, side, type = 'market', timeInForce = 'day', limitPrice, stopLossPrice } = {}) {
+    this.assertPaper();
+    if (typeof symbol !== 'string' || !/^[A-Z0-9.]{1,30}$/i.test(symbol) || !Number.isFinite(Number(qty)) || Number(qty)<=0 || !['market','limit','stop','stop_limit'].includes(type) || !['day','gtc'].includes(timeInForce)) { const e=new Error('Parámetros de orden inválidos.');e.status=400;throw e; }
+    if ((['limit','stop_limit'].includes(type)&&!(Number(limitPrice)>0)) || (['stop','stop_limit'].includes(type)&&!(Number(stopLossPrice)>0))) {const e=new Error('Los precios límite/stop deben ser mayores que cero.');e.status=400;throw e;}
     if (!symbol || !qty || !['buy', 'sell'].includes(String(side || '').toLowerCase())) {
       const error = new Error('createOrder requiere symbol, qty y side (buy|sell).');
       error.status = 400;
@@ -145,34 +162,16 @@ class AlpacaAdapter extends BrokerAdapter {
     };
   }
 
-  async createSpread({ symbol, legs }) {
-    if (!symbol || !Array.isArray(legs) || legs.length < 2) {
-      const error = new Error('createSpread requiere symbol y legs con al menos dos patas.');
-      error.status = 400;
-      throw error;
+  assertPaper() {
+    if (new URL(this.tradingBaseUrl).hostname !== 'paper-api.alpaca.markets') {
+      const error = new Error('La ejecución del proyecto está limitada a Alpaca Paper.'); error.status=403; throw error;
     }
-    const spreadLegs = legs.map((leg) => ({
-      symbol: leg.symbol,
-      qty: String(leg.qty ?? 1),
-      side: leg.side,
-      type: leg.type || 'market',
-      time_in_force: leg.timeInForce || 'day',
-      ...(leg.stopLossPrice !== undefined ? { stop_price: String(leg.stopLossPrice) } : {}),
-      ...(leg.limitPrice !== undefined ? { limit_price: String(leg.limitPrice) } : {}),
-    }));
-    const created = await this.request(this.tradingBaseUrl, '/v2/orders', {
-      method: 'POST',
-      body: JSON.stringify({
-        symbol: symbol.toUpperCase(),
-        legs: spreadLegs,
-        qty: String(legs.reduce((total, leg) => total + Number(leg.qty ?? 1), 0)),
-        side: legs[0].side,
-        position_intent: legs[0].side === 'buy' ? 'buy_to_open' : 'sell_to_open',
-        type: 'market',
-        time_in_force: 'day',
-      }),
-    });
-    return { provider: 'alpaca', ...created, legs: created.legs || spreadLegs };
+  }
+  async createSpread(input) {
+    this.assertPaper();
+    const order = buildSpreadOrder(input);
+    const created = await this.request(this.tradingBaseUrl, '/v2/orders', {method:'POST',body:JSON.stringify(order)});
+    return {provider:'alpaca', ...created, legs:created.legs || order.legs};
   }
 
   async getOptionChain({ symbol, expiration, strikeRange, limit = 100, type, pageToken }) {
@@ -235,6 +234,7 @@ class AlpacaAdapter extends BrokerAdapter {
         expiration: contract.expiration_date,
         multiplier: Number(contract.size || 100),
         status: contract.status,
+        tradable: contract.tradable !== false,
         bid: quote.bp ?? null,
         ask: quote.ap ?? null,
         bidSize: quote.bs ?? null,
