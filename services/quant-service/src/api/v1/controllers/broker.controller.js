@@ -17,7 +17,7 @@ const broker = createBroker({
   optionsFeed: alpacaOptionsFeed,
 });
 
-const ALLOWED_TIMEFRAMES = ['1Min', '5Min', '15Min', '30Min', '1Hour', '4Hour', '12Hour', '1Day', '1Week'];
+const ALLOWED_TIMEFRAMES = ['1Day', '1Week', '1Month', '3Month', '6Month', '12Month'];
 
 const getAccount = async (_request, response) => {
   try {
@@ -69,7 +69,12 @@ const getCandles = async (request, response) => {
       return response.status(400).json({ message: 'symbol debe ser un ticker válido.' });
     }
 
-    const normalizedTimeframe = ALLOWED_TIMEFRAMES.includes(timeframe) ? timeframe : '1Day';
+    if (timeframe !== undefined && (typeof timeframe !== 'string' || !ALLOWED_TIMEFRAMES.includes(timeframe))) {
+      return response.status(400).json({
+        message: `timeframe debe ser uno de: ${ALLOWED_TIMEFRAMES.join(', ')}.`,
+      });
+    }
+    const normalizedTimeframe = timeframe === undefined ? '1Day' : timeframe;
     const normalizedLimit = Math.min(Math.max(Number(limit) || 100, 1), 10000);
 
     const bars = await broker.getCandles({
