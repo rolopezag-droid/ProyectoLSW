@@ -1,0 +1,35 @@
+schema: spec-driven
+context: |
+  ProyectoLSW, equipo 5: Bull Call, Bear Call, Bull Put y Bear Put.
+  Node.js, Express y npm workspaces. Gateway 3000, Catalog 3001,
+  Quant 3002, Strategy 3003, Spread 3004 y GUI 3005.
+  Spread utiliza Supabase; Catalog y Strategy conservan dependencias MongoDB.
+  Alpaca proporciona mercado y broker. No enviar órdenes para validar cambios.
+  Idioma: español; conservar encabezados estructurales y SHALL/MUST en inglés.
+  Constitución del proyecto:
+  - Especificar requisitos y escenarios antes de implementar cada nuevo cambio.
+  - Si la estructura actual no es óptima, la IA SHALL proponer su propia estructura
+    adecuada y justificarla en design.md, incluyendo migración e impacto en contratos.
+    No mantener una estructura deficiente por copiar el código existente.
+  - Comparar estructura actual, alternativa propuesta y estructura finalmente aplicada.
+  - Registrar autor humano, asistencia IA, archivos, commits, pruebas y resultados reales.
+  - El código generado por Codex o Copilot es asistido por IA. No etiquetarlo como manual.
+  - Una optimización manual requiere intervención humana comprobable y comparación antes/después.
+  - No afirmar que cambios anteriores a esta adopción se desarrollaron con OpenSpec.
+  - Nunca guardar secretos, contenido de .env ni credenciales en evidencias o commits.
+  - No modificar esquemas de BD ni enviar órdenes al broker sin autorización específica.
+  - Los commits nuevos usan Roberto y su correo noreply configurado.
+githubCopilot:
+  cloudAgent: false
+rules:
+  proposal:
+    - Indicar API, problema, alcance y exclusiones. Distinguir diagnóstico de implementación.
+  specs:
+    - Usar requisitos SHALL y escenarios WHEN/THEN verificables para éxito y error.
+  design:
+    - Comparar estructura actual y propuesta; justificar conservarla o reorganizarla.
+    - Identificar límites entre rutas, controladores, dominio y adaptadores externos.
+  tasks:
+    - Separar especificación, implementación, pruebas y evidencia IA/manual.
+    - Marcar tareas solo con evidencia real; no inventar pruebas, autorías ni métricas.
+
