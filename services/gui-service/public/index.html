@@ -350,6 +350,12 @@
     @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 310px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
     @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; } }
     @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } }
+    #alertContainer { position:fixed; right:20px; bottom:20px; z-index:1000; width:min(380px,calc(100vw - 32px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+    #alertContainer .alert { position:relative; margin:0; padding:12px 38px 12px 14px; background:#172737; color:#deebf6; border:1px solid #416176; border-left:3px solid #72b4d5; border-radius:5px; box-shadow:0 4px 18px #0005; pointer-events:auto; overflow-wrap:anywhere; }
+    #alertContainer .alert-error { background:#302025; border-color:#71434c; border-left-color:#ef8b91; color:#ffdce0; }
+    .alert-dismiss { position:absolute; right:6px; top:5px; width:30px; height:30px; border:0; background:transparent; color:inherit; cursor:pointer; font-size:20px; }
+    .alert-dismiss:focus-visible { outline:2px solid currentColor; outline-offset:-3px; }
+    @media(max-width:650px) { #alertContainer { right:16px; bottom:16px; } }
   </style>
 </head>
 <body>
@@ -374,7 +380,7 @@
 
   <main>
     <div class="workspace-heading"><div><h2>Análisis de opciones</h2><p>Estrategias verticales, valoración y datos de mercado.</p></div><span class="workspace-tag">Entorno local</span></div>
-    <div id="alertContainer"></div>
+    <div id="alertContainer" role="status" aria-live="polite" aria-atomic="false"></div>
 
     <!-- ── Pestañas ── -->
     <div class="tabs">
@@ -733,6 +739,7 @@
 </div>
 
 <script src="/market-period.js"></script>
+<script src="/strategy-selection.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
 const navigation = document.querySelector('.tabs');
@@ -836,6 +843,14 @@ function showAlert(msg, type = 'info') {
   const div = document.createElement('div');
   div.className = `alert alert-${type}`;
   div.textContent = msg;
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'alert-dismiss';
+  dismiss.setAttribute('aria-label', 'Cerrar aviso');
+  dismiss.textContent = '×';
+  dismiss.onclick = () => div.remove();
+  div.appendChild(dismiss);
+  while (container.childElementCount >= 3) container.firstElementChild.remove();
   container.appendChild(div);
   setTimeout(() => div.remove(), 5000);
 }
@@ -845,68 +860,55 @@ document.querySelectorAll('.strategy-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.strategy-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
+    if(selectedStrategy !== chip.dataset.strategy) clearStrategyQuotes();
     selectedStrategy = chip.dataset.strategy;
     document.body.dataset.direction = selectedStrategy.startsWith('BEAR') ? 'bear' : 'bull';
   });
 });
 
-// ── Fetch cotizaciones ──
-document.getElementById('btnFetchQuotes').addEventListener('click', async () => {
-  const symbol = document.getElementById('symbol').value.trim();
-  const expiration = document.getElementById('expiration').value.trim();
-  if (!symbol || !expiration) {
-    showAlert('Ingresa símbolo y vencimiento primero.', 'error');
-    return;
-  }
-  const btn = document.getElementById('btnFetchQuotes');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Consultando Alpaca...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/market-data/options-chains?symbol=${encodeURIComponent(symbol)}&expiration=${encodeURIComponent(expiration)}&limit=200`);
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}: ${res.statusText}`);
-    const data = await res.json();
-
-    const calls = data.contracts?.filter(c => c.type === 'call' && c.bid && c.ask) || [];
-    if (calls.length === 0) throw new Error('No hay contratos call disponibles para este símbolo y vencimiento en Alpaca.');
-
-    calls.sort((a, b) => a.strike - b.strike);
-    const spot = (calls[0].bid + calls[0].ask) / 2;
-
-    // Buscar un par de strikes consecutivos que forme un spread de débito válido
-    let selected = null;
-    for (let i = 0; i < calls.length - 1; i++) {
-      const lower = calls[i];
-      const higher = calls[i + 1];
-      const width = higher.strike - lower.strike;
-      const debit = lower.ask - higher.bid;
-      if (width > 0 && debit > 0 && debit < width) {
-        selected = { lower, higher, width, debit };
-        break;
-      }
-    }
-
-    if (!selected) {
-      throw new Error('No se encontró un par de strikes que forme un spread de débito válido para este símbolo y vencimiento. Los precios de opciones están muy alejados entre sí. Intenta con otro vencimiento o ingresa los precios manualmente.');
-    }
-
-    document.getElementById('strikeLong').value = selected.lower.strike;
-    document.getElementById('strikeShort').value = selected.higher.strike;
-    document.getElementById('priceLong').value = selected.lower.ask;
-    document.getElementById('priceShort').value = selected.higher.bid;
-
-    log(`Cotizaciones obtenidas de Alpaca: Long strike=$${selected.lower.strike} ask=$${selected.lower.ask}, Short strike=$${selected.higher.strike} bid=$${selected.higher.bid} (width=$${selected.width}, débito=$${selected.debit.toFixed(2)})`);
-    showAlert(`Cotizaciones obtenidas de Alpaca (spot: $${spot.toFixed(2)}, width: $${selected.width}, débito: $${selected.debit.toFixed(2)}).`, 'info');
-  } catch (e) {
-    showAlert(e.message, 'error');
-    log('Error fetch quotes: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = ' Obtener cotizaciones (Alpaca)';
-  }
+// Selección compartida para cotizar, evaluar y preparar Paper.
+function clearStrategyQuotes() {
+  for(const id of ['strikeLong','strikeShort','priceLong','priceShort']) document.getElementById(id).value='';
+  lastEvaluatedInput=null; savedSpreadId=null;
+  document.getElementById('resultsCard').style.display='none';
+}
+for(const id of ['symbol','chSymbol','expiration']) document.getElementById(id).addEventListener('change',clearStrategyQuotes);
+async function fetchAutomaticSelection() {
+  const strategy=selectedStrategy;
+  const symbol=document.getElementById('symbol').value.trim().toUpperCase();
+  const expiration=document.getElementById('expiration').value.trim();
+  clearStrategyQuotes();
+  if(!symbol||!expiration) throw new Error('Ingresa símbolo y vencimiento.');
+  const type=strategy.includes('CALL')?'call':'put';
+  const contracts=await selectVertical.collectOptionChain(async pageToken=>{
+    const params=new URLSearchParams({symbol,expiration,type,limit:'200'});
+    if(pageToken) params.set('pageToken',pageToken);
+    const res=await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/options-chain?${params}`);
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.detail||data.message||'No se pudo consultar Alpaca.');
+    return data;
+  });
+  if(strategy!==selectedStrategy||symbol!==document.getElementById('symbol').value||expiration!==document.getElementById('expiration').value.trim()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
+  const result=selectVertical(contracts,strategy,symbol,expiration);
+  document.getElementById('strikeLong').value=result.long.strike;
+  document.getElementById('strikeShort').value=result.short.strike;
+  document.getElementById('priceLong').value=result.long.ask;
+  document.getElementById('priceShort').value=result.short.bid;
+  log(strategy+': compra '+result.long.contractSymbol+' Ask '+result.long.ask+'; venta '+result.short.contractSymbol+' Bid '+result.short.bid);
+  return result;
+}
+document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
+  const btn=document.getElementById('btnFetchQuotes'); btn.disabled=true;
+  try { const result=await fetchAutomaticSelection();showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'.','info'); }
+  catch(error){showAlert(error.message,'error');}
+  finally{btn.disabled=false;}
 });
 
 // ── Evaluar estrategia ──
 document.getElementById('btnEvaluate').addEventListener('click', async () => {
+  if(document.getElementById('chkAutoStrikes').checked) {
+    try { await fetchAutomaticSelection(); } catch(error) { showAlert(error.message,'error'); return; }
+  }
   const symbol = document.getElementById('symbol').value.trim().toUpperCase();
   const expiration = document.getElementById('expiration').value.trim();
   const strikeLong = Number(document.getElementById('strikeLong').value);
@@ -1667,23 +1669,8 @@ async function runPaperExecution() {
   ];
 
   if (document.getElementById('chkAutoStrikes').checked) {
-    const chainRes = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/options-chain?symbol=${encodeURIComponent(symbol)}&expiration=${encodeURIComponent(expiration)}&limit=200`);
-    const chain = await chainRes.json();
-    const contracts = (chain.contracts || []).filter((c) => c.type === optionType && c.bid && c.ask);
-    contracts.sort((a, b) => a.strike - b.strike);
-    let selected = null;
-    for (let i = 0; i < contracts.length - 1; i++) {
-      const lower = contracts[i];
-      const higher = contracts[i + 1];
-      const width = higher.strike - lower.strike;
-      const debit = lower.ask - higher.bid;
-      if (width > 0 && debit > 0 && debit < width) { selected = { lower, higher, width, debit }; break; }
-    }
-    if (!selected) throw new Error('No se encontró un spread válido automático para este ticker y vencimiento.');
-    legs = [
-      { type: optionType, side: 'buy', strike: selected.lower.strike, price: selected.lower.ask },
-      { type: optionType, side: 'sell', strike: selected.higher.strike, price: selected.higher.bid },
-    ];
+    try { legs = (await fetchAutomaticSelection()).legs; }
+    catch(error) { showAlert(error.message,'error'); return; }
   }
 
   const body = {
@@ -1749,9 +1736,9 @@ async function runPaperExecution() {
     };
     const friendlyText = {
       BULL_CALL_SPREAD: 'Se compró un spread call alcista (compra call + venta call más alta), pensado para ganar si el precio sube, con pérdida limitada.',
-      BULL_PUT_SPREAD: 'Se compró un spread put alcista (compra put + venta put más alta), pensado para ganar si el precio cae, con pérdida limitada.',
-      BEAR_CALL_SPREAD: 'Se vendió un spread call bajista (venta call + compra call más baja), pensado para ganar el crédito por una baja, con pérdida acotada por el crédito.',
-      BEAR_PUT_SPREAD: 'Se vendió un spread put bajista (venta put + compra put más baja), pensado para ganar el crédito por una subida, con pérdida acotada por el crédito.',
+      BULL_PUT_SPREAD: 'Spread put alcista de crédito: venta put de strike mayor y compra put de strike menor.',
+      BEAR_CALL_SPREAD: 'Spread call bajista de crédito: venta call de strike menor y compra call de strike mayor.',
+      BEAR_PUT_SPREAD: 'Spread put bajista de débito: compra put de strike mayor y venta put de strike menor.',
     };
     const friendlyStrategyName = strategyNames[result.strategyType] || result.strategyType;
 

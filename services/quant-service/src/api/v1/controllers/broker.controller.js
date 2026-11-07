@@ -43,7 +43,7 @@ const getQuote = async (request, response) => {
 
 const getOptionChain = async (request, response) => {
   try {
-    const { symbol, expiration, minStrike, maxStrike, limit } = request.query;
+    const { symbol, expiration, minStrike, maxStrike, limit, type, pageToken } = request.query;
     const strikeRange = minStrike !== undefined && maxStrike !== undefined
       ? [minStrike, maxStrike]
       : undefined;
@@ -52,6 +52,8 @@ const getOptionChain = async (request, response) => {
       expiration,
       strikeRange,
       limit,
+      type,
+      pageToken,
     }));
   } catch (error) {
     return response.status(error.status || 502).json({

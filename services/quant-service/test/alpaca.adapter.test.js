@@ -205,3 +205,18 @@ test('crea una orden compleja (spread) con dos patas en la cuenta paper de Alpac
   assert.equal(spread.id, 'spread-order-id');
   assert.equal(spread.legs.length, 2);
 });
+
+test('pagina filtrada consulta 201 contratos en tres lotes y preserva token', async()=>{
+ const sizes=[];
+ const adapter=new AlpacaAdapter({keyId:'key',secretKey:'secret',tradingBaseUrl:'https://paper.example',dataBaseUrl:'https://data.example',fetchImplementation:async(url)=>{
+  const u=new URL(url);
+  if(u.pathname==='/v2/options/contracts') {
+   assert.equal(u.searchParams.get('type'),'put');assert.equal(u.searchParams.get('page_token'),'pagina 2');
+   return createResponse({option_contracts:Array.from({length:201},(_,i)=>({symbol:'PUT'+i,type:'put',underlying_symbol:'TSLA',expiration_date:'2026-12-18',strike_price:String(i+1)})),next_page_token:'pagina3'});
+  }
+  const symbols=u.searchParams.get('symbols').split(',');sizes.push(symbols.length);
+  return createResponse({quotes:Object.fromEntries(symbols.map(symbol=>[symbol,{bp:2,ap:3}]))});
+ }});
+ const d=await adapter.getOptionChain({symbol:'TSLA',expiration:'2026-12-18',type:'put',pageToken:'pagina 2',limit:201});
+ assert.deepEqual(sizes,[100,100,1]);assert.equal(d.contracts.length,201);assert.equal(d.contracts[200].bid,2);assert.equal(d.nextPageToken,'pagina3');
+});

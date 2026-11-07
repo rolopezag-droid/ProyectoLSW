@@ -175,7 +175,7 @@ class AlpacaAdapter extends BrokerAdapter {
     return { provider: 'alpaca', ...created, legs: created.legs || spreadLegs };
   }
 
-  async getOptionChain({ symbol, expiration, strikeRange, limit = 100 }) {
+  async getOptionChain({ symbol, expiration, strikeRange, limit = 100, type, pageToken }) {
     if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
       const error = new Error('symbol debe ser un ticker válido.');
       error.status = 400;
@@ -187,12 +187,20 @@ class AlpacaAdapter extends BrokerAdapter {
       throw error;
     }
 
+    if (type !== undefined && !['call', 'put'].includes(type)) {
+      const error = new Error('type debe ser call o put.'); error.status = 400; throw error;
+    }
+    if (pageToken !== undefined && (typeof pageToken !== 'string' || pageToken.length > 4096)) {
+      const error = new Error('pageToken debe ser una cadena válida.'); error.status = 400; throw error;
+    }
     const params = new URLSearchParams({
       underlying_symbols: symbol.toUpperCase(),
       status: 'active',
       limit: String(Math.min(Math.max(Number(limit) || 100, 1), 1000)),
     });
     if (expiration) params.set('expiration_date', expiration);
+    if (type) params.set('type', type);
+    if (pageToken) params.set('page_token', pageToken);
     if (strikeRange) {
       params.set('strike_price_gte', String(strikeRange[0]));
       params.set('strike_price_lte', String(strikeRange[1]));
@@ -202,18 +210,18 @@ class AlpacaAdapter extends BrokerAdapter {
       `/v2/options/contracts?${params.toString()}`,
     );
     const contracts = contractsResponse.option_contracts || contractsResponse.contracts || [];
-    const quoteSymbols = contracts.map((contract) => contract.symbol).slice(0, 100);
+    const quoteSymbols = [...new Set(contracts.map((contract) => contract.symbol))];
     let quotes = {};
-    if (quoteSymbols.length) {
+    for (let offset = 0; offset < quoteSymbols.length; offset += 100) {
       const quoteParams = new URLSearchParams({
-        symbols: quoteSymbols.join(','),
+        symbols: quoteSymbols.slice(offset, offset + 100).join(','),
         feed: this.optionsFeed,
       });
       const quoteResponse = await this.request(
         this.dataBaseUrl,
         `/v1beta1/options/quotes/latest?${quoteParams.toString()}`,
       );
-      quotes = quoteResponse.quotes || {};
+      Object.assign(quotes, quoteResponse.quotes || {});
     }
 
     const normalizedContracts = contracts.map((contract) => {
@@ -240,6 +248,7 @@ class AlpacaAdapter extends BrokerAdapter {
       symbol: symbol.toUpperCase(),
       expiration: expiration || null,
       contracts: normalizedContracts,
+      nextPageToken: contractsResponse.next_page_token || null,
       capturedAt: new Date().toISOString(),
     };
   }
