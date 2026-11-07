@@ -25,7 +25,7 @@ function createHarness() {
   } };
 }
 
-for (const timeframe of ['1Day', '1Week', '1Month', '3Month', '6Month', '12Month']) {
+for (const timeframe of ['15Min', '1Hour', '1Day', '1Week', '1Month', '3Month', '6Month', '12Month']) {
   test('velas acepta ' + timeframe + ' sin sustituirlo', async () => {
     const h = createHarness();
     const response = await h.query({ symbol: 'AAPL', timeframe, limit: '30', start: '2026-01-01', end: '2026-10-01', sort: 'desc' });
@@ -45,7 +45,7 @@ test('velas usa 1Day cuando timeframe está ausente', async () => {
   assert.equal(response.statusCode, 200);
   assert.equal(h.calls[0].timeframe, '1Day');
 });
-for (const [name, timeframe] of [ ['intradia', '1Hour'], ['desconocido', 'invalid'], ['vacio', ''], ['repetido', ['1Day', '1Week']], ['objeto', {}], ['nulo', null], ['numerico', 1] ]) {
+for (const [name, timeframe] of [ ['no-admitido', '1Min'], ['desconocido', 'invalid'], ['vacio', ''], ['repetido', ['1Day', '1Week']], ['objeto', {}], ['nulo', null], ['numerico', 1] ]) {
   test('velas rechaza timeframe ' + name + ' antes de consultar al broker', async () => {
     const h = createHarness();
     const response = await h.query({ symbol: 'AAPL', timeframe });

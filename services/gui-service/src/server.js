@@ -52,7 +52,7 @@ const SERVICES = {
   },
   'quant-service': {
     name: 'Quant Service',
-    port: Number(process.env.PORT || 3002),
+    port: Number(process.env.QUANT_PORT || 3002),
     cwd: path.resolve(__dirname, '../../quant-service'),
     script: 'src/server.js',
   },
@@ -73,6 +73,44 @@ const SERVICES = {
 // Procesos de servicios en ejecución
 const serviceProcesses = {};
 
+
+function startService(name) {
+  const svc = SERVICES[name];
+  console.log(`🚀 Iniciando ${svc.name} en ${svc.cwd}...`);
+
+  const proc = spawn(process.execPath, [svc.script], {
+    cwd: svc.cwd,
+    windowsHide: true,
+    env: { ...process.env, ...(name === 'catalog-service' ? { PORT: String(svc.port) } : {}) },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  serviceProcesses[name] = proc;
+
+  let stdoutLog = '';
+  let stderrLog = '';
+
+  proc.stdout.on('data', (data) => {
+    process.stdout.write('[' + name + '] ' + data.toString());
+  });
+
+  proc.stderr.on('data', (data) => {
+    process.stderr.write('[' + name + '] ' + data.toString());
+  });
+
+  proc.on('close', (code) => {
+    console.log(`⏹️  ${svc.name} terminó con código ${code}`);
+    serviceProcesses[name] = null;
+  });
+
+  proc.on('error', (err) => {
+    console.error(`❌ Error iniciando ${svc.name}:`, err.message);
+    serviceProcesses[name] = null;
+  });
+
+  return proc;
+}
+
 // ---- Rutas de control de servicios ----
 
 // Obtener estado de todos los servicios
@@ -83,7 +121,7 @@ app.get('/api/services/status', (_req, res) => {
     status[key] = {
       name: svc.name,
       port: svc.port,
-      running: !!proc && !proc.exitCode && !proc.killed,
+      running: !!proc && proc.exitCode === null && proc.signalCode === null && !proc.killed,
       pid: proc ? proc.pid : null,
     };
   }
@@ -103,37 +141,7 @@ app.post('/api/services/:name/start', (req, res) => {
     return res.status(409).json({ message: `El servicio "${name}" ya está en ejecución.` });
   }
 
-  console.log(`🚀 Iniciando ${svc.name} en ${svc.cwd}...`);
-
-  const proc = spawn(process.execPath, [svc.script], {
-    cwd: svc.cwd,
-    windowsHide: true,
-    env: { ...process.env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  serviceProcesses[name] = proc;
-
-  let stdoutLog = '';
-  let stderrLog = '';
-
-  proc.stdout.on('data', (data) => {
-    stdoutLog += data.toString();
-  });
-
-  proc.stderr.on('data', (data) => {
-    stderrLog += data.toString();
-  });
-
-  proc.on('close', (code) => {
-    console.log(`⏹️  ${svc.name} terminó con código ${code}`);
-    serviceProcesses[name] = null;
-  });
-
-  proc.on('error', (err) => {
-    console.error(`❌ Error iniciando ${svc.name}:`, err.message);
-    serviceProcesses[name] = null;
-  });
+  const proc = startService(name);
 
   res.json({
     message: `Iniciando ${svc.name}...`,
@@ -246,8 +254,33 @@ app.use((_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-if (require.main === module) app.listen(PORT, () => {
-  console.log(`🖥️  GUI Service escuchando en http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  const net = require('net');
+  const checkPort = port => new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', () => reject(new Error('El puerto ' + port + ' está ocupado. Detén la versión anterior antes de iniciar.')));
+    probe.listen(port, () => probe.close(resolve));
+  });
+  let server;
+  let stopping = false;
+  function shutdown(code = 0) {
+    if (stopping) return;
+    stopping = true;
+    for (const proc of Object.values(serviceProcesses)) if (proc && proc.exitCode === null) proc.kill();
+    if (server) server.close();
+    process.exitCode = code;
+  }
+  process.on('SIGINT', () => shutdown());
+  process.on('SIGTERM', () => shutdown());
+  process.on('exit', () => { for (const proc of Object.values(serviceProcesses)) if (proc && proc.exitCode === null) proc.kill(); });
+  (async () => {
+    await Promise.all([PORT, ...Object.values(SERVICES).map(svc => svc.port)].map(checkPort));
+    server = app.listen(PORT, () => {
+      console.log('Mesa de operaciones: http://localhost:' + PORT);
+      for (const name of Object.keys(SERVICES)) startService(name);
+    });
+    server.on('error', error => { console.error(error.message); shutdown(1); });
+  })().catch(error => { console.error(error.message); shutdown(1); });
+}
 
 module.exports = app;

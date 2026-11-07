@@ -20,10 +20,14 @@
     "start:gui": "npm --workspace services/gui-service start",
     "start:spread": "npm --workspace services/spread-service start",
     "dev:spread": "npm --workspace services/spread-service run dev",
-    "test:spread": "npm --workspace services/spread-service test"
+    "test:spread": "npm --workspace services/spread-service test",
+    "start": "npm run start:gui"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "2.117.3"
+  },
+  "devDependencies": {
+    "@fission-ai/openspec": "1.16.1"
   }
 }

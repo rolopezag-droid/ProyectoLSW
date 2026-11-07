@@ -341,7 +341,7 @@
     aside .btn { min-height:28px; padding:5px 8px; font-size:10px; }
     aside .service-chip { font-size:10px; }
     #tab-candles .card { min-height:440px; }
-    #tab-candles .row { grid-template-columns:1fr 1fr 1fr; }
+    #tab-candles .row { grid-template-columns:1fr 1fr; }
     #candlesChart { border-radius:4px!important; }
     .chart-empty { display:flex; min-height:240px; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:#a4b4c7; background:repeating-linear-gradient(0deg,transparent,transparent 47px,#253344 48px),repeating-linear-gradient(90deg,transparent,transparent 79px,#253344 80px); border:1px solid var(--border); border-radius:4px; }
     .chart-empty strong { font-size:16px; color:#dce7f2; font-weight:500; background:#161e28; padding:4px 12px; }
@@ -404,7 +404,16 @@
           </div>
           <div>
             <label>Símbolo (Ticker)</label>
-            <input type="text" id="symbol" value="AAPL" required />
+            <select id="symbol" required aria-label="Empresa a analizar"><option value="AAPL">Apple (AAPL)</option>
+<option value="MSFT">Microsoft (MSFT)</option>
+<option value="TSLA">Tesla (TSLA)</option>
+<option value="AMZN">Amazon (AMZN)</option>
+<option value="GOOGL">Alphabet (Google) (GOOGL)</option>
+<option value="NVDA">NVIDIA (NVDA)</option>
+<option value="META">Meta (META)</option>
+<option value="NFLX">Netflix (NFLX)</option>
+<option value="AMD">AMD (AMD)</option>
+<option value="INTC">Intel (INTC)</option></select>
           </div>
           <div>
             <label>Vencimiento (YYYY-MM-DD)</label>
@@ -685,26 +694,29 @@
         <form id="candlesForm" class="row">
           <div>
             <label>Símbolo (Ticker)</label>
-            <input type="text" id="chSymbol" placeholder="Ej: AAPL" required />
+            <select id="chSymbol" required aria-label="Empresa a analizar"><option value="AAPL">Apple (AAPL)</option>
+<option value="MSFT">Microsoft (MSFT)</option>
+<option value="TSLA">Tesla (TSLA)</option>
+<option value="AMZN">Amazon (AMZN)</option>
+<option value="GOOGL">Alphabet (Google) (GOOGL)</option>
+<option value="NVDA">NVIDIA (NVDA)</option>
+<option value="META">Meta (META)</option>
+<option value="NFLX">Netflix (NFLX)</option>
+<option value="AMD">AMD (AMD)</option>
+<option value="INTC">Intel (INTC)</option></select>
           </div>
           <div>
-            <label>Timeframe</label>
+            <label>Periodo a mostrar</label>
             <select id="chTimeframe">
-              <option value="1Min">1 Min</option>
-              <option value="5Min">5 Min</option>
-              <option value="15Min">15 Min</option>
-              <option value="30Min">30 Min</option>
-              <option value="1Hour">1 Hora</option>
-              <option value="4Hour">4 Horas</option>
-              <option value="12Hour">12 Horas</option>
-              <option value="1Day" selected>1 Día</option>
-              <option value="1Week">1 Semana</option>
-            </select>
+<option value="1Day" selected>1 Día</option>
+<option value="1Week">1 Semana</option>
+<option value="1Month">1 Mes</option>
+<option value="3Month">3 Meses</option>
+<option value="6Month">6 Meses</option>
+<option value="12Month">1 Año</option>
+</select>
           </div>
-          <div>
-            <label>Límite de velas</label>
-            <input type="number" id="chLimit" value="100" min="1" max="10000" />
-          </div>
+
         </form>
 
         <button type="button" class="btn btn-primary btn-block" id="btnLoadCandles"> Mostrar gráfica</button>
@@ -720,13 +732,15 @@
   </main>
 </div>
 
+<script src="/market-period.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
 const navigation = document.querySelector('.tabs');
 const side = document.querySelector('aside');
-const drawer = document.createElement('details');
+const drawer = document.createElement('div');
+drawer.hidden = true;
 drawer.className = 'service-drawer';
-const summary = document.createElement('summary'); summary.textContent = 'Servicios y actividad'; drawer.append(summary);
+
 while (side.firstChild) drawer.append(side.firstChild);
 side.append(navigation, drawer);
 const strategyView = document.getElementById('tab-strategy');
@@ -1374,17 +1388,18 @@ function formatAxisTime(timestamp, timeframe) {
   if (/Min|Hour/.test(timeframe)) return `${hours}:${minutes}`;
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
-  if (/Week/.test(timeframe)) return `${day}/${month}`;
-  return `${day}/${month}`;
+  const year = date.getFullYear();
+  if (/Month/.test(timeframe)) return `${month}/${year}`;
+  return `${day}/${month}/${String(year).slice(-2)}`;
 }
 
 function renderCandlesChart(candles, timeframe) {
   const width = 900;
   const height = 420;
-  const padLeft = 62;
-  const padRight = 16;
-  const padTop = 16;
-  const padBottom = 34;
+  const padLeft = 88;
+  const padRight = 28;
+  const padTop = 24;
+  const padBottom = 42;
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
@@ -1403,8 +1418,8 @@ function renderCandlesChart(candles, timeframe) {
   max += pricePadding;
 
   const y = (value) => padTop + (1 - (value - min) / (max - min)) * plotH;
-  const xForIndex = (index) => padLeft + (candles.length <= 1 ? plotW / 2 : (index / (candles.length - 1)) * plotW);
-  const step = plotW / Math.max(candles.length - 1, 1);
+  const step = plotW / candles.length;
+  const xForIndex = index => padLeft + (index + 0.5) * step;
   const bodyWidth = Math.max(Math.min(12, step * 0.7), 1);
 
   const gridColors = { line: '#334155', text: '#94a3b8', up: '#22c55e', down: '#ef4444' };
@@ -1414,7 +1429,7 @@ function renderCandlesChart(candles, timeframe) {
     const value = min + (max - min) * fraction;
     const yPosition = y(value);
     gridLines += `<line x1="${padLeft}" y1="${yPosition}" x2="${width - padRight}" y2="${yPosition}" stroke="${gridColors.line}" stroke-width="1" />`;
-    yLabels += `<text x="${padLeft - 8}" y="${yPosition}" textAnchor="end" dominantBaseline="middle" font-size="11" fill="${gridColors.text}">${formatPrice(value)}</text>`;
+    yLabels += `<text x="${padLeft - 8}" y="${yPosition}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="${gridColors.text}">${formatPrice(value)}</text>`;
   });
 
   let shapes = '';
@@ -1433,7 +1448,7 @@ function renderCandlesChart(candles, timeframe) {
   const lastPriceY = y(lastCandle.close);
   const lastPriceColor = lastCandle.close >= lastCandle.open ? gridColors.up : gridColors.down;
   shapes += `<line x1="${padLeft}" y1="${lastPriceY}" x2="${width - padRight}" y2="${lastPriceY}" stroke="${lastPriceColor}" stroke-width="1" stroke-dasharray="4 3" />`;
-  shapes += `<text x="${width - padRight}" y="${lastPriceY - 5}" textAnchor="end" font-size="11" font-weight="700" fill="${lastPriceColor}">${formatPrice(lastCandle.close)}</text>`;
+  shapes += `<text x="${width - padRight}" y="${lastPriceY - 5}" text-anchor="end" font-size="11" font-weight="700" fill="${lastPriceColor}">${formatPrice(lastCandle.close)}</text>`;
 
   const tickCount = Math.min(6, candles.length);
   let xLabels = '';
@@ -1442,20 +1457,64 @@ function renderCandlesChart(candles, timeframe) {
     const text = formatAxisTime(candles[index].timestamp, timeframe);
     const xPosition = xForIndex(index);
     const anchor = index === 0 ? 'start' : index === candles.length - 1 ? 'end' : 'middle';
-    xLabels += `<text x="${xPosition}" y="${height - 10}" textAnchor="${anchor}" font-size="11" fill="${gridColors.text}">${text}</text>`;
+    xLabels += `<text x="${xPosition}" y="${height - 10}" text-anchor="${anchor}" font-size="11" fill="${gridColors.text}">${text}</text>`;
   }
 
-  document.getElementById('candlesChart').innerHTML = `
+  const svg = document.getElementById('candlesChart');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'Gráfica de velas; pasa el cursor o enfoca una vela para consultar sus datos.');
+  const hits = candles.map((candle,index) => '<rect data-candle="'+index+'" tabindex="0" role="button" aria-label="'+escapeHtml(new Date(candle.timestamp).toLocaleString('es-MX') + ', cierre ' + formatPrice(candle.close))+'" x="'+(padLeft+index*step)+'" y="'+padTop+'" width="'+step+'" height="'+plotH+'" fill="transparent" />').join('');
+  svg.innerHTML = `
     <g>
       ${gridLines}
       <g>${shapes}</g>
       ${xLabels}
       ${yLabels}
+      <line id="candleCursor" y1="${padTop}" y2="${height-padBottom}" stroke="#a3b4c7" stroke-dasharray="3 3" pointer-events="none" visibility="hidden" />
+      ${hits}
     </g>
   `;
+  const host = svg.parentElement;
+  host.style.position = 'relative';
+  let tooltip = host.querySelector('.candle-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'candle-tooltip';
+    tooltip.id = 'candleTooltip';
+    tooltip.setAttribute('role','tooltip');
+    tooltip.style.cssText = 'position:absolute;z-index:5;pointer-events:none;background:#0b131d;border:1px solid #52647a;border-radius:5px;padding:12px;color:#e5ecf3;font-size:12px;line-height:1.7;box-shadow:0 6px 20px #0006;max-width:calc(100% - 16px);';
+    host.appendChild(tooltip);
+  }
+  tooltip.hidden = true;
+  const crosshair = svg.querySelector('#candleCursor');
+  function hide() { tooltip.hidden = true; crosshair.setAttribute('visibility','hidden'); }
+  function inspect(event) {
+    const target = event.target.closest('[data-candle]');
+    if (!target) { hide(); return; }
+    const index = Number(target.dataset.candle), candle = candles[index];
+    const date = new Date(candle.timestamp).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'});
+    tooltip.innerHTML = '<strong>'+escapeHtml(date)+'</strong><br>'+[['Apertura',formatPrice(candle.open)],['Máximo',formatPrice(candle.high)],['Mínimo',formatPrice(candle.low)],['Cierre',formatPrice(candle.close)],['Volumen',Number(candle.volume||0).toLocaleString('es-MX')]].map(([name,value])=>'<span>'+name+': <b>'+escapeHtml(value)+'</b></span>').join('<br>');
+    tooltip.hidden = false;
+    const hostRect = host.getBoundingClientRect(), rect = svg.getBoundingClientRect();
+    const cursorX = Number.isFinite(event.clientX) ? event.clientX-hostRect.left : rect.left-hostRect.left+xForIndex(index)*rect.width/width;
+    const cursorY = Number.isFinite(event.clientY) ? event.clientY-hostRect.top : rect.top-hostRect.top+padTop*rect.height/height;
+    const left = cursorX+tooltip.offsetWidth+18 > host.clientWidth ? cursorX-tooltip.offsetWidth-14 : cursorX+14;
+    tooltip.style.left = Math.max(8,Math.min(left,host.clientWidth-tooltip.offsetWidth-8))+'px';
+    tooltip.style.top = Math.max(rect.top-hostRect.top,Math.min(cursorY+12,rect.bottom-hostRect.top-tooltip.offsetHeight))+'px';
+    crosshair.setAttribute('x1',xForIndex(index)); crosshair.setAttribute('x2',xForIndex(index));
+    crosshair.setAttribute('visibility','visible');
+  }
+  svg.onpointermove = inspect;
+  svg.onpointerleave = hide;
+  svg.onfocusin = inspect;
+  svg.onfocusout = hide;
+  svg.onkeydown = event => { if (event.key === 'Escape') hide(); };
+
 }
 
 function renderCandles(data) {
+  const periodLabel = data.periodLabel || 'Periodo consultado';
+  const candleLabel = ({'15Min':'15 minutos','1Hour':'1 hora','1Day':'1 día','1Week':'1 semana','1Month':'1 mes','3Month':'3 meses','6Month':'6 meses','12Month':'1 año'})[data.timeframe] || data.timeframe;
   const candles = (data.bars || []).slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   const container = document.getElementById('candlesChartContainer');
   const grid = document.getElementById('candlesMetricsGrid');
@@ -1464,13 +1523,13 @@ function renderCandles(data) {
 
   if (!candles.length) {
     container.style.display = 'none';
-    note.textContent = `No se encontraron velas para ${data.symbol || 'este ticker'} con timeframe ${data.timeframe || ''}.`;
+    note.textContent = `No se encontraron velas para ${data.symbol || 'este ticker'} en el periodo ${periodLabel}.`;
     showAlert(`No se encontraron velas para ${data.symbol || 'el ticker elegido'} en el periodo consultado.`, 'error');
     return false;
   }
 
   container.style.display = 'block';
-  meta.innerHTML = `Símbolo <strong>${escapeHtml(data.symbol)}</strong> · Timeframe ${escapeHtml(data.timeframe)} · ${candles.length} velas · Capturadas ${escapeHtml(data.capturedAt || '')}`;
+  meta.innerHTML = `Símbolo <strong>${escapeHtml(data.symbol)}</strong> · Periodo ${escapeHtml(periodLabel)} · Velas de ${escapeHtml(candleLabel)} · ${candles.length} velas · Capturadas ${escapeHtml(data.capturedAt || '')}`;
 
   const last = candles[candles.length - 1];
   const prev = candles[candles.length - 2];
@@ -1486,7 +1545,8 @@ function renderCandles(data) {
 
   const metrics = [
     { label: 'Símbolo', value: data.symbol, neutral: true },
-    { label: 'Timeframe', value: data.timeframe, neutral: true },
+    { label: 'Periodo mostrado', value: periodLabel, neutral: true },
+    { label: 'Duración de cada vela', value: candleLabel, neutral: true },
     { label: 'Velas', value: String(candles.length), neutral: true },
     { label: 'Último Close', value: formatPrice(last.close), neutral: true },
     { label: 'Apertura', value: formatPrice(last.open), neutral: true },
@@ -1507,13 +1567,14 @@ function renderCandles(data) {
   });
 
   renderCandlesChart(candles, data.timeframe);
-  document.getElementById('candlesNote').textContent = `Gráfica de ${data.symbol} (${data.timeframe}) renderizada con ${candles.length} velas.`;
+  document.getElementById('candlesNote').textContent = `${data.symbol} · Periodo: ${periodLabel} · Vela: ${candleLabel} · ${candles.length} velas · Del ${new Date(candles[0].timestamp).toLocaleDateString('es-MX')} al ${new Date(last.timestamp).toLocaleDateString('es-MX')}.`;
 }
 
-document.getElementById('btnLoadCandles').addEventListener('click', async () => {
+let candleRequestVersion = 0;
+async function loadCandles() {
   const symbol = document.getElementById('chSymbol').value.trim().toUpperCase();
-  const timeframe = document.getElementById('chTimeframe').value;
-  const limit = Number(document.getElementById('chLimit').value || 100);
+  const period = document.getElementById('chTimeframe').value;
+  const periodLabel = document.getElementById('chTimeframe').selectedOptions[0].textContent;
 
   if (!symbol) {
     showAlert('Elige un ticker antes de mostrar la gráfica.', 'error');
@@ -1524,31 +1585,41 @@ document.getElementById('btnLoadCandles').addEventListener('click', async () => 
     return;
   }
 
+  const requestVersion = ++candleRequestVersion;
   const btn = document.getElementById('btnLoadCandles');
+  document.getElementById('candlesChartContainer').style.display = 'none';
+  document.querySelector('.chart-empty strong').textContent = 'Consultando ' + symbol;
+  document.querySelector('.chart-empty span').textContent = 'Periodo: ' + document.getElementById('chTimeframe').selectedOptions[0].textContent;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Cargando velas...';
 
   try {
-    const intervalMinutes = timeframe.endsWith('Min') ? parseInt(timeframe, 10) : timeframe.endsWith('Hour') ? parseInt(timeframe, 10) * 60 : timeframe === '1Week' ? 10080 : 1440;
-    const requestedBars = Math.min(Math.max(Math.trunc(limit) || 100, 1), 10000);
-    // Un margen de días naturales cubre sesiones cerradas y fines de semana.
-    const lookbackDays = Math.max(7, Math.ceil(requestedBars * intervalMinutes / 1440 * 2.5));
-    const start = new Date(Date.now() - lookbackDays * 86400000).toISOString();
-    const params = new URLSearchParams({symbol, timeframe, limit: String(requestedBars), start, sort: 'desc'});
+    const query = marketPeriod(period);
+    const params = new URLSearchParams({symbol, ...query});
     const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/candles?${params}`);
     const data = await res.json().catch(() => ({}));
+    if (requestVersion !== candleRequestVersion) return;
     if (!res.ok) throw new Error(data.message || `quant-service respondió ${res.status}`);
+    data.periodLabel = periodLabel;
     if (!Array.isArray(data.bars) || data.bars.length === 0) { renderCandles(data); return; }
     renderCandles(data);
-    showAlert(`Gráfica de ${data.symbol} (${data.timeframe}) cargada desde Alpaca.`, 'info');
+    showAlert(`Gráfica de ${data.symbol}: periodo de ${periodLabel} cargado desde Alpaca.`, 'info');
   } catch (e) {
+    if (requestVersion !== candleRequestVersion) return;
     showAlert(e.message, 'error');
     log('Error candles: ' + e.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = ' Mostrar gráfica';
+    if (requestVersion === candleRequestVersion) {
+      btn.disabled = false;
+      btn.textContent = 'Actualizar gráfica';
+      document.querySelector('.chart-empty strong').textContent = 'Sin datos para ' + symbol;
+      document.querySelector('.chart-empty span').textContent = 'Consulta otro intervalo o vuelve a intentarlo.';
+    }
   }
-});
+}
+document.getElementById('btnLoadCandles').addEventListener('click', loadCandles);
+document.getElementById('chTimeframe').addEventListener('change', loadCandles);
+
 
 function renderExecutionSummary(result, orders) {
   const container = document.getElementById('executionSummary');
@@ -1722,6 +1793,17 @@ document.getElementById('chkAutoCycle').addEventListener('change', (event) => {
   if (event.target.checked) startAutoCycle(); else stopAutoCycle();
 });
 
+// Una sola empresa seleccionada para la gráfica y la operación.
+for (const [source, target] of [['symbol', 'chSymbol'], ['chSymbol', 'symbol']]) {
+  document.getElementById(source).addEventListener('change', event => {
+    document.getElementById(target).value = event.target.value;
+    document.getElementById('candlesChartContainer').style.display = 'none';
+    document.querySelector('.chart-empty strong').textContent = 'Datos de mercado · ' + event.target.value;
+    document.getElementById('resultsCard').style.display = 'none';
+    lastEvaluatedInput = null;
+    savedSpreadId = null;
+  });
+}
 // ── Init ──
 refreshServices();
 setInterval(refreshServices, 10000);

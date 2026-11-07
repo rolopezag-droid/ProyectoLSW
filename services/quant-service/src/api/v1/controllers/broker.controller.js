@@ -17,7 +17,7 @@ const broker = createBroker({
   optionsFeed: alpacaOptionsFeed,
 });
 
-const ALLOWED_TIMEFRAMES = ['1Day', '1Week', '1Month', '3Month', '6Month', '12Month'];
+const ALLOWED_TIMEFRAMES = ['15Min', '1Hour', '1Day', '1Week', '1Month', '3Month', '6Month', '12Month'];
 
 const getAccount = async (_request, response) => {
   try {
