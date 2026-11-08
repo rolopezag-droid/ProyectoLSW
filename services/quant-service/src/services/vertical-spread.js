@@ -18,9 +18,12 @@ const evaluateVerticalSpread = (input) => {
 
   const symbol = String(input.symbol || 'AAPL').trim().toUpperCase();
   const expiration = String(input.expiration || '2026-12-18');
-  const quantity = Number(input.quantity || input.legs?.[0]?.quantity || 1);
-  const multiplier = Number(input.multiplier || 100);
+  const quantity = Number(input.quantity ?? input.legs?.[0]?.quantity ?? 1);
+  const multiplier = Number(input.multiplier ?? 100);
   const legs = Array.isArray(input.legs) ? input.legs : [];
+  if(!/^[A-Z0-9.\^-]{1,20}$/.test(symbol)) throw new Error('symbol inválido.');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(expiration)||!Number.isFinite(Date.parse(expiration))||new Date(expiration).toISOString().slice(0,10)!==expiration) throw new Error('expiration inválida.');
+  if(legs.some(leg=>(leg.expiration!==undefined&&leg.expiration!==expiration)||(leg.expirationDate!==undefined&&leg.expirationDate!==expiration)||(leg.quantity!==undefined&&Number(leg.quantity)!==quantity))) throw new Error('Las patas deben compartir vencimiento y cantidad.');
 
   if (legs.length !== 2) throw new Error('legs debe contener exactamente dos patas.');
   if (!Number.isInteger(quantity) || quantity <= 0) throw new Error('quantity debe ser un entero mayor que cero.');

@@ -1,3 +1,5 @@
+> Revisión funcional actual: [docs/verificacion/REVISION_FUNCIONAL.md](docs/verificacion/REVISION_FUNCIONAL.md). Incluye arranque, contratos actualizados, pruebas y límites externos. El texto histórico siguiente puede describir etapas anteriores.
+
 > Integración local actual: consulta [INTEGRACION_SUPABASE.md](INTEGRACION_SUPABASE.md). El contrato Supabase de ese documento sustituye las referencias antiguas de MongoDB para Spread Service.
 
 # Catalogos Microservices Demo

@@ -15,6 +15,7 @@ function createHarness() {
     require(name) {
       if (name === '../../../brokers') return { createBroker: () => broker };
       if (name === '../../../config/env') return {};
+      if (name === '../../../services/ingestion') return {createIngestor:()=>({})};
       throw new Error('Dependencia no esperada: ' + name);
     },
   }, { filename });

@@ -21,13 +21,17 @@
     "start:spread": "npm --workspace services/spread-service start",
     "dev:spread": "npm --workspace services/spread-service run dev",
     "test:spread": "npm --workspace services/spread-service test",
-    "start": "npm run start:gui"
+    "start": "npm run start:gui",
+    "test": "node --test services/*/test/*.test.js",
+    "dev": "npm start",
+    "test:startup": "node scripts/smoke-startup.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "2.117.3"
   },
   "devDependencies": {
-    "@fission-ai/openspec": "1.16.1"
+    "@fission-ai/openspec": "1.16.1",
+    "jsdom": "29.1.1"
   }
 }

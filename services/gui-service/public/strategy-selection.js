@@ -22,12 +22,14 @@
       if (!(width>0 && net>0 && net<width)) continue;
       const bracketDist = target < lower.strike ? lower.strike - target : target > higher.strike ? target - higher.strike : 0;
       const midDist = Math.abs(((lower.strike + higher.strike) / 2) - target);
-      candidates.push({long,short,lower,higher,width,net,category:debit?'debit':'credit',bracketDist,midDist,legs:[{type,side:'buy',strike:long.strike,price:long.ask,contractSymbol:long.contractSymbol},{type,side:'sell',strike:short.strike,price:short.ask != null ? short.bid : short.bid,contractSymbol:short.contractSymbol}]});
+      candidates.push({long,short,lower,higher,width,net,category:debit?'debit':'credit',bracketDist,midDist,legs:[
+        {type,side:'buy',strike:long.strike,price:long.ask,contractSymbol:long.contractSymbol,bid:long.bid,ask:long.ask},
+        {type,side:'sell',strike:short.strike,price:short.bid,contractSymbol:short.contractSymbol,bid:short.bid,ask:short.ask}
+      ]});
     }
     if (!candidates.length) {
       throw new Error('Se revisaron '+valid.length+' contratos cotizados para '+strategy+', pero ningún par consecutivo deja un '+(debit?'débito':'crédito')+' positivo menor que el ancho. Prueba otro vencimiento.');
     }
-    // Menor distancia al ATM (primero dentro del bracket, luego el más cercano). Desempate: spread más angosto/cercano.
     candidates.sort((a,b)=>a.bracketDist-b.bracketDist || a.midDist-b.midDist || a.width-b.width);
     const best = candidates[0];
     return {long:best.long,short:best.short,width:best.width,net:best.net,category:best.category,legs:best.legs};

@@ -1,49 +1,11 @@
-const Catalog = require('../models/Catalog');
-
-// FIC: Todos los catálogos activos
-const getCatalogsService = async () => {
-  return Catalog.find({ active: true, deletedAt: null });
+const Catalog=require('../models/Catalog');
+const getCatalogsService=async()=>Catalog.find({active:true,deletedAt:null});
+const getCatalogByKeyService=async key=>Catalog.findOne({key,active:true,deletedAt:null});
+const postCatalogService=async data=>new Catalog(data).save();
+const putCatalogService=async(key,data)=>{
+ if(!data||typeof data!=='object'||Array.isArray(data)||!Object.keys(data).length||Object.keys(data).some(k=>k.startsWith('$')||k.includes('.')||['_id','__v','deletedAt','createdAt'].includes(k))){const e=new Error('Campos de actualización inválidos.');e.status=400;throw e;}
+ return Catalog.findOneAndUpdate({key,active:true,deletedAt:null},data,{new:true,runValidators:true});
 };
-
-// FIC: Un catálogo por su key (ej. "institutos")
-const getCatalogByKeyService = async (key) => {
-  return Catalog.findOne({ key, active: true, deletedAt: null });
-};
-
-// FIC: Crear un nuevo catálogo
-const postCatalogService = async (catalogData) => {
-  const newCatalog = new Catalog(catalogData);
-  return newCatalog.save();
-};
-
-// FIC: Actualizar un catálogo por su key
-const putCatalogService = async (key, updateData) => {
-  return Catalog.findOneAndUpdate(
-    { key, active: true, deletedAt: null },
-    updateData,
-    { new: true },
-  );
-};
-
-// FIC: Borrado lógico (Soft Delete)
-const deleteCatalogService = async (key) => {
-  return Catalog.findOneAndUpdate(
-    { key, active: true, deletedAt: null },
-    { active: false, deletedAt: new Date() },
-    { new: true },
-  );
-};
-
-// FIC: Borrado físico de la base de datos (Hard Delete)
-const hardDeleteCatalogService = async (key) => {
-  return Catalog.findOneAndDelete({ key });
-};
-
-module.exports = {
-  getCatalogsService,
-  getCatalogByKeyService,
-  postCatalogService,
-  putCatalogService,
-  deleteCatalogService,
-  hardDeleteCatalogService,
-};
+const deleteCatalogService=async key=>Catalog.findOneAndUpdate({key,active:true,deletedAt:null},{active:false,deletedAt:new Date()},{new:true});
+const hardDeleteCatalogService=async key=>Catalog.findOneAndDelete({key});
+module.exports={getCatalogsService,getCatalogByKeyService,postCatalogService,putCatalogService,deleteCatalogService,hardDeleteCatalogService};

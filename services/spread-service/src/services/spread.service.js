@@ -28,7 +28,7 @@ class SpreadService {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(skip) || skip < 0) input.fail('Paginación inválida.');
     let query = this.owned(this.db.from('spreads').select(SELECT,{count:'exact'}).is('deleted_at',null));
     if (filters.underlyingTicker) query = query.eq('underlying_ticker',String(filters.underlyingTicker).toUpperCase());
-    if (filters.status) query = query.eq('status',filters.status);
+    if (filters.status) query = query.eq('status',({active:'evaluated',closed:'archived'})[filters.status]||filters.status);
     if (filters.strategyType) query = query.eq('strategy_type_id',await this.typeId(filters.strategyType));
     const {data,count} = await result(query.order('created_at',{ascending:false}).range(skip,skip+limit-1));
     return {data:data.map(mapSpread),total:count};
@@ -45,10 +45,11 @@ class SpreadService {
     if ('currentStockPrice' in data) input.number(data.currentStockPrice,'currentStockPrice',0.000001);
     if ('expirationDate' in data) input.date(data.expirationDate);
     for (const key of ['quantity','multiplier']) if (key in data) { input.number(data[key],key,1); if (!Number.isInteger(data[key])) input.fail(`${key} debe ser entero.`); }
-    if ('status' in data && !['draft','active','closed'].includes(data.status)) input.fail('status debe ser draft, active o closed.');
+    if ('status' in data && !['draft','evaluated','archived','active','closed'].includes(data.status)) input.fail('status debe ser draft, evaluated o archived (active/closed se aceptan como alias).');
     if ('notes' in data && data.notes !== null && (typeof data.notes !== 'string' || data.notes.length > 5000)) input.fail('notes debe ser texto de hasta 5000 caracteres.');
   }
   parentRow(data) {
+    data={...data,...('status' in data?{status:({active:'evaluated',closed:'archived'})[data.status]||data.status}:{})};
     const columns = {underlyingTicker:'underlying_ticker',currentStockPrice:'underlying_price',expirationDate:'expiration_date',quantity:'quantity',multiplier:'multiplier',status:'status',notes:'notes'};
     return Object.fromEntries(Object.entries(columns).filter(([key])=>key in data).map(([key,col])=>[col,key==='underlyingTicker'?data[key].toUpperCase():data[key]]));
   }
@@ -141,7 +142,17 @@ class SpreadService {
     catch(error) { input.fail(error.message); }
     const row={spread_id:id,spread_width:calculated.width,net_debit:calculated.netDebit,net_credit:calculated.netCredit,max_profit:calculated.maxProfit,max_loss:calculated.maxLoss,break_even_price:calculated.breakEven,risk_reward_ratio:calculated.riskRewardRatio,evaluated_at:calculated.evaluatedAt,assumptions:{underlyingPrice:parent.currentStockPrice,model:'vertical-spread',dataSource:'manual'}};
     const {data}=await result(this.db.from('spread_evaluations').insert(row).select('*').single());
-    return {evaluation:data,calculation:calculated};
+    let spreadStatus=parent.status, statusUpdated=true;
+    if (parent.status==='draft') {
+      try {
+        // No sobrescribir un archivo/borrado concurrente. La evaluación ya existe:
+        // comunicar un fallo de estado sin inducir otro INSERT al reintentar.
+        const update=await this.db.from('spreads').update({status:'evaluated',updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',this.userId).eq('status','draft').is('deleted_at',null).select('status').maybeSingle();
+        if(update.error || !update.data) statusUpdated=false;
+        else spreadStatus=update.data.status;
+      } catch { statusUpdated=false; }
+    }
+    return {evaluation:data,calculation:calculated,spreadStatus,statusUpdated,...(!statusUpdated?{warning:'La evaluación se guardó, pero no se pudo confirmar el cambio de estado. Consulta el spread antes de repetir la evaluación.'}:{})};
   }
   async runBatch(items,operation) {
     if (!Array.isArray(items) || !items.length || items.length>100) input.fail('Cada lote requiere entre 1 y 100 elementos.');

@@ -1,3 +1,5 @@
+const { buildVertical } = require('../../../../../strategy-service/src/domain/verticals');
+const setupClient = require('../../../services/setup-client').createSetupClient();
 const { evaluateVerticalSpread } = require('../../../services/vertical-spread');
 
 const strategyCatalog = [
@@ -47,14 +49,14 @@ const strategyCatalog = [
 
 const getStrategyTypes = (_request, response) => {
   response.status(200).json({
-    phase: 'F0-F4',
-    strategies: strategyCatalog,
+    phase: 'F3',
+    strategies: strategyCatalog.filter(item=>item.phase==='F3'),
   });
 };
 
 const getStrategyType = (request, response) => {
   const { strategyType } = request.params;
-  const result = strategyCatalog.find((item) => item.code === strategyType.toUpperCase());
+  const result = strategyCatalog.find((item) => item.phase==='F3' && item.code === strategyType.toUpperCase());
 
   if (!result) {
     return response.status(404).json({ message: `Tipo de estrategia no encontrado: ${strategyType}` });
@@ -63,32 +65,13 @@ const getStrategyType = (request, response) => {
   return response.status(200).json(result);
 };
 
-const buildStrategyTemplate = (request, response) => {
-  const { strategyType, symbol, underlyingPrice, expiration, strike, quantity = 1, premium = 0 } = request.body || {};
-
-  response.status(200).json({
-    strategyType: strategyType || 'LONG_CALL',
-    symbol: symbol || 'AAPL',
-    underlyingPrice: Number(underlyingPrice || 0),
-    expiration: expiration || '2026-12-18',
-    strike: Number(strike || 0),
-    quantity: Number(quantity),
-    premium: Number(premium),
-    legs: [{
-      legId: 'leg-1',
-      type: 'option',
-      side: 'long',
-      quantity: Number(quantity),
-      strike: Number(strike || 0),
-      expiration,
-      premium: Number(premium),
-    }],
-    status: 'draft',
-    validation: {
-      complete: Boolean(symbol && expiration),
-      missingFields: [],
-    },
-  });
+const buildStrategyTemplate = (request,response) => {
+  try {
+    const input=request.body||{};
+    if(!Number.isFinite(Number(input.multiplier??100))||Number(input.multiplier??100)<=0) throw new Error('multiplier debe ser mayor que cero.');
+    const result=buildVertical({...input,quantity:input.quantity??1});
+    return response.json({...result,quantity:input.quantity??1,multiplier:input.multiplier??100,status:'draft',validation:{complete:!result.pendingFields.length,missingFields:result.pendingFields}});
+  } catch(error) {return response.status(error.status||400).json({message:'No se pudo construir la estrategia.',detail:error.message});}
 };
 
 const evaluateStrategy = (request, response) => {
@@ -102,7 +85,7 @@ const evaluateStrategy = (request, response) => {
       assumptions: {
         underlyingPrice: Number(request.body?.underlyingPrice || 0),
         model: 'vertical-spread',
-        dataSource: hasBrokerQuotes ? 'alpaca' : 'mock',
+        dataSource: hasBrokerQuotes ? 'provided-quotes' : 'provided-premiums',
       },
     });
   } catch (error) {
@@ -113,25 +96,17 @@ const evaluateStrategy = (request, response) => {
   }
 };
 
-const getSetups = (_request, response) => {
-  response.status(200).json({
-    setups: [],
-    total: 0,
-    message: 'Base de setups lista para integrar el modelo de persistencia del servicio.',
-  });
+const getSetups = async (request,response) => {
+  try{const result=await setupClient.list(request);return response.json({setups:result.data,total:result.total,storage:'supabase'});}
+  catch(error){return response.status(error.status||500).json({message:error.message});}
 };
-
-const createSetup = (request, response) => {
-  const body = request.body || {};
-
-  response.status(201).json({
-    setupId: `setup-${Date.now()}`,
-    strategyType: body.strategyType || 'LONG_CALL',
-    symbol: body.symbol || 'AAPL',
-    status: 'draft',
-    createdAt: new Date().toISOString(),
-    data: body,
-  });
+const createSetup = async (request,response) => {
+  try {
+    const body=request.body||{};
+    const payload=body.underlyingTicker?body:{strategyType:body.strategyType,underlyingTicker:body.symbol,currentStockPrice:body.underlyingPrice,expirationDate:body.expiration,quantity:body.quantity??1,multiplier:body.multiplier??100,status:body.status||'draft',notes:body.notes??null,legs:(body.legs||[]).map(l=>({optionType:l.type,action:l.side,strike:l.strike,premium:l.price??l.premium,expirationDate:l.expiration||body.expiration,...(l.contractSymbol?{contractSymbol:l.contractSymbol}:{})}))};
+    const result=await setupClient.create(request,payload);
+    return response.status(201).json({...result,setupId:result.id,storage:'supabase'});
+  }catch(error){return response.status(error.status||500).json({message:error.message});}
 };
 
 module.exports = {

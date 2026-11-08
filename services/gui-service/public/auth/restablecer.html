@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Nueva contraseña · Mesa de operaciones</title><link rel="stylesheet" href="/auth/auth.css"><script src="/auth/auth.js" defer></script></head>
+<body data-auth-page="reset">
+<header><a href="/">Mesa de operaciones</a><span>Acceso a tu cuenta</span></header>
+<main><aside><p class="eyebrow">SEGURIDAD DE LA CUENTA</p><h1>Un nuevo inicio.<br>La misma cuenta.</h1><p>Actualiza tu contraseña para volver a consultar y guardar tus estrategias.</p><div class="steps"><p><b>01</b> Usa al menos 8 caracteres</p><p><b>02</b> Confirma la contraseña</p><p><b>03</b> Vuelve al dashboard</p></div></aside>
+<section class="panel" aria-labelledby="formTitle"><p class="eyebrow">RESTABLECER ACCESO</p><h2 id="formTitle">Elige tu nueva contraseña</h2><p class="intro" id="authIntro">Utiliza una contraseña propia para esta aplicación.</p>
+<div id="authMessage" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+<form id="resetForm" hidden>
+<label for="newPassword">Nueva contraseña</label><div class="password-field"><input id="newPassword" type="password" autocomplete="new-password" minlength="8" maxlength="256" required aria-describedby="passwordHelp"><button type="button" data-password-toggle="newPassword" aria-controls="newPassword" aria-pressed="false">Mostrar</button></div>
+<p class="helper" id="passwordHelp">Entre 8 y 256 caracteres. Combina palabras, números o símbolos.</p>
+<label for="confirmPassword">Confirmar nueva contraseña</label><div class="password-field"><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="256" required><button type="button" data-password-toggle="confirmPassword" aria-controls="confirmPassword" aria-pressed="false">Mostrar</button></div>
+<button class="primary" id="submitReset" type="submit">Guardar nueva contraseña</button></form>
+<a id="requestAgain" class="secondary" href="/auth/recuperar.html">Solicitar otro enlace</a><a class="back" href="/">← Volver al dashboard</a></section></main>
+<footer>Mesa de operaciones · Estrategias con opciones</footer></body></html>

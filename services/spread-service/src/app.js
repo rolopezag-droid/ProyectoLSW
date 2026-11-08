@@ -4,7 +4,14 @@ const { SpreadService } = require('./services/spread.service');
 function createApp(databaseFactory = createDatabase) {
  const app = express();
  app.use(express.json({limit:'256kb'}));
- app.get('/health',(_req,res)=>res.json({status:'OK',service:'spread-service',database:'supabase'}));
+ app.get('/health',async(_req,res)=>{
+  try {
+   let query=databaseFactory().from('strategy_types').select('id').range(0,0);
+   if(typeof query.abortSignal==='function') query=query.abortSignal(AbortSignal.timeout(1500));
+   const {error}=await query;
+   res.status(error?503:200).json({status:error?'unavailable':'OK',service:'spread-service',database:error?'unavailable':'supabase'});
+  }catch{res.status(503).json({status:'unavailable',service:'spread-service',database:'unavailable'});}
+ });
  app.use('/api/v1/spreads',async(req,res,next)=>{
   try {
    const header=req.get('authorization'); let token;

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Recuperar acceso · Mesa de operaciones</title><link rel="stylesheet" href="/auth/auth.css"><script src="/auth/auth.js" defer></script></head>
+<body data-auth-page="request">
+<header><a href="/">Mesa de operaciones</a><span>Acceso a tu cuenta</span></header>
+<main><aside><p class="eyebrow">CUENTA PERSONAL</p><h1>Recupera tu acceso.</h1><p>Conserva tus estrategias y evaluaciones. Cambia tu contraseña mediante un enlace enviado a tu correo.</p><div class="steps"><p><b>01</b> Solicita el enlace</p><p><b>02</b> Abre el correo más reciente</p><p><b>03</b> Elige una contraseña nueva</p></div></aside>
+<section class="panel" aria-labelledby="formTitle"><p class="eyebrow">RECUPERACIÓN</p><h2 id="formTitle">¿Olvidaste tu contraseña?</h2><p class="intro">Usa el correo con el que creaste tu cuenta en esta aplicación.</p>
+<form id="recoveryForm"><label for="recoveryEmail">Correo electrónico</label><input id="recoveryEmail" name="email" type="email" autocomplete="username" required maxlength="254" placeholder="tu@correo.com"><button class="primary" id="submitRecovery" type="submit">Enviar enlace de recuperación</button></form>
+<div id="authMessage" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+<p class="helper">El enlace es personal y puede vencer. No compartas el correo de recuperación.</p><a class="back" href="/">← Volver al dashboard</a></section></main>
+<footer>Mesa de operaciones · Estrategias con opciones</footer></body></html>

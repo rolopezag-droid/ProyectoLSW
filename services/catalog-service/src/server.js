@@ -6,7 +6,7 @@ const connectMongoDB = require('./database/mongodb');
 const startServer = async () => {
   await connectMongoDB();
 
-  app.listen(port, () => {
+  app.listen(port, '127.0.0.1', () => {
     console.log(`catalog-service listening on port ${port}`);
   });
 };

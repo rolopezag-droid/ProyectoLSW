@@ -3,6 +3,14 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const { catalogServiceUrl, quantServiceUrl, spreadServiceUrl } = require('./config/env');
 const app = express();
 
+// Compatibilidad con el Site URL local anterior. El navegador conserva el fragmento
+// de autenticación en el redirect HTTP; no se transmite ni registra en el servidor.
+app.get('/', (_request, response) => {
+  const destination = new URL(process.env.APP_PUBLIC_URL || `http://localhost:${Number(process.env.GUI_PORT || 3005)}`);
+  response.set({ 'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer' });
+  response.redirect(303, destination.origin + '/auth/restablecer.html');
+});
+
 app.get('/health', (_request, response) => {
   response.json({ service: 'api-gateway', status: 'ok' });
 });
