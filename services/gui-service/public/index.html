@@ -880,6 +880,9 @@ async function fetchAutomaticSelection() {
   clearStrategyQuotes();
   if(!symbol||!expiration) throw new Error('Ingresa símbolo y vencimiento.');
   const type=strategy.includes('CALL')?'call':'put';
+  const quotePromise = fetch(`${QUANT_SERVICE_URL}/api/v1/broker/quotes?symbol=${encodeURIComponent(symbol)}`)
+    .then(async res => { const data = await res.json().catch(()=>({})); if(!res.ok) return null; const bid=Number(data.bid), ask=Number(data.ask); return Number.isFinite(bid)&&Number.isFinite(ask)&&(bid>0||ask>0)?((bid>0&&ask>0)?(bid+ask)/2:(bid||ask)):null; })
+    .catch(() => null);
   const contracts=await selectVertical.collectOptionChain(async pageToken=>{
     const params=new URLSearchParams({symbol,expiration,type,limit:'200'});
     if(pageToken) params.set('pageToken',pageToken);
@@ -888,13 +891,15 @@ async function fetchAutomaticSelection() {
     if(!res.ok) throw new Error(data.detail||data.message||'No se pudo consultar Alpaca.');
     return data;
   });
+  const spotPrice = await quotePromise;
   if(strategy!==selectedStrategy||symbol!==document.getElementById('symbol').value||expiration!==document.getElementById('expiration').value.trim()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
-  const result=selectVertical(contracts,strategy,symbol,expiration);
+  const result=selectVertical(contracts,strategy,symbol,expiration,spotPrice);
   document.getElementById('strikeLong').value=result.long.strike;
   document.getElementById('strikeShort').value=result.short.strike;
   document.getElementById('priceLong').value=result.long.ask;
   document.getElementById('priceShort').value=result.short.bid;
-  log(strategy+': compra '+result.long.contractSymbol+' Ask '+result.long.ask+'; venta '+result.short.contractSymbol+' Bid '+result.short.bid);
+  if(Number.isFinite(spotPrice)) log(`${strategy}: spot ${spotPrice.toFixed(2)}; compra ${result.long.contractSymbol} Ask ${result.long.ask}; venta ${result.short.contractSymbol} Bid ${result.short.bid}`);
+  else log(`${strategy}: compra ${result.long.contractSymbol} Ask ${result.long.ask}; venta ${result.short.contractSymbol} Bid ${result.short.bid}`);
   return result;
 }
 document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
@@ -1695,24 +1700,24 @@ async function runPaperExecution() {
     const result = await res.json();
     if (!res.ok) throw new Error(result.message || `quant-service respondió ${res.status}`);
 
-    // Ejecutar la estrategia: colocar una orden por cada pata en la cuenta paper.
+    // Ejecutar la estrategia: orden MLEG (multi-pata) en la cuenta paper de Alpaca.
     const useStopLoss = document.getElementById('chkStopLoss').checked;
-    const stopLossPerShare = (result.maxLoss || 0) / (result.quantity || 1);
     const optionLetter = (optionType) => (optionType === 'put' ? 'P' : 'C');
-    const buildContractSymbol = (leg) => `${result.symbol}${String(result.expiration || '').replaceAll('-', '')}${optionLetter(leg.type)}${String(Math.round(leg.strike * 1000)).padStart(8, '0')}`;
+    // OCC/Alpaca: root + YYMMDD (6) + C/P + strike*1000 (8 dígitos). Evita construir símbolos manualmente si tienes contractSymbol real.
+    const buildContractSymbol = (leg) => `${result.symbol}${String(result.expiration || '').replaceAll('-', '').slice(2)}${optionLetter(leg.type)}${String(Math.round(leg.strike * 1000)).padStart(8, '0')}`;
+    if (useStopLoss) log('Aviso: el stop-loss por pata no aplica igual en una orden MLEG; se enviará la orden MLEG sin stop-loss por pata.');
     const spreadRes = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/spreads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         symbol: result.symbol,
+        qty: result.quantity || 1,
+        type: 'market',
+        timeInForce: 'day',
         legs: (result.legs || []).map((leg) => ({
-          symbol: buildContractSymbol(leg),
-          qty: result.quantity,
+          symbol: leg.contractSymbol || buildContractSymbol(leg),
+          qty: 1,
           side: leg.side,
-          type: useStopLoss ? 'stop_limit' : 'limit',
-          timeInForce: 'day',
-          limitPrice: leg.price,
-          ...(useStopLoss ? { stopLossPrice: leg.side === 'buy' ? leg.price - stopLossPerShare : leg.price + stopLossPerShare } : {}),
         })),
       }),
     });
@@ -1721,9 +1726,9 @@ async function runPaperExecution() {
     const orders = (result.legs || []).map((leg) => ({
       ...leg,
       qty: result.quantity,
-      type: useStopLoss ? 'stop_limit' : 'limit',
+      type: 'market',
       strike: leg.strike,
-      symbol: buildContractSymbol(leg),
+      symbol: leg.contractSymbol || buildContractSymbol(leg),
       id: spreadData.id,
       status: spreadData.status,
     }));

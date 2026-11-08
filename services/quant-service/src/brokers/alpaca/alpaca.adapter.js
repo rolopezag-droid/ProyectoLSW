@@ -145,32 +145,38 @@ class AlpacaAdapter extends BrokerAdapter {
     };
   }
 
-  async createSpread({ symbol, legs }) {
+  async createSpread({ symbol, qty = 1, legs, type = 'market', timeInForce = 'day', limitPrice, positionIntent } = {}) {
     if (!symbol || !Array.isArray(legs) || legs.length < 2) {
       const error = new Error('createSpread requiere symbol y legs con al menos dos patas.');
       error.status = 400;
       throw error;
     }
-    const spreadLegs = legs.map((leg) => ({
-      symbol: leg.symbol,
-      qty: String(leg.qty ?? 1),
-      side: leg.side,
-      type: leg.type || 'market',
-      time_in_force: leg.timeInForce || 'day',
-      ...(leg.stopLossPrice !== undefined ? { stop_price: String(leg.stopLossPrice) } : {}),
-      ...(leg.limitPrice !== undefined ? { limit_price: String(leg.limitPrice) } : {}),
-    }));
+    const spreadLegs = legs.map((leg) => {
+      const side = String(leg.side || '').toLowerCase();
+      const normalized = {
+        symbol: leg.symbol,
+        side,
+        ratio_qty: String(leg.ratioQty ?? leg.qty ?? 1),
+      };
+      // Alpaca MLEG: position_intent por pata ayuda a abrir spreads correctamente (buy_to_open/sell_to_open).
+      const intent = leg.positionIntent || positionIntent;
+      if (intent) normalized.position_intent = intent;
+      else if (['buy', 'sell'].includes(side)) normalized.position_intent = side === 'buy' ? 'buy_to_open' : 'sell_to_open';
+      return normalized;
+    });
+
+    const order = {
+      order_class: 'mleg',
+      qty: String(qty),
+      type,
+      time_in_force: timeInForce,
+      legs: spreadLegs,
+    };
+    if ((type === 'limit' || type === 'stop_limit') && limitPrice != null) order.limit_price = String(limitPrice);
+
     const created = await this.request(this.tradingBaseUrl, '/v2/orders', {
       method: 'POST',
-      body: JSON.stringify({
-        symbol: symbol.toUpperCase(),
-        legs: spreadLegs,
-        qty: String(legs.reduce((total, leg) => total + Number(leg.qty ?? 1), 0)),
-        side: legs[0].side,
-        position_intent: legs[0].side === 'buy' ? 'buy_to_open' : 'sell_to_open',
-        type: 'market',
-        time_in_force: 'day',
-      }),
+      body: JSON.stringify(order),
     });
     return { provider: 'alpaca', ...created, legs: created.legs || spreadLegs };
   }

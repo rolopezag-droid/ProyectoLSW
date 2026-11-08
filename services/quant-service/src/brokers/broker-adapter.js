@@ -18,6 +18,10 @@ class BrokerAdapter {
   async getOptionChain(_filters) {
     throw new Error('El broker debe implementar getOptionChain().');
   }
+
+  async createSpread(_spread) {
+    throw new Error('El broker debe implementar createSpread().');
+  }
 }
 
 module.exports = BrokerAdapter;

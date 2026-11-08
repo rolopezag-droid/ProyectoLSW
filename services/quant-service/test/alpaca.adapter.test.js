@@ -166,7 +166,7 @@ test('crea una orden de mercado en la cuenta paper de Alpaca', async () => {
   assert.equal(order.status, 'pending_new');
 });
 
-test('crea una orden compleja (spread) con dos patas en la cuenta paper de Alpaca', async () => {
+test('crea un bull call spread como orden MLEG (compra y venta) en Alpaca paper', async () => {
   const adapter = new AlpacaAdapter({
     keyId: 'key',
     secretKey: 'secret',
@@ -176,34 +176,43 @@ test('crea una orden compleja (spread) con dos patas en la cuenta paper de Alpac
       assert.equal(url, 'https://paper.example/v2/orders');
       assert.equal(options.method, 'POST');
       const body = JSON.parse(options.body);
-      assert.equal(body.symbol, 'AAPL');
-      assert.equal(body.qty, '2');
-      assert.equal(body.side, 'buy');
-      assert.equal(body.position_intent, 'buy_to_open');
+      assert.equal(body.order_class, 'mleg');
+      assert.equal(body.qty, '1');
       assert.equal(body.type, 'market');
       assert.equal(body.time_in_force, 'day');
+      assert.equal(body.symbol, undefined);
+      assert.equal(body.side, undefined);
       assert.equal(body.legs.length, 2);
-      assert.equal(body.legs[0].symbol, 'AAPL261218C00005000');
-      assert.equal(body.legs[0].side, 'buy');
-      assert.equal(body.legs[0].type, 'limit');
-      assert.equal(body.legs[0].limit_price, '5.5');
-      assert.equal(body.legs[1].symbol, 'AAPL261218C00010000');
-      assert.equal(body.legs[1].side, 'sell');
-      return createResponse({ id: 'spread-order-id', status: 'pending_new', symbol: 'AAPL', legs: [{ symbol: 'AAPL261218C00005000', side: 'buy', type: 'limit' }, { symbol: 'AAPL261218C00010000', side: 'sell', type: 'limit' }] });
+      assert.deepEqual(body.legs[0], {
+        symbol: 'AAPL261218C00100000',
+        side: 'buy',
+        ratio_qty: '1',
+        position_intent: 'buy_to_open',
+      });
+      assert.deepEqual(body.legs[1], {
+        symbol: 'AAPL261218C00110000',
+        side: 'sell',
+        ratio_qty: '1',
+        position_intent: 'sell_to_open',
+      });
+      return createResponse({ id: 'spread-order-id', status: 'accepted', order_class: 'mleg', legs: body.legs });
     },
   });
 
   const spread = await adapter.createSpread({
     symbol: 'aapl',
+    qty: 1,
+    // bull call: compra call strike bajo, vende call strike alto
     legs: [
-      { symbol: 'AAPL261218C00005000', qty: 1, side: 'buy', type: 'limit', limitPrice: 5.5 },
-      { symbol: 'AAPL261218C00010000', qty: 1, side: 'sell', type: 'limit', limitPrice: 6.2 },
+      { symbol: 'AAPL261218C00100000', qty: 1, side: 'buy' },
+      { symbol: 'AAPL261218C00110000', qty: 1, side: 'sell' },
     ],
   });
 
   assert.equal(spread.provider, 'alpaca');
   assert.equal(spread.id, 'spread-order-id');
-  assert.equal(spread.legs.length, 2);
+  assert.equal(spread.legs[0].side, 'buy');
+  assert.equal(spread.legs[1].side, 'sell');
 });
 
 test('pagina filtrada consulta 201 contratos en tres lotes y preserva token', async()=>{

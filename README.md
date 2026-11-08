@@ -10,7 +10,7 @@ Demo de una aplicacion REST con Express organizada como microservicios.
 - `services/catalog-service`: servicio preparado para el dominio de catalogos.
 - `services/quant-service`: servicio base para cálculo cuantitativo, market data y estrategias de opciones.
 - `services/strategy-service`: capa de dominio, modelos y servicios de persistencia para F3.
-- `catalogs-mongodb.md`: modelo de persistencia para MongoDB.
+- `catalogs-mongodb.md`: modelo de persistencia para MongoDB.O
 - `catalogs-supabase-postgres.md`: modelo de persistencia para Supabase/Postgres.
 
 ## Módulos base integrados

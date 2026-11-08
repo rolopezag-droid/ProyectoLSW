@@ -130,11 +130,11 @@ const createOrder = async (request, response) => {
 
 const createSpread = async (request, response) => {
   try {
-    const { symbol, legs } = request.body || {};
+    const { symbol, qty = 1, legs, type = 'market', timeInForce = 'day', limitPrice, positionIntent } = request.body || {};
     if (!symbol || !Array.isArray(legs) || legs.length < 2) {
       return response.status(400).json({ message: 'Se requiere symbol y legs con al menos dos patas para crear el spread.' });
     }
-    const spread = await broker.createSpread({ symbol, legs });
+    const spread = await broker.createSpread({ symbol, qty, legs, type, timeInForce, limitPrice, positionIntent });
     return response.status(201).json(spread);
   } catch (error) {
     return response.status(error.status || 502).json({
