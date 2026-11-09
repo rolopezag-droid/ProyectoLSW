@@ -15,7 +15,7 @@ app.get('/health',(_req,res)=>res.json({service:'gui-service',status:'ok',pid:pr
 app.use(createProxyMiddleware({
   target: process.env.GATEWAY_SERVICE_URL || 'http://localhost:3000',
   changeOrigin: true,
-  pathFilter: path => path === '/api/v1/spreads' || path.startsWith('/api/v1/spreads/'),
+  pathFilter: path => path === '/api/v1/spreads' || path.startsWith('/api/v1/spreads/') || path === '/api/v1/research-journal' || path.startsWith('/api/v1/research-journal/'),
   on: { error: (_error, _req, res) => {
     if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: 'No se pudo contactar al Gateway.' }));

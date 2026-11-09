@@ -7,6 +7,7 @@ class AlpacaAdapter extends BrokerAdapter {
     secretKey,
     tradingBaseUrl,
     dataBaseUrl,
+    stockFeed = 'iex',
     optionsFeed = 'indicative',
     fetchImplementation = fetch,
   }) {
@@ -15,6 +16,7 @@ class AlpacaAdapter extends BrokerAdapter {
     this.secretKey = secretKey;
     this.tradingBaseUrl = tradingBaseUrl.replace(/\/$/, '');
     this.dataBaseUrl = dataBaseUrl.replace(/\/$/, '');
+    this.stockFeed = stockFeed;
     this.optionsFeed = optionsFeed;
     this.fetch = fetchImplementation;
   }
@@ -93,6 +95,7 @@ class AlpacaAdapter extends BrokerAdapter {
     }
     const params = new URLSearchParams({
       timeframe,
+      feed: this.stockFeed,
       limit: String(Math.min(Math.max(Number(limit) || 100, 1), 10000)),
     });
     if (start) params.set('start', start);
@@ -117,7 +120,35 @@ class AlpacaAdapter extends BrokerAdapter {
       provider: 'alpaca',
       symbol: symbol.toUpperCase(),
       timeframe,
+      feed: this.stockFeed,
       bars,
+      nextPageToken: response.next_page_token ?? null,
+      capturedAt: new Date().toISOString(),
+    };
+  }
+
+  async getNews({ symbols, start, end, limit = 50, sort = 'desc' } = {}) {
+    const list = Array.isArray(symbols) ? symbols : String(symbols || '').split(',').filter(Boolean);
+    const normalized = [...new Set(list.map(value => String(value).trim().toUpperCase()))];
+    if (!normalized.length || normalized.length > 10 || normalized.some(value => !/^[A-Z0-9.-]{1,12}$/.test(value))) {
+      const error = new Error('symbols debe incluir entre 1 y 10 tickers válidos.');
+      error.status = 400;
+      throw error;
+    }
+    if (sort !== 'asc' && sort !== 'desc') {
+      const error = new Error('sort debe ser asc o desc.');
+      error.status = 400;
+      throw error;
+    }
+    const pageLimit = Math.min(Math.max(Number(limit) || 50, 1), 50);
+    const params = new URLSearchParams({ symbols: normalized.join(','), sort, limit: String(pageLimit), include_content: 'false' });
+    if (start) params.set('start', start);
+    if (end) params.set('end', end);
+    const response = await this.request(this.dataBaseUrl, `/v1beta1/news?${params.toString()}`);
+    return {
+      provider: 'alpaca',
+      symbols: normalized,
+      articles: response.news || response.articles || [],
       nextPageToken: response.next_page_token ?? null,
       capturedAt: new Date().toISOString(),
     };

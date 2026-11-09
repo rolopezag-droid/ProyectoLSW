@@ -63,7 +63,7 @@ app.use(
 app.use(createProxyMiddleware({
   target: spreadServiceUrl,
   changeOrigin: true,
-  pathFilter: path => path === '/api/v1/spreads' || path.startsWith('/api/v1/spreads/'),
+    pathFilter: path => path === '/api/v1/spreads' || path.startsWith('/api/v1/spreads/') || path === '/api/v1/research-journal' || path.startsWith('/api/v1/research-journal/'),
   on: { error: (_error, _req, res) => {
     if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: 'No se pudo contactar al spread-service.' }));

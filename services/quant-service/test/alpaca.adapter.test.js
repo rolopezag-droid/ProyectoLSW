@@ -126,7 +126,7 @@ test('obtiene velas (candles) historicas de Alpaca para un ticker', async () => 
     dataBaseUrl: 'https://data.example',
     fetchImplementation: async (url) => {
       requests.push(url);
-      assert.equal(url, 'https://data.example/v2/stocks/AAPL/bars?timeframe=1Day&limit=100&sort=asc');
+      assert.equal(url, 'https://data.example/v2/stocks/AAPL/bars?timeframe=1Day&feed=iex&limit=100&sort=asc');
       return createResponse({
         bars: [
           { t: '2026-10-01T20:00:00Z', o: 178.26, h: 179.1, l: 177.9, c: 178.5, v: 1118, n: 65, vw: 178.23 },
@@ -154,6 +154,7 @@ test('obtiene velas (candles) historicas de Alpaca para un ticker', async () => 
   });
   assert.equal(result.symbol, 'AAPL');
   assert.equal(result.timeframe, '1Day');
+  assert.equal(result.feed, 'iex');
 });
 
 test('crea una orden de mercado en la cuenta paper de Alpaca', async () => {

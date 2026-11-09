@@ -6,6 +6,12 @@
 
 Demo de una aplicacion REST con Express organizada como microservicios.
 
+## Feed de acciones en Alpaca
+
+Quant consulta velas de acciones con `ALPACA_STOCKS_FEED=iex` por defecto, compatible con el nivel Basic. Para cuentas con permiso SIP se puede configurar `ALPACA_STOCKS_FEED=sip`. Valores admitidos: `iex`, `sip`, `delayed_sip`. Las cadenas de opciones conservan su configuración independiente `ALPACA_OPTIONS_FEED`.
+
+Las noticias del análisis se consultan a Alpaca Market Data por los tickers analizados. Se muestran titulares, fuente, fecha y enlace. El análisis fundamental y el sentimiento automático están fuera del alcance actual.
+
 ## Estructura base
 
 - `services/api-gateway`: punto de entrada HTTP para los clientes.

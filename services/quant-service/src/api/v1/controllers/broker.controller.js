@@ -5,6 +5,7 @@ const {
   alpacaSecretKey,
   alpacaTradingBaseUrl,
   alpacaDataBaseUrl,
+  alpacaStocksFeed,
   alpacaOptionsFeed,
 } = require('../../../config/env');
 
@@ -14,6 +15,7 @@ const broker = createBroker({
   secretKey: alpacaSecretKey,
   tradingBaseUrl: alpacaTradingBaseUrl,
   dataBaseUrl: alpacaDataBaseUrl,
+  stockFeed: alpacaStocksFeed,
   optionsFeed: alpacaOptionsFeed,
 });
 
@@ -97,6 +99,18 @@ const getCandles = async (request, response) => {
   }
 };
 
+const getNews = async (request, response) => {
+  try {
+    const { symbols, start, end, limit, sort } = request.query;
+    return response.json(await broker.getNews({ symbols, start, end, limit, sort }));
+  } catch (error) {
+    return response.status(error.status || 502).json({
+      message: 'No se pudieron consultar noticias de Alpaca.',
+      detail: error.message,
+    });
+  }
+};
+
 const createOrder = async (request, response) => {
   try {
     const { symbol, qty, side, type = 'market', timeInForce = 'day', limitPrice, stopLossPrice } = request.body || {};
@@ -147,4 +161,4 @@ const createSpread = async (request, response) => {
 const ingestor=require('../../../services/ingestion').createIngestor(broker);
 const ingestOptions=async(req,res)=>{try{return res.status(201).json(await ingestor.run(req.body));}catch(error){return res.status(error.status||502).json({message:'No se pudo completar la ingestión.',detail:error.message});}};
 const readIngestion=async(req,res)=>{try{return res.json(await ingestor.read(req.params.id));}catch(error){return res.status(error.status||502).json({message:error.message});}};
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getCandles, createOrder, createSpread };
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getCandles, getNews, createOrder, createSpread };
