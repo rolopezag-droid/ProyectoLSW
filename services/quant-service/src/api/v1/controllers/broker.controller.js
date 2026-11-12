@@ -147,4 +147,23 @@ const createSpread = async (request, response) => {
 const ingestor=require('../../../services/ingestion').createIngestor(broker);
 const ingestOptions=async(req,res)=>{try{return res.status(201).json(await ingestor.run(req.body));}catch(error){return res.status(error.status||502).json({message:'No se pudo completar la ingestión.',detail:error.message});}};
 const readIngestion=async(req,res)=>{try{return res.json(await ingestor.read(req.params.id));}catch(error){return res.status(error.status||502).json({message:error.message});}};
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getCandles, createOrder, createSpread };
+const getOptionStrikes = async (request, response) => {
+  try {
+    const { symbol, expiration, type } = request.query;
+    if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
+      return response.status(400).json({ message: 'symbol debe ser un ticker válido.' });
+    }
+    if (expiration && !/^\d{4}-\d{2}-\d{2}$/.test(expiration)) {
+      return response.status(400).json({ message: 'expiration debe usar YYYY-MM-DD.' });
+    }
+    if (type !== undefined && !['call', 'put'].includes(type)) {
+      return response.status(400).json({ message: 'type debe ser call o put.' });
+    }
+    const contracts = await broker.getOptionChain({ symbol, expiration, type, limit: 1000 });
+    const strikes = [...new Set((contracts.contracts || []).map(c => Number(c.strike)).filter(s => Number.isFinite(s)))].sort((a, b) => a - b);
+    return response.json({ provider: 'alpaca', symbol: symbol.toUpperCase(), expiration: expiration || null, type: type || null, strikes, count: strikes.length });
+  } catch (error) {
+    return response.status(error.status || 502).json({ message: 'No se pudo consultar los strikes.', detail: error.message });
+  }
+};
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getCandles, createOrder, createSpread };
