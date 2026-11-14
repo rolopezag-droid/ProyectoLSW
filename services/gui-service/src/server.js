@@ -11,11 +11,25 @@ const PORT = Number(process.env.GUI_PORT || 3005);
 
 app.get('/health',(_req,res)=>res.json({service:'gui-service',status:'ok',pid:process.pid}));
 
+app.get('/api/research/fundamentals', async (req, res) => {
+  const symbols = String(req.query.symbols || '').split(',').map(symbol => symbol.trim().toUpperCase()).filter(Boolean);
+  if (!symbols.length || symbols.length > 3 || symbols.some(symbol => !/^[A-Z0-9.-]{1,12}$/.test(symbol))) {
+    return res.status(400).json({ message: 'symbols debe contener de 1 a 3 tickers válidos.' });
+  }
+  res.set('Cache-Control', 'no-store');
+  try {
+    const result = await require('./fmp-fundamentals').loadFundamentals(symbols, process.env.FMP_API_KEY);
+    return res.json(result);
+  } catch {
+    return res.status(502).json({ message: 'No se pudieron consultar los fundamentales de FMP.' });
+  }
+});
+
 // Middlewares
 app.use(createProxyMiddleware({
   target: process.env.GATEWAY_SERVICE_URL || 'http://localhost:3000',
   changeOrigin: true,
-  pathFilter: path => path === '/api/v1/spreads' || path.startsWith('/api/v1/spreads/'),
+  pathFilter: path => path === '/api/v1/spreads' || path.startsWith('/api/v1/spreads/') || path === '/api/v1/research-journal' || path.startsWith('/api/v1/research-journal/'),
   on: { error: (_error, _req, res) => {
     if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: 'No se pudo contactar al Gateway.' }));

@@ -5,6 +5,7 @@ const {
   alpacaSecretKey,
   alpacaTradingBaseUrl,
   alpacaDataBaseUrl,
+  alpacaStocksFeed,
   alpacaOptionsFeed,
 } = require('../../../config/env');
 
@@ -14,6 +15,7 @@ const broker = createBroker({
   secretKey: alpacaSecretKey,
   tradingBaseUrl: alpacaTradingBaseUrl,
   dataBaseUrl: alpacaDataBaseUrl,
+  stockFeed: alpacaStocksFeed,
   optionsFeed: alpacaOptionsFeed,
 });
 
@@ -97,6 +99,18 @@ const getCandles = async (request, response) => {
   }
 };
 
+const getNews = async (request, response) => {
+  try {
+    const { symbols, start, end, limit, sort } = request.query;
+    return response.json(await broker.getNews({ symbols, start, end, limit, sort }));
+  } catch (error) {
+    return response.status(error.status || 502).json({
+      message: 'No se pudieron consultar noticias de Alpaca.',
+      detail: error.message,
+    });
+  }
+};
+
 const createOrder = async (request, response) => {
   try {
     const { symbol, qty, side, type = 'market', timeInForce = 'day', limitPrice, stopLossPrice } = request.body || {};
@@ -166,4 +180,4 @@ const getOptionStrikes = async (request, response) => {
     return response.status(error.status || 502).json({ message: 'No se pudo consultar los strikes.', detail: error.message });
   }
 };
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getCandles, createOrder, createSpread };
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getCandles, getNews, createOrder, createSpread };

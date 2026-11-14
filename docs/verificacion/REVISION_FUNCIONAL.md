@@ -1,5 +1,20 @@
 # Revisión funcional de ProyectoLSW
 
+## Organización visual del análisis
+Fecha: 2026-11-09. A solicitud de Roberto, se separaron los resultados en paneles identificados: técnico por ticker, noticias de Alpaca, comparación de spreads y bitácora. A petición posterior se retiró el panel placeholder de fundamentales y el campo pendiente del snapshot. La explicación de score, intervalo y filtros ahora está plegada bajo metodología. Se mejoraron jerarquía, tarjetas, colores de tendencia, filtros y distribución adaptable de paneles. Cambio asistido por Codex; no se ejecutaron pruebas ni una revisión visual en navegador durante esta edición.
+
+## Feed de velas Alpaca: compatibilidad con plan Basic
+Fecha: 2026-11-09. La captura del usuario mostró que la consulta histórica reciente fallaba con `subscription does not permit querying recent SIP data`. Se añadió `ALPACA_STOCKS_FEED` (por defecto `iex`) al adaptador de velas; `sip` y `delayed_sip` quedan configurables para planes que los permitan. El feed queda devuelto en metadatos de velas y se conserva en cada análisis. No se cambiaron credenciales ni se hizo una consulta real a Alpaca. Pruebas no ejecutadas en esta intervención.
+
+## Bitácora y comparación de estrategias: implementación inicial
+Fecha: 2026-11-08 y actualización 2026-11-09. Requisitos aportados por Roberto; implementación asistida por Codex. Se añadieron cálculo técnico con SMA20/50, RSI14, ATR14 y volatilidad histórica; comparación de Bull Call, Bear Call, Bull Put y Bear Put para tickers configurables; filtros de probabilidad, ganancia/riesgo, diferencial relativo Bid/Ask y alineación técnica; probabilidad histórica al vencimiento e intervalo Wilson aproximado; y registro append-only por usuario en Supabase. La actualización integra titulares de Alpaca Market Data filtrados por ticker, fecha, fuente y enlace, y los guarda en el snapshot. No se genera sentimiento automático.
+
+Fuentes actuales: Alpaca (velas, cotización de referencia, cotizaciones de opciones y noticias). Las cotizaciones de opciones sin timestamp o con más de 72 horas se excluyen. El análisis fundamental queda fuera del alcance actual. Las observaciones históricas se traslapan, por lo que el intervalo puede subestimar incertidumbre; la puntuación de ranking es heurística, no calibrada. El análisis compara los tickers que ingresa el usuario; no clasifica automáticamente todo el mercado.
+
+Archivos: `services/quant-service/src/brokers/alpaca/alpaca.adapter.js`, `services/quant-service/src/api/v1/controllers/broker.controller.js`, `services/quant-service/src/api/v1/routes/broker.routes.js`, `services/gui-service/public/research-analysis.js`, `services/gui-service/public/research-ui.js`, `services/gui-service/public/index.html`, `services/gui-service/src/server.js`, `services/api-gateway/src/app.js`, `services/spread-service/src/app.js`, `services/spread-service/src/services/research-journal.service.js`, `services/spread-service/src/controllers/research-journal.controller.js`, `services/spread-service/src/routes/research-journal.routes.js`, `docs/supabase/migrations/202611080001_research_journal.sql` y `openspec/changes/bitacora-analisis-opciones/`.
+
+Se preparó el SQL con RLS de propietario, pero no se ejecutó en Supabase. Para guardar/cargar en la nube, primero hay que aplicar esa migración. No se ejecutaron pruebas en esta intervención; los resultados están pendientes. No se enviaron órdenes al broker ni se consultaron/escribieron datos reales durante esta intervención.
+
 ## Verificación de entrega: 2026-11-07
 Suite completa `npm test`: 150 pruebas aprobadas, cero fallidas. Ejecución previa a preparar el commit de esta entrega. Se confirmó por lectura SQL el primer guardado real del usuario: un spread, dos patas y una evaluación. Tras autorización se corrigió únicamente su estado a evaluated y se comprobó de nuevo. Las verificaciones históricas descritas abajo conservan el alcance y resultados que tenían en su fecha; no deben interpretarse como limitaciones de acceso que sigan sin resolverse.
 

@@ -221,6 +221,74 @@
     .metric-card .value.neg { color: var(--danger); }
     .metric-card .value.neutral { color: var(--muted); }
 
+    .research-dashboard { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:16px; margin-top:18px; }
+    #researchEvidence[hidden] { display:none!important; }
+    .research-panel { grid-column:span 6; min-width:0; padding:18px; background:linear-gradient(145deg,rgba(28,39,52,.96),rgba(17,25,35,.98)); border:1px solid #2b3949; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); }
+    .research-panel-wide { grid-column:1 / -1; }
+    .research-panel-technical { grid-column:span 5; }
+    .research-panel-news { grid-column:span 7; }
+    .research-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(137,157,178,.13); }
+    .research-panel-heading h3 { margin:3px 0 0; color:var(--text); font-size:15px; font-weight:650; letter-spacing:-.2px; }
+    .research-panel-kicker { color:var(--accent); font-size:9px; font-weight:750; letter-spacing:1.1px; text-transform:uppercase; }
+    .research-panel-description { margin:0 0 13px; color:var(--muted); font-size:11px; line-height:1.6; }
+    .research-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:4px 0 14px; }
+    .research-heading h2 { margin:4px 0 3px; color:var(--text); font-size:17px; font-weight:650; }
+    .research-heading p { max-width:680px; margin:0; color:var(--muted); font-size:11px; line-height:1.55; }
+    .research-eyebrow { color:var(--accent); font-size:9px; font-weight:750; letter-spacing:1.3px; text-transform:uppercase; }
+    .research-controls { padding:15px; border:1px solid #2b3949; border-radius:9px; background:rgba(10,16,23,.42); }
+    .research-filter-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:10px 0 12px; }
+    .research-filter-grid label { display:block; }
+    .research-filter-grid input,.research-filter-grid select { width:100%; }
+    .research-module-options { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; padding:0; border:0; }
+    .research-module-option { display:flex; align-items:center; gap:7px; padding:8px 10px; border:1px solid #2b3949; border-radius:7px; background:rgba(10,16,23,.48); color:var(--text); font-size:11px; cursor:pointer; }
+    .research-module-option input { width:auto; margin:0; padding:0; border:0; border-radius:0; background:transparent; accent-color:var(--accent); }
+    .research-import-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:8px 0 12px; }
+    .research-import-status { color:var(--muted); font-size:10px; }
+    .research-zone-list,.research-financial-list,.research-movers-list { display:grid; gap:8px; margin-top:10px; }
+    .research-zone-row,.research-financial-row,.research-mover-row { padding:9px 10px; border:1px solid #2b3949; border-radius:7px; background:rgba(10,16,23,.38); font-size:10px; line-height:1.55; }
+    .research-zone-row strong,.research-financial-row strong,.research-mover-row strong { color:var(--text); }
+    .research-zone-row a,.research-financial-row a,.research-mover-row a { color:var(--accent); }
+    .research-summary-list { margin:0; padding-left:18px; color:#bfccda; font-size:11px; line-height:1.7; }
+    .research-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    #researchStatus { flex:1 1 260px; margin:0; line-height:1.5; }
+    #researchStatus[data-state="loading"] { color:var(--accent); }
+    #researchStatus[data-state="error"] { color:var(--danger); }
+    #researchStatus[data-state="info"] { color:#a9d9ca; }
+    .research-metrics { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+    .research-ticker-card { min-width:0; padding:14px; border:1px solid #2b3949; border-radius:8px; background:rgba(10,16,23,.58); }
+    .research-ticker-title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:11px; font-weight:700; }
+    .research-ticker-title strong { font-size:14px; letter-spacing:.3px; }
+    .research-trend { display:inline-flex; align-items:center; padding:4px 8px; border:1px solid #425163; border-radius:999px; color:var(--muted); font-size:9px; font-weight:750; letter-spacing:.5px; text-transform:uppercase; }
+    .research-trend.trend-bullish { border-color:rgba(80,199,154,.45); background:rgba(80,199,154,.1); color:#77ddb8; }
+    .research-trend.trend-bearish { border-color:rgba(240,123,133,.45); background:rgba(240,123,133,.1); color:#f49aa2; }
+    .research-stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    .research-stat-label { display:block; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.4px; }
+    .research-stat-value { display:block; margin-top:3px; color:var(--text); font-size:12px; font-weight:650; overflow-wrap:anywhere; }
+    .research-news-list { max-height:474px; overflow:auto; padding-right:5px; }
+    .research-news-item { padding:12px 9px; border-bottom:1px solid rgba(137,157,178,.13); border-radius:5px; }
+    .research-news-item:hover { background:rgba(255,255,255,.025); }
+    .research-news-item:last-child { border-bottom:0; }
+    .research-news-item a { color:var(--text); font-weight:650; text-decoration:none; }
+    .research-news-item a:hover { color:var(--accent); text-decoration:underline; }
+    .research-news-meta { margin-top:4px; color:var(--muted); font-size:10px; }
+    .research-news-summary { margin:6px 0 0; color:#bfccda; font-size:11px; line-height:1.5; }
+    .research-source-status { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid rgba(80,199,154,.27); border-radius:999px; background:rgba(80,199,154,.07); color:#9bdcc5; font-size:9px; font-weight:750; letter-spacing:.45px; text-transform:uppercase; white-space:nowrap; }
+    .research-source-status::before { width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 8px rgba(80,199,154,.5); content:''; }
+    .research-method { margin:0 0 12px; padding:10px 12px; border:1px solid var(--border); border-radius:7px; background:rgba(10,16,23,.45); }
+    .research-method summary { cursor:pointer; color:var(--muted); font-size:10px; font-weight:650; }
+    .research-method p { margin:9px 0 0; color:var(--muted); font-size:10px; line-height:1.55; }
+    .research-table-wrap { overflow:auto; border-radius:5px; }
+    .research-table { min-width:1120px; font-size:10px; }
+    .research-table th { position:sticky; top:0; z-index:1; background:#202b38; }
+    .research-table td { white-space:nowrap; }
+    .research-table td:nth-child(2),.research-table td:nth-child(3) { font-weight:650; }
+    .research-table tr:hover td { background:rgba(80,199,154,.07); }
+    .research-journal-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    #researchDecision { width:100%; min-height:88px; resize:vertical; }
+    #researchHistory { margin-top:12px; padding-top:8px; border-top:1px solid rgba(137,157,178,.13); }
+    @media(max-width:1100px) { .research-panel-technical,.research-panel-news { grid-column:1 / -1; } .research-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:580px) { .research-panel { padding:14px; } .research-filter-grid { grid-template-columns:1fr; } .research-heading h2 { font-size:15px; } .research-source-status { font-size:8px; padding:4px 7px; } }
+
     table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
     th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
     th { background: var(--panel-hover); color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
@@ -738,9 +806,68 @@
         <div id="candlesChartContainer" style="display:none;">
           <div class="small-note" id="candlesMeta" style="margin-bottom:0.75rem;"></div>
           <div class="results-grid" id="candlesMetricsGrid"></div>
-          <svg id="candlesChart" viewBox="0 0 900 420" style="width:100%; height:auto; display:block; background:var(--panel); border:1px solid var(--border); border-radius:12px;"></svg>
+          <svg id="candlesChart" viewBox="0 0 900 400" style="width:100%; height:auto; display:block; background:var(--panel); border:1px solid var(--border); border-radius:12px;"></svg>
           <div class="small-note" id="candlesNote"></div>
         </div>
+        <section class="research-workspace" aria-labelledby="researchTitle">
+          <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
+          <div class="research-controls">
+            <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 3</span></label>
+            <input id="researchSymbols" value="AAPL" maxlength="40" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
+            <fieldset class="research-module-options" aria-label="Módulos que incluir en el análisis">
+              <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Técnico y soportes/resistencias</label>
+              <label class="research-module-option"><input id="researchModuleBlackScholes" type="checkbox" checked /> Probabilidad Black‑Scholes</label>
+              <label class="research-module-option"><input id="researchModuleFinancial" type="checkbox" /> Análisis fundamental FMP</label>
+              <label class="research-module-option"><input id="researchModuleMovers" type="checkbox" /> Ganadores/perdedores entre tickers elegidos</label>
+              <label class="research-module-option"><input id="researchModuleNews" type="checkbox" checked /> Noticias Alpaca</label>
+            </fieldset>
+            <div class="research-filter-grid">
+              <div><label for="researchMinProb">Probabilidad mínima (%)</label><input id="researchMinProb" type="number" min="0" max="100" value="0" aria-label="Probabilidad histórica mínima en porcentaje" /></div>
+              <div><label for="researchMinRR">Ganancia/riesgo mínimo</label><input id="researchMinRR" type="number" min="0" step="0.1" value="0" /></div>
+              <div><label for="researchMaxSpread">Diferencial Bid/Ask máx. (suma relativa)</label><input id="researchMaxSpread" type="number" min="0" step="0.05" value="1" /></div>
+              <div><label for="researchTrendFilter">Filtro de tendencia</label><select id="researchTrendFilter"><option value="all">Todas las tendencias</option><option value="aligned">Alineada con SMA20/50</option></select></div>
+            </div>
+            <div class="research-actions"><button type="button" class="btn btn-primary" id="btnResearchAnalyze">Analizar los cuatro spreads</button><p id="researchStatus" role="status" aria-live="polite"></p></div>
+          </div>
+          <div id="researchEvidence" class="research-dashboard" hidden>
+            <section id="researchCoreSummaryPanel" class="research-panel research-panel-wide" aria-labelledby="researchCoreSummaryTitle">
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">00 · Qué hizo el core</span><h3 id="researchCoreSummaryTitle">Resumen del análisis</h3></div><span id="researchCoreModules" class="research-source-status">Métodos</span></div>
+              <div id="researchCoreSummary" class="research-panel-description"></div>
+            </section>
+            <section id="researchTechnicalPanel" class="research-panel research-panel-technical" aria-labelledby="researchTechnicalTitle">
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">01 · Precio y tendencia</span><h3 id="researchTechnicalTitle">Análisis técnico</h3></div><span class="research-source-status">Velas Alpaca</span></div>
+              <p class="research-panel-description">Indicadores calculados con velas diarias del último año. Los pivotes necesitan tres velas posteriores para confirmarse; las zonas usan ATR.</p>
+              <div id="researchMetrics" class="research-metrics"></div>
+            </section>
+            <section id="researchFinancialPanel" class="research-panel research-panel-wide" aria-labelledby="researchFinancialTitle" hidden>
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">02 · Valoración y negocio</span><h3 id="researchFinancialTitle">Análisis fundamental</h3></div><span id="researchFinancialSource" class="research-source-status">FMP API</span></div>
+              <p id="researchFinancialStatus" class="research-panel-description"></p><div id="researchFinancialRows" class="research-financial-list"></div>
+            </section>
+            <section id="researchMoversPanel" class="research-panel research-panel-wide" aria-labelledby="researchMoversTitle" hidden>
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">03 · Movimiento de mercado</span><h3 id="researchMoversTitle">Ganadores y perdedores</h3></div><span class="research-source-status">Alpaca · tickers elegidos</span></div>
+              <p id="researchMoversStatus" class="research-panel-description"></p><div id="researchMovers" class="research-movers-list"></div>
+            </section>
+            <section id="researchNewsPanel" class="research-panel research-panel-news" aria-labelledby="researchNewsTitle">
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">04 · Contexto reciente</span><h3 id="researchNewsTitle">Noticias</h3></div><span class="research-source-status">Alpaca</span></div>
+              <p id="researchNewsStatus" class="research-panel-description" role="status"></p>
+              <div id="researchNews" class="research-news-list"></div>
+            </section>
+            <section class="research-panel research-panel-wide" aria-labelledby="researchStrategiesTitle">
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">05 · Riesgo y strikes</span><h3 id="researchStrategiesTitle">Comparación de estrategias</h3></div><span class="research-source-status">Opciones Alpaca</span></div>
+              <p class="research-panel-description">Ordenadas por score combinado orientativo. El score fundamental puede ajustar el orden cuando hay suficientes métricas; no cambia las probabilidades mostradas.</p>
+              <details class="research-method"><summary>Cómo se calcula el score y qué límites tiene</summary><p>Score base = probabilidad histórica × ganancia/riesgo × factor técnico (1.1 alineada, 1.0 mixta, 0.9 contraria; factor 1 si se desactiva técnico) ÷ (1 + diferencial relativo Bid/Ask). Cuando se selecciona fundamentales, el score base se multiplica por un factor de 0.80 a 1.20 derivado de un score fundamental de 0 a 100. El score fundamental pondera crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B; normaliza los datos disponibles y requiere al menos 50% de cobertura. Los umbrales son una heurística general sin ajuste sectorial ni calibración. No altera la probabilidad histórica ni Black‑Scholes. La probabilidad histórica usa ventanas traslapadas y su IC Wilson puede subestimar incertidumbre. Black‑Scholes usa volatilidad realizada como proxy, no volatilidad implícita. Ninguna cifra es pronóstico calibrado ni recomendación.</p></details>
+              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+            </section>
+            <section class="research-panel research-panel-wide" aria-labelledby="researchJournalTitle">
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">06 · Registro</span><h3 id="researchJournalTitle">Bitácora del análisis</h3></div><span class="research-source-status">Supabase</span></div>
+              <p class="research-panel-description">Guarda la evidencia consultada junto con tu tesis, filtros y decisión.</p>
+              <label for="researchDecision">Tesis, filtros y decisión</label>
+              <textarea id="researchDecision" rows="3" maxlength="4000" placeholder="Anota la razón y qué invalidaría este análisis."></textarea>
+              <div class="research-journal-controls"><button type="button" class="btn btn-secondary" id="btnResearchSave">Guardar análisis en Supabase</button><button type="button" class="btn btn-secondary" id="btnResearchHistory">Cargar bitácora</button></div>
+              <div id="researchHistory" class="small-note"></div>
+            </section>
+          </div>
+        </section>
       </div>
     </div>
   </main>
@@ -748,6 +875,8 @@
 
 <script src="/market-period.js"></script>
 <script src="/strategy-selection.js"></script>
+<script src="/research-analysis.js"></script>
+<script src="/research-ui.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
 const navigation = document.querySelector('.tabs');
@@ -1482,11 +1611,11 @@ function formatAxisTime(timestamp, timeframe) {
 
 function renderCandlesChart(candles, timeframe) {
   const width = 900;
-  const height = 420;
+  const height = 400;
   const padLeft = 88;
   const padRight = 28;
   const padTop = 24;
-  const padBottom = 42;
+  const padBottom = 115;
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
@@ -1531,11 +1660,34 @@ function renderCandlesChart(candles, timeframe) {
     shapes += `<rect x="${x - bodyWidth / 2}" y="${bodyTop}" width="${bodyWidth}" height="${bodyHeight}" fill="${color}" rx="1" />`;
   });
 
+  const movingAverages=[{period:20,color:'#c05cc8',label:'SMA 20'},{period:50,color:'#f59e0b',label:'SMA 50'},{period:200,color:'#a87916',label:'SMA 200'}];
+  let maShapes='',maLegend='',legendY=padTop+14;
+  movingAverages.forEach(({period,color,label})=>{
+    let path='';
+    const series=window.ResearchAnalysis?.simpleMovingAverageSeries(candles,period)||[];
+    series.forEach((point,index)=>{
+      if(Number.isFinite(point.value))path+=`${path?'L':'M'}${xForIndex(index).toFixed(2)},${y(point.value).toFixed(2)} `;
+    });
+    const latestValue=series.at(-1)?.value;
+    if(Number.isFinite(latestValue)){
+      maShapes+=`<path d="${path.trim()}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+      maLegend+=`<text x="${padLeft+8}" y="${legendY}" fill="${color}" font-size="10">${label} · ${formatPrice(latestValue)}</text>`;legendY+=14;
+    }
+  });
+
+  const volumeValue=candle=>{const value=Number(candle.volume);return Number.isFinite(value)&&value>0?value:0;};
+  const volumeTop=298,volumeBottom=380,volumeMax=Math.max(1,...candles.map(volumeValue)),volumeHeight=74;
+  const compactVolume=value=>value>=1e9?(value/1e9).toFixed(1)+'B':value>=1e6?(value/1e6).toFixed(1)+'M':value>=1e3?(value/1e3).toFixed(1)+'K':String(Math.round(value));
+  const volumeBars=candles.map((candle,index)=>{
+    const volume=volumeValue(candle),barHeight=volume/volumeMax*volumeHeight,color=candle.close>=candle.open?gridColors.up:gridColors.down;
+    return `<rect x="${xForIndex(index)-Math.max(1,bodyWidth/2)}" y="${volumeBottom-barHeight}" width="${Math.max(1,bodyWidth)}" height="${barHeight}" fill="${color}" fill-opacity=".55"/>`;
+  }).join('');
+  const volumeMarkup=`<line x1="${padLeft}" y1="${volumeBottom}" x2="${width-padRight}" y2="${volumeBottom}" stroke="#334155"/><g>${volumeBars}</g><text x="${padLeft+8}" y="${volumeTop+11}" fill="#94a3b8" font-size="9">VOL · máx. ${compactVolume(volumeMax)}</text>`;
+
   const lastCandle = candles[candles.length - 1];
   const lastPriceY = y(lastCandle.close);
   const lastPriceColor = lastCandle.close >= lastCandle.open ? gridColors.up : gridColors.down;
-  shapes += `<line x1="${padLeft}" y1="${lastPriceY}" x2="${width - padRight}" y2="${lastPriceY}" stroke="${lastPriceColor}" stroke-width="1" stroke-dasharray="4 3" />`;
-  shapes += `<text x="${width - padRight}" y="${lastPriceY - 5}" text-anchor="end" font-size="11" font-weight="700" fill="${lastPriceColor}">${formatPrice(lastCandle.close)}</text>`;
+  const lastPriceMarkup=`<line x1="${padLeft}" y1="${lastPriceY}" x2="${width-padRight}" y2="${lastPriceY}" stroke="${lastPriceColor}" stroke-width="1" stroke-dasharray="4 3"/><text x="${width-padRight}" y="${lastPriceY-5}" text-anchor="end" font-size="11" font-weight="700" fill="${lastPriceColor}">${formatPrice(lastCandle.close)}</text>`;
 
   const tickCount = Math.min(6, candles.length);
   let xLabels = '';
@@ -1549,15 +1701,18 @@ function renderCandlesChart(candles, timeframe) {
 
   const svg = document.getElementById('candlesChart');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Gráfica de velas; pasa el cursor o enfoca una vela para consultar sus datos.');
-  const hits = candles.map((candle,index) => '<rect data-candle="'+index+'" tabindex="0" role="button" aria-label="'+escapeHtml(new Date(candle.timestamp).toLocaleString('es-MX') + ', cierre ' + formatPrice(candle.close))+'" x="'+(padLeft+index*step)+'" y="'+padTop+'" width="'+step+'" height="'+plotH+'" fill="transparent" />').join('');
+  svg.setAttribute('aria-label', 'Gráfica de velas con medias móviles simples de 20, 50 y 200 periodos y volumen; pasa el cursor para consultar fecha y datos de cada vela.');
+  const hits = candles.map((candle,index) => '<rect data-candle="'+index+'" tabindex="0" role="button" aria-label="'+escapeHtml(new Date(candle.timestamp).toLocaleString('es-MX') + ', cierre ' + formatPrice(candle.close))+'" x="'+(padLeft+index*step)+'" y="'+padTop+'" width="'+step+'" height="'+(height-padTop-38)+'" fill="transparent" />').join('');
   svg.innerHTML = `
     <g>
       ${gridLines}
       <g>${shapes}</g>
+      <g>${maShapes}${lastPriceMarkup}</g>
+      <g>${volumeMarkup}</g>
+      <g>${maLegend}</g>
       ${xLabels}
       ${yLabels}
-      <line id="candleCursor" y1="${padTop}" y2="${height-padBottom}" stroke="#a3b4c7" stroke-dasharray="3 3" pointer-events="none" visibility="hidden" />
+      <line id="candleCursor" y1="${padTop}" y2="${height-38}" stroke="#a3b4c7" stroke-dasharray="3 3" pointer-events="none" visibility="hidden" />
       ${hits}
     </g>
   `;
