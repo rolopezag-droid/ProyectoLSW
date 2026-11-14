@@ -10,7 +10,15 @@ Demo de una aplicacion REST con Express organizada como microservicios.
 
 Quant consulta velas de acciones con `ALPACA_STOCKS_FEED=iex` por defecto, compatible con el nivel Basic. Para cuentas con permiso SIP se puede configurar `ALPACA_STOCKS_FEED=sip`. Valores admitidos: `iex`, `sip`, `delayed_sip`. Las cadenas de opciones conservan su configuración independiente `ALPACA_OPTIONS_FEED`.
 
-Las noticias del análisis se consultan a Alpaca Market Data por los tickers analizados. Se muestran titulares, fuente, fecha y enlace. El análisis fundamental y el sentimiento automático están fuera del alcance actual.
+Las noticias del análisis se consultan a Alpaca Market Data por los tickers analizados. Se muestran titulares, fuente, fecha y enlace.
+
+En el panel de investigación se pueden seleccionar por separado el análisis técnico, la probabilidad Black-Scholes, los fundamentales de Financial Modeling Prep (FMP), el cambio diario entre los tickers elegidos y las noticias. El análisis técnico detecta pivotes confirmados con tres velas posteriores, agrupa niveles cercanos con tolerancia de medio ATR y marca ruptura cuando el cierre atraviesa la zona por un cuarto de ATR. Los niveles son orientativos y dependen del periodo de velas.
+
+La gráfica muestra velas, SMA 20/50/200 y barras de volumen, calculadas con OHLCV de Alpaca. No requiere otra API ni una cuenta Finviz Elite. El RSI sigue disponible como métrica del análisis técnico, pero no se dibuja en esta gráfica.
+
+Los fundamentales se consultan desde FMP en el servidor. Crea una cuenta gratuita en [FMP](https://site.financialmodelingprep.com/developer/docs/dashboard), copia la API key y configura `FMP_API_KEY` en `.env`; la clave nunca se entrega al navegador. Se consultan valoración, rentabilidad, deuda y crecimiento anual disponibles, con fecha del último reporte. El servicio conserva respuestas en caché durante seis horas. El plan gratuito limita las consultas diarias, los periodos y el universo de símbolos; datos no disponibles se muestran como tales. El core calcula un score fundamental de 0 a 100 con ocho indicadores y pesos visibles; requiere al menos 50% de cobertura y ajusta el score de ranking por un factor de 0.80 a 1.20. Es una heurística general sin calibración sectorial. No modifica las probabilidades histórica ni Black-Scholes, que permanecen como estimaciones separadas. El ranking de ganadores/perdedores usa el cambio diario de las velas Alpaca únicamente para los tickers ingresados, no para todo el mercado.
+
+La probabilidad histórica y la probabilidad Black-Scholes se muestran separadas. La histórica es una frecuencia de retornos pasados en ventanas traslapadas. Black-Scholes calcula una probabilidad risk-neutral con volatilidad realizada anualizada como proxy, porque las velas de Alpaca no proporcionan volatilidad implícita por contrato en este flujo. Ninguna cifra es un pronóstico calibrado ni una recomendación. El score de spreads es una heurística orientativa.
 
 ## Estructura base
 
