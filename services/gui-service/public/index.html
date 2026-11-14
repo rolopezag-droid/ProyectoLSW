@@ -491,11 +491,13 @@
           </div>
           <div class="full">
             <label>Strike Compra (Long)</label>
-            <input type="number" id="strikeLong" step="0.01" required />
+            <select id="strikeLong" required></select>
+            <div class="small-note" id="strikeLongNote">Selecciona ticker, vencimiento y estrategia para cargar strikes.</div>
           </div>
           <div class="full">
             <label>Strike Venta (Short)</label>
-            <input type="number" id="strikeShort" step="0.01" required />
+            <select id="strikeShort" required></select>
+            <div class="small-note" id="strikeShortNote">Selecciona ticker, vencimiento y estrategia para cargar strikes.</div>
           </div>
           <div class="full">
             <label>Prima de compra (Ask) · vacía para consultar Alpaca</label>
@@ -1984,14 +1986,112 @@ for (const [source, target] of [['symbol', 'chSymbol'], ['chSymbol', 'symbol']])
     savedSpreadId = null;
   });
 }
-for(const id of ['strikeLong','strikeShort','priceLong','priceShort','quantity','multiplier']) document.getElementById(id).addEventListener('input',()=>{
- lastEvaluatedInput=null;savedSpreadId=null;document.getElementById('resultsCard').style.display='none';
- stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;
-});
+// ── Strikes disponibles desde Alpaca (combobox) ──
+let availableStrikes = [];
+let selectedSpotForStrikes = null;
+
+async function loadStrikes() {
+  const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+  const expiration = document.getElementById('expiration').value.trim();
+  const type = selectedStrategy.includes('CALL') ? 'call' : 'put';
+  const selectLong = document.getElementById('strikeLong');
+  const selectShort = document.getElementById('strikeShort');
+  const noteLong = document.getElementById('strikeLongNote');
+  const noteShort = document.getElementById('strikeShortNote');
+
+  selectLong.innerHTML = '<option value="">Cargando strikes…</option>';
+  selectShort.innerHTML = '<option value="">Cargando strikes…</option>';
+  selectLong.disabled = true;
+  selectShort.disabled = true;
+  availableStrikes = [];
+
+  if (!symbol || !expiration) {
+    noteLong.textContent = 'Ingresa símbolo y vencimiento para cargar strikes.';
+    noteShort.textContent = noteLong.textContent;
+    selectLong.innerHTML = '<option value="">Sin strikes</option>';
+    selectShort.innerHTML = '<option value="">Sin strikes</option>';
+    selectLong.disabled = false;
+    selectShort.disabled = false;
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({ symbol, expiration, type });
+    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/options-chain/strikes?${params}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || `quant-service respondió ${res.status}`);
+    availableStrikes = data.strikes || [];
+    fillStrikeSelects(availableStrikes);
+    selectDefaultStrikes();
+    noteLong.textContent = `Strikes disponibles: ${availableStrikes.length}.`;
+    noteShort.textContent = noteLong.textContent;
+    selectLong.disabled = false;
+    selectShort.disabled = false;
+  } catch (error) {
+    noteLong.textContent = 'Error cargando strikes: ' + error.message;
+    noteShort.textContent = noteLong.textContent;
+    selectLong.innerHTML = '<option value="">Error</option>';
+    selectShort.innerHTML = '<option value="">Error</option>';
+    selectLong.disabled = false;
+    selectShort.disabled = false;
+    log('Error strikes: ' + error.message);
+  }
+}
+
+function fillStrikeSelects(strikes) {
+  const selectLong = document.getElementById('strikeLong');
+  const selectShort = document.getElementById('strikeShort');
+  const curLong = selectLong.value;
+  const curShort = selectShort.value;
+  selectLong.innerHTML = '';
+  selectShort.innerHTML = '';
+  strikes.forEach(s => {
+    const o1 = document.createElement('option'); o1.value = s; o1.textContent = s.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); if(String(s)===String(curLong))o1.selected=true; selectLong.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value = s; o2.textContent = s.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); if(String(s)===String(curShort))o2.selected=true; selectShort.appendChild(o2);
+  });
+}
+
+function selectDefaultStrikes() {
+  if (availableStrikes.length < 2) return;
+  const spot = selectedSpotForStrikes;
+  let ni = 0, nd = Infinity;
+  availableStrikes.forEach((s,i)=>{ const d = spot?Math.abs(s-spot):Math.abs(s-availableStrikes[Math.floor(availableStrikes.length/2)]); if(d<nd){nd=d;ni=i;} });
+  const isBull = selectedStrategy.startsWith('BULL');
+  const isCall = selectedStrategy.includes('CALL');
+  let li, si;
+  if (isCall) { if(isBull){li=Math.max(0,ni-1);si=Math.min(availableStrikes.length-1,ni+1);} else {li=Math.min(availableStrikes.length-1,ni+1);si=Math.max(0,ni-1);} }
+  else { if(isBull){li=Math.max(0,ni-1);si=Math.min(availableStrikes.length-1,ni+1);} else {li=Math.min(availableStrikes.length-1,ni+1);si=Math.max(0,ni-1);} }
+  if(li===si){ if(li<availableStrikes.length-1)si++; else li--; }
+  document.getElementById('strikeLong').value = availableStrikes[li];
+  document.getElementById('strikeShort').value = availableStrikes[si];
+}
+
+function validateStrikesByStrategy() {
+  const s = Number(document.getElementById('strikeLong').value);
+  const sh = Number(document.getElementById('strikeShort').value);
+  if(!Number.isFinite(s)||!Number.isFinite(sh)) return true;
+  const isBull = selectedStrategy.startsWith('BULL');
+  if(isBull){ if(s>=sh){ showAlert('Para '+selectedStrategy+' el strike Long debe ser MENOR que el Short.','error'); return false; } }
+  else { if(s<=sh){ showAlert('Para '+selectedStrategy+' el strike Long debe ser MAYOR que el Short.','error'); return false; } }
+  return true;
+}
+
+document.getElementById('symbol').addEventListener('change', loadStrikes);
+document.getElementById('expiration').addEventListener('change', loadStrikes);
+document.querySelectorAll('.strategy-chip').forEach(chip=>{chip.addEventListener('click',()=>{setTimeout(loadStrikes,50);});});
+for(const id of ['strikeLong','strikeShort']) { document.getElementById(id).addEventListener('change',()=>{ lastEvaluatedInput=null;savedSpreadId=null;document.getElementById('resultsCard').style.display='none'; stopAutoCycle();document.getElementById('chkAutoCycle').checked=false; }); }
+for(const id of ['priceLong','priceShort','quantity','multiplier']) document.getElementById(id).addEventListener('input',()=>{ lastEvaluatedInput=null;savedSpreadId=null;document.getElementById('resultsCard').style.display='none'; stopAutoCycle();document.getElementById('chkAutoCycle').checked=false; });
+
+const _origEval = document.getElementById('btnEvaluate').onclick;
+document.getElementById('btnEvaluate').onclick = async function(e){ if(!validateStrikesByStrategy()) return; if(_origEval) return _origEval.call(this,e); };
+const _origExec = document.getElementById('btnExecutePaper').onclick;
+document.getElementById('btnExecutePaper').onclick = async function(e){ if(!validateStrikesByStrategy()) return; if(_origExec) return _origExec.call(this,e); };
+
 // ── Init ──
 refreshServices();
 setInterval(refreshServices, 10000);
 renderHistory();
+loadStrikes();
 log('Dashboard listo. Estado de servicios comprobado mediante health checks.');
 </script>
 
