@@ -73,6 +73,36 @@ test('UI IV recupera botón tras 422 y gráfica inspecciona una vela sin mover a
  }finally{dom.window.close();}
 });
 
+test('UI distingue el periodo sin velas del periodo con 250 velas',async()=>{
+ const bars=Array.from({length:250},(_,i)=>({timestamp:new Date(Date.UTC(2026,0,i+1)).toISOString(),open:100,high:102,low:99,close:101,volume:123}));
+ let fail=false;
+ const {dom,w}=page(null,u=>u.pathname.endsWith('/candles')?(fail?{ok:false,status:502,json:async()=>({message:'Error real de velas'})}:{ok:true,status:200,json:async()=>({symbol:'TSLA',timeframe:u.searchParams.get('timeframe'),bars:u.searchParams.get('timeframe')==='15Min'?[]:bars})}):null);try{
+  const symbol=w.document.getElementById('chSymbol'),period=w.document.getElementById('chTimeframe'),btn=w.document.getElementById('btnLoadCandles');
+  symbol.value='TSLA';symbol.dispatchEvent(new w.Event('change'));btn.click();await until(()=>!btn.disabled);
+  assert.match(w.document.querySelector('.alert-error').textContent,/TSLA/);
+  period.value='12Month';period.dispatchEvent(new w.Event('change'));await until(()=>!btn.disabled);
+  assert.match(w.document.getElementById('candlesMeta').textContent,/TSLA.*1 Año.*250 velas/);
+  assert.match(w.document.querySelector('.alert-error').textContent,/TSLA.*1 Día/);
+  fail=true;btn.click();await until(()=>!btn.disabled);assert.match(w.document.getElementById('alertContainer').textContent,/Error real de velas/);
+ }finally{await new Promise(r=>setImmediate(r));dom.window.close();}
+});
+
+test('UI explica una resistencia histórica bajo el cierre hasta su ruptura',async()=>{
+ const {dom,w}=page();try{
+  const bars=Array.from({length:25},(_,i)=>({timestamp:new Date(Date.UTC(2026,0,i+1)).toISOString(),open:374,high:384,low:364,close:374,volume:100}));
+  bars[10].high=385.58;Object.assign(bars.at(-1),{high:391,low:371,close:390.24});
+  const zone=w.ResearchAnalysis.supportResistance(bars).resistances.find(item=>item.level===385.58);assert.equal(zone.status,'active');
+  w.renderCandles({symbol:'TSLA',timeframe:'1Day',bars});
+  const svg=w.document.getElementById('candlesChart'),note=w.document.getElementById('candlesLevelsNote');
+  assert.ok(svg.querySelector('[data-level-kind="resistance"]'));assert.match(note.textContent,/último cierre.*390\.24/i);assert.match(note.textContent,/385\.58.*zona.*margen/i);
+  const inverted=bars.map(bar=>({...bar,open:800-bar.open,high:800-bar.low,low:800-bar.high,close:800-bar.close}));
+  w.renderCandles({symbol:'TSLA',timeframe:'1Day',bars:inverted});assert.ok(svg.querySelector('[data-level-kind="support"]'));assert.match(note.textContent,/414\.42.*zona.*margen/i);
+  Object.assign(bars.at(-1),{high:392,low:372,close:391});
+  assert.equal(w.ResearchAnalysis.supportResistance(bars).resistances.find(item=>item.level===385.58).status,'breached');
+  w.renderCandles({symbol:'TSLA',timeframe:'1Day',bars});assert.equal(svg.querySelectorAll('[data-level-kind="resistance"]').length,0);
+ }finally{await new Promise(r=>setImmediate(r));dom.window.close();}
+});
+
 test('UI guarda una evaluación con sesión y estado draft, conservando contratos reales',async()=>{
  const {dom,w,calls}=page();try{
   w.document.getElementById('chkAutoStrikes').checked=true;w.document.getElementById('btnEvaluate').click();await until(()=>w.document.getElementById('resultsCard').style.display==='block');

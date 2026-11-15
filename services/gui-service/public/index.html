@@ -807,6 +807,7 @@
           <div class="small-note" id="candlesMeta" style="margin-bottom:0.75rem;"></div>
           <div class="results-grid" id="candlesMetricsGrid"></div>
           <svg id="candlesChart" viewBox="0 0 900 400" style="width:100%; height:auto; display:block; background:var(--panel); border:1px solid var(--border); border-radius:12px;"></svg>
+          <div class="small-note" id="candlesLevelsNote"></div>
           <div class="small-note" id="candlesNote"></div>
         </div>
         <section class="research-workspace" aria-labelledby="researchTitle">
@@ -841,6 +842,7 @@
             </section>
             <section id="researchFinancialPanel" class="research-panel research-panel-wide" aria-labelledby="researchFinancialTitle" hidden>
               <div class="research-panel-heading"><div><span class="research-panel-kicker">02 · Valoración y negocio</span><h3 id="researchFinancialTitle">Análisis fundamental</h3></div><span id="researchFinancialSource" class="research-source-status">FMP API</span></div>
+              <p class="research-panel-description">El score fundamental (0 a 100) pondera los datos disponibles de crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B. Un valor mayor es más favorable según los rangos de esta heurística, sin comparación sectorial. La cobertura indica el porcentaje de pesos con datos (mínimo 50%); el score ajusta el ranking, no las probabilidades.</p>
               <p id="researchFinancialStatus" class="research-panel-description"></p><div id="researchFinancialRows" class="research-financial-list"></div>
             </section>
             <section id="researchMoversPanel" class="research-panel research-panel-wide" aria-labelledby="researchMoversTitle" hidden>
@@ -1648,6 +1650,28 @@ function renderCandlesChart(candles, timeframe) {
     yLabels += `<text x="${padLeft - 8}" y="${yPosition}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="${gridColors.text}">${formatPrice(value)}</text>`;
   });
 
+  const levels = window.ResearchAnalysis?.supportResistance(candles);
+  const levelGroups = [
+    { kind: 'support', label: 'Soportes', color: '#38bdf8', zones: levels?.supports || [] },
+    { kind: 'resistance', label: 'Resistencias', color: '#fb7185', zones: levels?.resistances || [] },
+  ];
+  let levelShapes = '';
+  const levelNote = document.getElementById('candlesLevelsNote');
+  if (levels?.available) {
+    const descriptions = levelGroups.map(({kind, label, color, zones}) => {
+      const active = zones.filter(zone => zone.status === 'active' && Number.isFinite(zone.level) && zone.level >= min && zone.level <= max);
+      levelShapes += active.map(zone => `<line data-level-kind="${kind}" x1="${padLeft}" y1="${y(zone.level)}" x2="${width-padRight}" y2="${y(zone.level)}" stroke="${color}" stroke-width="1.5" stroke-dasharray="8 4" pointer-events="none"/>`).join('');
+      const describe = zone => {
+        const oppositeSide = kind === 'support' ? zone.level > levels.latestClose : zone.level < levels.latestClose;
+        return formatPrice(zone.level) + (oppositeSide ? ` (zona ${formatPrice(zone.lower)}–${formatPrice(zone.upper)}; cierre en zona o margen ATR)` : '');
+      };
+      return `<span style="color:${color}">${label}: ${active.length ? active.map(describe).join(', ') : 'ninguno visible'}</span>`;
+    });
+    levelNote.innerHTML = `Niveles activos con las velas mostradas (centro de zona; último cierre ${formatPrice(levels.latestClose)}): ${descriptions.join(' · ')}. Una zona está activa si el último cierre no rebasa su límite por ${levels.breakoutAtrBuffer} ATR. Pueden diferir del panel técnico, que usa velas diarias del último año.`;
+  } else {
+    levelNote.textContent = 'Niveles no disponibles: se requieren al menos 15 velas válidas y ATR positivo.';
+  }
+
   let shapes = '';
   candles.forEach((candle, index) => {
     const x = xForIndex(index);
@@ -1701,11 +1725,12 @@ function renderCandlesChart(candles, timeframe) {
 
   const svg = document.getElementById('candlesChart');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Gráfica de velas con medias móviles simples de 20, 50 y 200 periodos y volumen; pasa el cursor para consultar fecha y datos de cada vela.');
+  svg.setAttribute('aria-label', 'Gráfica de velas con soportes y resistencias activos cuando están disponibles, medias móviles simples de 20, 50 y 200 periodos y volumen; pasa el cursor para consultar fecha y datos de cada vela.');
   const hits = candles.map((candle,index) => '<rect data-candle="'+index+'" tabindex="0" role="button" aria-label="'+escapeHtml(new Date(candle.timestamp).toLocaleString('es-MX') + ', cierre ' + formatPrice(candle.close))+'" x="'+(padLeft+index*step)+'" y="'+padTop+'" width="'+step+'" height="'+(height-padTop-38)+'" fill="transparent" />').join('');
   svg.innerHTML = `
     <g>
       ${gridLines}
+      <g>${levelShapes}</g>
       <g>${shapes}</g>
       <g>${maShapes}${lastPriceMarkup}</g>
       <g>${volumeMarkup}</g>
@@ -1765,8 +1790,9 @@ function renderCandles(data) {
 
   if (!candles.length) {
     container.style.display = 'none';
-    note.textContent = `No se encontraron velas para ${data.symbol || 'este ticker'} en el periodo ${periodLabel}.`;
-    showAlert(`No se encontraron velas para ${data.symbol || 'el ticker elegido'} en el periodo consultado.`, 'error');
+    const message = `No se encontraron velas para ${data.symbol || 'este ticker'} en el periodo ${periodLabel}.`;
+    note.textContent = message;
+    showAlert(message, 'error');
     return false;
   }
 
