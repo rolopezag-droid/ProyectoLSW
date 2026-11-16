@@ -1,5 +1,9 @@
 (function(){
   let currentSnapshot=null,accessToken=null,running=false,modulesDirty=false;
+  // Caché runtime de velas diarias por ticker para señales/prefill. Vive FUERA del
+  // snapshot persistido: la bitácora de Supabase no se engorda con las velas.
+  window.__researchMarketCache = window.__researchMarketCache || {};
+  let selectedCandidateIndex = null;
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=value=>Number.isFinite(value)?'$'+value.toFixed(2):'—';
@@ -32,6 +36,7 @@
     const contracts=[...calls,...puts];
     const previous=bars.at(-2);
     const changePct=last&&previous&&Number.isFinite(last.close)&&Number.isFinite(previous.close)&&previous.close!==0?(last.close/previous.close-1)*100:null;
+    window.__researchMarketCache[symbol]={bars,fetchedAt:new Date().toISOString(),realizedVolatility:technical?.annualizedVolatility??null,spot,expiration};
     return {symbol,spot,spotSource:quote.referenceSource||'último cierre de vela',spotTimestamp:quote.referenceTimestamp||last?.timestamp||null,capturedAt:barsData.capturedAt,stockFeed:barsData.feed||'iex',dailyChangePct:changePct,technical,supportResistance:levels,candidates:ResearchAnalysis.compareStrategies(contracts,{symbol,expiration,spot,bars,includeTechnical:modules.technical,includeBlackScholes:modules.blackScholes,riskFreeRate,dividendYield})};
   }
   async function fetchNews(symbols){
@@ -96,8 +101,8 @@
       $('researchNews').innerHTML=news.status==='available'&&news.articles.length?news.articles.slice(0,20).map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada';return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}</strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div>${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):'<p class="research-panel-description">No hay artículos disponibles para los tickers y periodo consultados.</p>';
     }
     const minP=Number($('researchMinProb').value)/100,minRR=Number($('researchMinRR').value),maxSpread=Number($('researchMaxSpread').value),trendFilter=snapshot.modules.technical?$('researchTrendFilter').value:'all';
-    const rows=snapshot.candidates.filter(c=>(minP===0||Number.isFinite(c.probability.probability)&&c.probability.probability>=minP)&&c.riskReward>=minRR&&c.liquidityScore<=maxSpread&&(trendFilter==='all'||c.technicalTrend===c.side)).slice(0,100);
-    $('researchCandidates').innerHTML=rows.map((c,i)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}%`:`${c.blackScholes?.reason||''}`,scoreTitle=snapshot.modules.financial&&c.fundamentalScore!==null?`Score base ${c.baseScore?.toFixed(3)} × factor fundamental ${c.fundamentalFactor.toFixed(2)}. No modifica probabilidades.`:'Score orientativo de estrategia';return `<tr><td>${i+1}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td>${esc(c.technicalTrend||'No incluido')}</td><td>${c.longStrike} / ${c.shortStrike}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td>${pct(c.probability.probability)}</td><td title="${esc(bsTitle)}">${esc(bsLabel)}</td><td>${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td>${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td></tr>`;}).join('')||'<tr><td colspan="14">No hay candidatas que cumplan los filtros seleccionados.</td></tr>';
+    const rows=snapshot.candidates.map((candidate,index)=>({candidate,index})).filter(({candidate:c})=>(minP===0||Number.isFinite(c.probability.probability)&&c.probability.probability>=minP)&&c.riskReward>=minRR&&c.liquidityScore<=maxSpread&&(trendFilter==='all'||c.technicalTrend===c.side)).slice(0,100);
+    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}%`:`${c.blackScholes?.reason||''}`,scoreTitle=snapshot.modules.financial&&c.fundamentalScore!==null?`Score base ${c.baseScore?.toFixed(3)} × factor fundamental ${c.fundamentalFactor.toFixed(2)}. No modifica probabilidades.`:'Score orientativo de estrategia';return `<tr data-candidate="${index}" title="Clic para ver sus señales y niveles en la gráfica"><td>${position+1}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td>${esc(c.technicalTrend||'No incluido')}</td><td>${c.longStrike} / ${c.shortStrike}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td>${pct(c.probability.probability)}</td><td title="${esc(bsTitle)}">${esc(bsLabel)}</td><td>${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td>${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td></tr>`;}).join('')||'<tr><td colspan="14">No hay candidatas que cumplan los filtros seleccionados.</td></tr>';
     $('researchEvidence').hidden=false;
     snapshot.filters={minProbability:minP,minRiskReward:minRR,maxRelativeBidAsk:maxSpread,technicalAlignment:trendFilter};
   }
@@ -124,6 +129,9 @@
       const movers=modules.movers?{status:changes.length?'available':'unavailable',provider:'Alpaca daily bars',capturedAt:new Date().toISOString(),gainers:changes.filter(x=>x.changePct>=0).sort((a,b)=>b.changePct-a.changePct),losers:changes.filter(x=>x.changePct<0).sort((a,b)=>a.changePct-b.changePct)}:null;
       currentSnapshot={generatedAt:new Date().toISOString(),provider:'Alpaca',expirationDate:expiration,modules,marketData:{capturedAt:new Date().toISOString(),stocksFeed:underlyings.map(x=>({symbol:x.symbol,feed:x.stockFeed})),spotMethod:'midpoint quote, latest trade fallback, then last daily close',candidateRules:'valid bid/ask with timestamp no older than 72h; strikes within 30% of spot; same expiration; vertical width and premium checked'},underlyings,candidates,news,fundamentals,movers,estimation:{historical:{method:'historical-overlapping-returns',confidenceLevel:.95,minSampleSize:20,disclaimer:'Historical frequency is not a calibrated forecast. Rolling windows overlap and the Wilson interval may understate uncertainty.'},blackScholes:{method:'black-scholes-risk-neutral',volatilitySource:'annualized-realized-historical-proxy-not-option-implied',rate:riskFreeRate,dividendYield,disclaimer:'Risk-neutral model estimate; not a calibrated real-world forecast.'}},filters:{},decision:''};
       render(currentSnapshot);modulesDirty=false;setStatus(`Análisis listo: ${underlyings.length}/${symbols.length} tickers; ${candidates.length} spreads válidos.${failures.length?' Sin datos: '+failures.join(' · '):''} Las probabilidades son estimaciones separadas, no calibradas.`,'info');
+      const triggerSelect=$('chTriggerStrategy');
+      triggerSelect.innerHTML='<option value="">— Ninguna seleccionada —</option>'+candidates.map((c,i)=>`<option value="${i}">${esc(c.symbol+' · '+c.strategy.replace('_SPREAD','').replaceAll('_',' ')+' · '+c.longStrike+'/'+c.shortStrike)}</option>`).join('');
+      selectedCandidateIndex=null;
     }catch(error){setStatus(error.message,'error');}
     finally{running=false;btn.disabled=false;btn.textContent='Analizar y comparar los cuatro spreads';}
   }
@@ -149,10 +157,82 @@
       host.innerHTML=(data.data||[]).map(x=>`<div style="padding:.35rem 0;border-bottom:1px solid var(--border)"><strong>${esc(x.underlying_ticker)}</strong> · ${esc(x.expiration_date)} · ${esc(new Date(x.created_at).toLocaleString('es-MX'))} · ${esc(String(x.snapshot?.candidates?.length??0))} spreads considerados</div>`).join('')||'La bitácora aún no tiene análisis.';
     }catch(error){host.textContent=error.message;}
   }
+  // ── Selección de candidata ↔ gráfica ↔ workbench ──
+  function getSelectedCandidate() {
+    if (selectedCandidateIndex === null || !currentSnapshot) return null;
+    return currentSnapshot.candidates[selectedCandidateIndex] ?? null;
+  }
+  function selectCandidate(index, rowElement) {
+    selectedCandidateIndex = Number.isInteger(index) && currentSnapshot && currentSnapshot.candidates[index] ? index : null;
+    document.querySelectorAll('#researchCandidates tr.is-selected').forEach(row => row.classList.remove('is-selected'));
+    const row = rowElement || (selectedCandidateIndex !== null ? document.querySelector('#researchCandidates tr[data-candidate="' + selectedCandidateIndex + '"]') : null);
+    if (row) row.classList.add('is-selected');
+    const select = $('chTriggerStrategy');
+    if (select) select.value = selectedCandidateIndex === null ? '' : String(selectedCandidateIndex);
+    if (typeof refreshChartOverlays === 'function') refreshChartOverlays();
+  }
+  // Fuente de overlays para renderCandlesChart (niveles siempre con candidata;
+  // marcadores de señales solo si el usuario marcó "Mostrar señales").
+  window.__candleOverlaySource = function () {
+    if (!window.StrategyTriggers) return null;
+    const state = window.__candlesChartState;
+    if (!state || !Array.isArray(state.candles) || !state.candles.length) return null;
+    const candidate = getSelectedCandidate();
+    const showSignals = $('chShowTriggers') && $('chShowTriggers').checked;
+    if (!candidate && !showSignals) return null;
+    if (!candidate) return { levels: null, entries: [], exits: [], note: 'Selecciona una candidata en la tabla comparativa para dibujar sus niveles y señales.' };
+    if (candidate.symbol !== state.symbol) return { levels: null, entries: [], exits: [], note: 'La candidata corresponde a ' + candidate.symbol + ' y la gráfica muestra ' + state.symbol + '. Cambia el ticker de la gráfica o elige otra candidata.' };
+    const overlays = { levels: window.StrategyTriggers.strategyLevels(candidate), entries: [], exits: [], note: '' };
+    if (showSignals) {
+      const cache = window.__researchMarketCache[candidate.symbol];
+      if (!cache || !Array.isArray(cache.bars)) {
+        overlays.note = 'No hay velas diarias en caché para ' + candidate.symbol + '; vuelve a ejecutar el análisis para calcular señales.';
+        return overlays;
+      }
+      const triggers = window.StrategyTriggers.computeTriggers(cache.bars, candidate);
+      overlays.entries = triggers.entries;
+      overlays.exits = triggers.exits;
+      if (!overlays.levels) overlays.note = 'La candidata no tiene strikes válidos para dibujar niveles de salida.';
+    }
+    return overlays;
+  };
+  // Fuente de prefill explícito para el Quant Workbench (candidata primero,
+  // gráfica cargada como alternativa; nunca llamadas automáticas).
+  window.__chartPrefillSource = function () {
+    const candidate = getSelectedCandidate();
+    if (candidate) {
+      const cache = window.__researchMarketCache[candidate.symbol];
+      const bsSigma = candidate.blackScholes?.assumptions?.volatility;
+      const volatilityPercent = Number.isFinite(bsSigma) ? bsSigma * 100 : (Number.isFinite(cache?.realizedVolatility) ? cache.realizedVolatility : null);
+      return {
+        symbol: candidate.symbol,
+        spot: Number.isFinite(cache?.spot) ? cache.spot : candidate.blackScholes?.assumptions?.spot ?? null,
+        strike: candidate.longStrike,
+        expiration: candidate.expiration,
+        volatility: volatilityPercent,
+        source: 'candidata ' + candidate.symbol + ' ' + candidate.strategy.replace('_SPREAD', '').replaceAll('_', ' ') + ' (' + candidate.longStrike + '/' + candidate.shortStrike + ')',
+      };
+    }
+    const state = window.__candlesChartState;
+    if (state && Array.isArray(state.candles) && state.candles.length) {
+      const cache = window.__researchMarketCache[state.symbol];
+      return {
+        symbol: state.symbol,
+        spot: state.candles.at(-1).close,
+        strike: null,
+        expiration: null,
+        volatility: Number.isFinite(cache?.realizedVolatility) ? cache.realizedVolatility : null,
+        source: 'última vela de la gráfica (' + state.symbol + ')',
+      };
+    }
+    return null;
+  };
   document.addEventListener('DOMContentLoaded',()=>{
     $('btnResearchAnalyze').addEventListener('click',runAnalysis);$('btnResearchSave').addEventListener('click',saveJournal);$('btnResearchHistory').addEventListener('click',loadJournal);
     for(const id of ['researchMinProb','researchMinRR','researchMaxSpread','researchTrendFilter'])$(id).addEventListener('change',()=>{if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchModuleTechnical','researchModuleBlackScholes','researchModuleFinancial','researchModuleMovers','researchModuleNews'])$(id).addEventListener('change',()=>{if(currentSnapshot){modulesDirty=true;$('researchEvidence').hidden=true;setStatus('Cambiaste los módulos seleccionados. Vuelve a analizar para recalcular evidencias.','info');}});
     $('chSymbol').addEventListener('change',()=>{if($('researchSymbols').value.trim()==='AAPL')$('researchSymbols').value=$('chSymbol').value;});
+    $('researchCandidates').addEventListener('click',event=>{const tr=event.target.closest('tr[data-candidate]');if(tr)selectCandidate(Number(tr.dataset.candidate),tr);});
+    $('chTriggerStrategy').addEventListener('change',()=>{const value=$('chTriggerStrategy').value;selectCandidate(value===''?null:Number(value));});
   });
 })();

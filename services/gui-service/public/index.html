@@ -417,6 +417,27 @@
     .chart-empty span { font-size:11px; background:#161e28; padding:4px 12px; }
     #tab-candles:has(#candlesChartContainer:not([style*="none"])) .chart-empty { display:none; }
     @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 310px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
+    /* Comparación side-by-side: gráfica a la izquierda, tabla de estrategias a la derecha */
+    .market-split { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:16px; align-items:start; }
+    .market-split-chart { min-width:0; display:flex; flex-direction:column; gap:0.75rem; }
+    .market-split-table { min-width:0; max-height:880px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:12px; background:var(--panel); }
+    .market-split-table .research-workspace { margin-top:0; }
+    .market-split-table .research-table thead th { position:sticky; top:-1px; background:#0d1520; z-index:2; }
+    #researchCandidates tbody tr { cursor:pointer; }
+    #researchCandidates tbody tr:hover td { background:rgba(56,189,248,.06); }
+    #researchCandidates tbody tr.is-selected td { background:rgba(56,189,248,.14); }
+    /* Selector de método cuantitativo (Quant Workbench) */
+    .method-chip { padding:0.6rem; border:1px solid var(--border); border-radius:8px; text-align:center; font-size:0.85rem; cursor:pointer; user-select:none; background:#101720; font-weight:600; }
+    .method-chip:hover { background: var(--panel-hover); }
+    .method-chip.active { background:var(--accent); color:#000; border-color:var(--accent); font-weight:700; }
+    .method-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .quant-iv-extras[hidden] { display:none !important; }
+    .quant-result-section { margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border); }
+    .chart-trigger-controls { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; }
+    .chart-trigger-controls label { display:flex; gap:0.4rem; align-items:center; font-size:0.9rem; }
+    .chart-trigger-controls select { max-width:340px; }
+    @media(max-width:1100px) { .market-split { grid-template-columns:1fr; } .market-split-table { max-height:none; overflow:visible; } }
+    @media(max-width:650px) { .method-grid { grid-template-columns:1fr 1fr; } }
     @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; } }
     @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } }
     #alertContainer { position:fixed; right:20px; bottom:20px; z-index:1000; width:min(380px,calc(100vw - 32px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
@@ -458,9 +479,7 @@
     <!-- ── Pestañas ── -->
     <div class="tabs">
       <button class="tab-btn active" id="tab-btn-strategy" onclick="showTab('strategy')"> Estrategia</button>
-      <button class="tab-btn" id="tab-btn-prices" onclick="showTab('prices')"> Precios Black-Scholes</button>
-      <button class="tab-btn" id="tab-btn-greeks" onclick="showTab('greeks')"> Griegas</button>
-      <button class="tab-btn" id="tab-btn-iv" onclick="showTab('iv')"> Volatilidad Implícita</button>
+      <button class="tab-btn" id="tab-btn-quant" onclick="showTab('quant')"> Análisis cuantitativo</button>
       <button class="tab-btn" id="tab-btn-candles" onclick="showTab('candles')"> Gráfica</button>
       <a class="password-recovery" href="/auth/recuperar.html" target="_blank" rel="noopener noreferrer">Recuperar acceso</a>
     </div>
@@ -591,179 +610,77 @@
       </div>
     </div>
 
-    <!-- ── Precios Black-Scholes ── -->
-    <div id="tab-prices" class="tab-content">
+    <!-- ── Análisis cuantitativo (Quant Workbench) ── -->
+    <div id="tab-quant" class="tab-content">
       <div class="card">
-        <h2>Precio de Opción — Black-Scholes</h2>
+        <h2>Análisis cuantitativo</h2>
+        <p class="small-note">Elige el método a aplicar al contrato. Los tres usan el modelo Black-Scholes del Quant Service; la volatilidad implícita se resuelve con Newton-Raphson y respaldo por bisección en el servidor.</p>
 
-        <form id="pricesForm" class="row">
+        <div class="method-grid" id="quantMethodGrid" role="radiogroup" aria-label="Método cuantitativo">
+          <div class="method-chip active" data-method="prices" role="radio" aria-checked="true" tabindex="0">Precio Black-Scholes</div>
+          <div class="method-chip" data-method="greeks" role="radio" aria-checked="false" tabindex="0">Griegas</div>
+          <div class="method-chip" data-method="iv" role="radio" aria-checked="false" tabindex="0">IV Newton-Raphson</div>
+          <div class="method-chip" data-method="all" role="radio" aria-checked="false" tabindex="0">Los tres</div>
+        </div>
+
+        <form id="quantForm" class="row" style="margin-top:1rem;">
           <div>
             <label>Símbolo</label>
-            <input type="text" id="bsSymbol" value="AAPL" required />
+            <input type="text" id="qwSymbol" value="AAPL" required />
           </div>
           <div>
             <label>Tipo</label>
-            <select id="bsOptionType">
+            <select id="qwOptionType">
               <option value="call">Call</option>
               <option value="put">Put</option>
             </select>
           </div>
           <div class="full">
             <label>Precio Spot del subyacente (S)</label>
-            <input type="number" id="bsSpot" step="0.01" value="343.87" required />
+            <input type="number" id="qwSpot" step="0.01" value="343.87" required />
           </div>
           <div class="full">
             <label>Strike (K)</label>
-            <input type="number" id="bsStrike" step="0.01" value="340" required />
+            <input type="number" id="qwStrike" step="0.01" value="340" required />
           </div>
           <div>
             <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="bsExpiration" value="2026-12-18" required />
+            <input type="text" id="qwExpiration" value="2026-12-18" required />
           </div>
           <div>
             <label>Tasa libre de riesgo (r, anual)</label>
-            <input type="number" id="bsRate" step="0.0001" value="0.05" required />
+            <input type="number" id="qwRate" step="0.0001" value="0.05" required />
           </div>
           <div>
             <label>Rendimiento de dividendos (q, anual)</label>
-            <input type="number" id="bsDividend" step="0.0001" value="0" required />
+            <input type="number" id="qwDividend" step="0.0001" value="0" required />
           </div>
           <div class="full">
             <label>Volatilidad implícita (σ, anual)</label>
-            <input type="number" id="bsVolatility" step="0.0001" value="0.25" required />
+            <input type="number" id="qwVolatility" step="0.0001" value="0.25" required />
           </div>
         </form>
 
-        <button type="button" class="btn btn-primary btn-block" id="btnCalcPrices"> Calcular precio</button>
-
-        <div id="pricesResult" style="margin-top:1.5rem; display:none;">
-          <h3 style="color:var(--accent); margin-bottom:0.5rem;">Resultado</h3>
-          <div class="results-grid" id="pricesGrid"></div>
-          <div class="small-note" id="pricesNote"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Griegas ── -->
-    <div id="tab-greeks" class="tab-content">
-      <div class="card">
-        <h2>Griegas de Opción — Black-Scholes</h2>
-
-        <form id="greeksForm" class="row">
+        <div id="qwIvExtras" class="row quant-iv-extras" hidden>
           <div>
-            <label>Símbolo</label>
-            <input type="text" id="grSymbol" value="AAPL" required />
-          </div>
-          <div>
-            <label>Tipo</label>
-            <select id="grOptionType">
-              <option value="call">Call</option>
-              <option value="put">Put</option>
-            </select>
-          </div>
-          <div class="full">
-            <label>Precio Spot del subyacente (S)</label>
-            <input type="number" id="grSpot" step="0.01" value="343.87" required />
-          </div>
-          <div class="full">
-            <label>Strike (K)</label>
-            <input type="number" id="grStrike" step="0.01" value="340" required />
-          </div>
-          <div>
-            <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="grExpiration" value="2026-12-18" required />
-          </div>
-          <div>
-            <label>Tasa libre de riesgo (r, anual)</label>
-            <input type="number" id="grRate" step="0.0001" value="0.05" required />
-          </div>
-          <div>
-            <label>Rendimiento de dividendos (q, anual)</label>
-            <input type="number" id="grDividend" step="0.0001" value="0" required />
-          </div>
-          <div class="full">
-            <label>Volatilidad implícita (σ, anual)</label>
-            <input type="number" id="grVolatility" step="0.0001" value="0.25" required />
-          </div>
-        </form>
-
-        <button type="button" class="btn btn-primary btn-block" id="btnCalcGreeks"> Calcular griegas</button>
-
-        <div id="greeksResult" style="margin-top:1.5rem; display:none;">
-          <h3 style="color:var(--accent); margin-bottom:0.5rem;">Resultado</h3>
-          <table>
-            <thead>
-              <tr><th>Griega</th><th>Valor</th><th>Interpretación</th></tr>
-            </thead>
-            <tbody id="greeksTable"></tbody>
-          </table>
-          <div class="small-note" id="greeksNote"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Volatilidad Implícita ── -->
-    <div id="tab-iv" class="tab-content">
-      <div class="card">
-        <h2>Volatilidad Implícita — Newton-Raphson</h2>
-
-        <form id="ivForm" class="row">
-          <div>
-            <label>Símbolo</label>
-            <input type="text" id="ivSymbol" value="AAPL" required />
-          </div>
-          <div>
-            <label>Tipo</label>
-            <select id="ivOptionType">
-              <option value="call">Call</option>
-              <option value="put">Put</option>
-            </select>
-          </div>
-          <div class="full">
-            <label>Precio Spot del subyacente (S)</label>
-            <input type="number" id="ivSpot" step="0.01" value="343.87" required />
-          </div>
-          <div class="full">
-            <label>Strike (K)</label>
-            <input type="number" id="ivStrike" step="0.01" value="340" required />
-          </div>
-          <div>
-            <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="ivExpiration" value="2026-12-18" required />
-          </div>
-          <div>
-            <label>Tasa libre de riesgo (r, anual)</label>
-            <input type="number" id="ivRate" step="0.0001" value="0.05" required />
-          </div>
-          <div>
-            <label>Rendimiento de dividendos (q, anual)</label>
-            <input type="number" id="ivDividend" step="0.0001" value="0" required />
-          </div>
-          <div class="full">
             <label>Precio de mercado de la opción</label>
-            <input type="number" id="ivMarketPrice" step="0.01" value="5.00" required />
+            <input type="number" id="qwMarketPrice" step="0.01" value="5.00" required />
             <div class="small-note">Precio observado en el mercado para resolver σ.</div>
           </div>
           <div>
             <label>Suposición inicial (σ inicial)</label>
-            <input type="number" id="ivInitialGuess" step="0.0001" value="0.2" required />
+            <input type="number" id="qwInitialGuess" step="0.0001" value="0.2" required />
             <div class="small-note">Valor inicial para el método de Newton-Raphson.</div>
           </div>
-        </form>
-
-        <button type="button" class="btn btn-primary btn-block" id="btnCalcIV"> Calcular volatilidad implícita</button>
-
-        <div id="ivResult" style="margin-top:1.5rem; display:none;">
-          <h3 style="color:var(--accent); margin-bottom:0.5rem;">Resultado</h3>
-          <div class="results-grid" id="ivGrid"></div>
-          <table style="margin-top:1rem;">
-            <thead>
-              <tr><th>Campo</th><th>Valor</th></tr>
-            </thead>
-            <tbody id="ivTable"></tbody>
-          </table>
-          <div class="small-note" id="ivNote"></div>
         </div>
+
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+          <button type="button" class="btn btn-primary" id="btnCalcQuant"> Calcular precio</button>
+          <button type="button" class="btn btn-secondary" id="btnPrefillQuant" title="Toma S, K, vencimiento y σ de la gráfica o de la candidata seleccionada en la tabla comparativa">Tomar datos de la gráfica/candidata</button>
+        </div>
+
+        <div id="quantResult" style="margin-top:1.5rem; display:none;"></div>
+        <div class="small-note" id="quantNote" style="margin-top:0.5rem;"></div>
       </div>
     </div>
 
@@ -803,11 +720,21 @@
 
         <button type="button" class="btn btn-primary btn-block" id="btnLoadCandles"> Mostrar gráfica</button>
 
+        <div class="chart-trigger-controls">
+          <label><input type="checkbox" id="chShowTriggers" style="width:auto;" /> Mostrar señales de entrada/salida</label>
+          <label>Candidata evaluada
+            <select id="chTriggerStrategy" aria-label="Candidata evaluada para señales en la gráfica">
+              <option value="">— Ninguna seleccionada —</option>
+            </select>
+          </label>
+        </div>
+
         <div id="candlesChartContainer" style="display:none;">
           <div class="small-note" id="candlesMeta" style="margin-bottom:0.75rem;"></div>
           <div class="results-grid" id="candlesMetricsGrid"></div>
           <svg id="candlesChart" viewBox="0 0 900 400" style="width:100%; height:auto; display:block; background:var(--panel); border:1px solid var(--border); border-radius:12px;"></svg>
           <div class="small-note" id="candlesLevelsNote"></div>
+          <div class="small-note" id="candlesTriggersNote"></div>
           <div class="small-note" id="candlesNote"></div>
         </div>
         <section class="research-workspace" aria-labelledby="researchTitle">
@@ -878,7 +805,9 @@
 <script src="/market-period.js"></script>
 <script src="/strategy-selection.js"></script>
 <script src="/research-analysis.js"></script>
+<script src="/strategy-triggers.js"></script>
 <script src="/research-ui.js"></script>
+<script src="/quant-workbench.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
 const navigation = document.querySelector('.tabs');
@@ -902,6 +831,18 @@ emptyChart.append(emptyTitle, emptyText); chartView.querySelector('.card').appen
 analysisColumn.append(chartView);
 [...strategyView.children].filter(node => node !== orderPanel).forEach(node => analysisColumn.append(node));
 layout.append(analysisColumn, orderPanel); strategyView.append(layout);
+// ── Comparación side-by-side: gráfica a la izquierda, panel de investigación a la derecha ──
+const candlesCard = chartView.querySelector(':scope > .card');
+const researchSection = candlesCard ? candlesCard.querySelector(':scope > .research-workspace') : null;
+if (candlesCard && researchSection) {
+  const marketSplit = document.createElement('div'); marketSplit.className = 'market-split';
+  const chartColumn = document.createElement('div'); chartColumn.className = 'market-split-chart';
+  const tableColumn = document.createElement('div'); tableColumn.className = 'market-split-table';
+  [...candlesCard.children].filter(node => node !== researchSection).forEach(node => chartColumn.append(node));
+  tableColumn.append(researchSection);
+  marketSplit.append(chartColumn, tableColumn);
+  candlesCard.append(marketSplit);
+}
 </script>
 <script>
 const API_BASE = '';
@@ -1044,10 +985,12 @@ async function fetchAutomaticSelection() {
   if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
   const quoteRes = await quotePromise;
   const q = quoteRes.data || {};
+  const quotedSymbol=String(q.symbol||'').trim().toUpperCase();
+  if(quotedSymbol && quotedSymbol!==symbol) throw new Error('La cotización recibida es de '+quotedSymbol+' y no corresponde a '+symbol+'. Vuelve a consultar.');
   let spotPrice = null;
   const bid=Number(q.bid), ask=Number(q.ask), ref=Number(q.referencePrice);
   if(Number.isFinite(ref) && ref>0) spotPrice = ref;
-  else if(Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>0) spotPrice=(bid+ask)/2;
+  else if(Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>0&&ask>=bid) spotPrice=(bid+ask)/2;
   const result=selectVertical(contracts,strategy,symbol,expiration,spotPrice);
   if(stillCurrent() && Number.isFinite(spotPrice) && spotPrice>0) {
     document.getElementById('saveSpot').value=spotPrice.toFixed(2);
@@ -1347,252 +1290,20 @@ function renderHistory() {
   });
 }
 
-// ── Black-Scholes Prices ──
-document.getElementById('btnCalcPrices').addEventListener('click', async () => {
-  const body = {
-    symbol: document.getElementById('bsSymbol').value.trim().toUpperCase(),
-    spot: Number(document.getElementById('bsSpot').value),
-    strike: Number(document.getElementById('bsStrike').value),
-    expiration: document.getElementById('bsExpiration').value.trim(),
-    rate: Number(document.getElementById('bsRate').value || 0),
-    dividendYield: Number(document.getElementById('bsDividend').value || 0),
-    volatility: Number(document.getElementById('bsVolatility').value),
-    optionType: document.getElementById('bsOptionType').value,
-  };
-
-  if (!body.symbol || !body.spot || !body.strike || !body.expiration || !body.volatility) {
-    showAlert('Completa todos los campos requeridos.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btnCalcPrices');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Calculando...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/quant/prices`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
-    const data = await res.json();
-
-    const grid = document.getElementById('pricesGrid');
-    grid.innerHTML = '';
-    const metrics = [
-      { label: 'Modelo', value: data.model, neutral: true },
-      { label: 'Símbolo', value: data.symbol, neutral: true },
-      { label: 'Precio teórico', value: `$${data.price.toFixed(4)}`, neutral: true },
-      { label: 'Moneda', value: data.currency, neutral: true },
-      { label: 'Tiempo al vencimiento (años)', value: data.assumptions?.timeToMaturityYears?.toFixed(6) ?? 'N/A', neutral: true },
-      { label: 'Calculado en', value: data.calculatedAt, neutral: true },
-    ];
-    metrics.forEach(m => {
-      const el = document.createElement('div');
-      el.className = 'metric-card';
-      el.innerHTML = `<div class="label">${m.label}</div><div class="value ${m.pos ? 'pos' : m.neg ? 'neg' : 'neutral'}">${escapeHtml(m.value)}</div>`;
-      grid.appendChild(el);
-    });
-
-    document.getElementById('pricesNote').textContent = `Asumciones: spot=$${body.spot}, strike=$${body.strike}, rate=$${body.rate}, dividendYield=$${body.dividendYield}, volatility=$${body.volatility}, optionType=$${body.optionType}`;
-    document.getElementById('pricesResult').style.display = 'block';
-    showAlert('Precio calculado con Black-Scholes.', 'info');
-  } catch (e) {
-    showAlert('Error calculando precio: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = ' Calcular precio';
-  }
-});
-
-// ── Greeks ──
-document.getElementById('btnCalcGreeks').addEventListener('click', async () => {
-  const body = {
-    symbol: document.getElementById('grSymbol').value.trim().toUpperCase(),
-    spot: Number(document.getElementById('grSpot').value),
-    strike: Number(document.getElementById('grStrike').value),
-    expiration: document.getElementById('grExpiration').value.trim(),
-    rate: Number(document.getElementById('grRate').value || 0),
-    dividendYield: Number(document.getElementById('grDividend').value || 0),
-    volatility: Number(document.getElementById('grVolatility').value),
-    optionType: document.getElementById('grOptionType').value,
-  };
-
-  if (!body.symbol || !body.spot || !body.strike || !body.expiration || !body.volatility) {
-    showAlert('Completa todos los campos requeridos.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btnCalcGreeks');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Calculando...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/quant/greeks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
-    const data = await res.json();
-
-    const tbody = document.getElementById('greeksTable');
-    tbody.innerHTML = '';
-    const greeks = data.greeks || {};
-    const rows = [
-      { label: 'Delta', value: greeks.delta?.toFixed(6), desc: 'Sensibilidad del precio al cambio en el spot' },
-      { label: 'Gamma', value: greeks.gamma?.toFixed(6), desc: 'Tasa de cambio del delta respecto al spot' },
-      { label: 'Theta', value: greeks.theta?.toFixed(6), desc: 'Pérdida de valor por el paso del tiempo (día)' },
-      { label: 'Vega', value: greeks.vega?.toFixed(6), desc: 'Sensibilidad al cambio en la volatilidad' },
-      { label: 'Rho', value: greeks.rho?.toFixed(6), desc: 'Sensibilidad al cambio en la tasa de interés' },
-    ];
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.label}</td><td>${r.value}</td><td>${r.desc}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('greeksNote').textContent = `Asumciones: spot=$${body.spot}, strike=$${body.strike}, rate=$${body.rate}, dividendYield=$${body.dividendYield}, volatility=$${body.volatility}, optionType=$${body.optionType}`;
-    document.getElementById('greeksResult').style.display = 'block';
-    showAlert('Griegas calculadas con Black-Scholes.', 'info');
-  } catch (e) {
-    showAlert('Error calculando griegas: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = ' Calcular griegas';
-  }
-});
-
-// ── Implied Volatility ──
-document.getElementById('btnCalcIV').addEventListener('click', async () => {
-  const body = {
-    symbol: document.getElementById('ivSymbol').value.trim().toUpperCase(),
-    spot: Number(document.getElementById('ivSpot').value),
-    strike: Number(document.getElementById('ivStrike').value),
-    expiration: document.getElementById('ivExpiration').value.trim(),
-    rate: Number(document.getElementById('ivRate').value || 0),
-    dividendYield: Number(document.getElementById('ivDividend').value || 0),
-    optionType: document.getElementById('ivOptionType').value,
-    marketPrice: Number(document.getElementById('ivMarketPrice').value),
-    initialGuess: Number(document.getElementById('ivInitialGuess').value || 0.2),
-    tolerance: 1e-8,
-    maxIterations: 200,
-  };
-
-  if (!body.symbol || !body.spot || !body.strike || !body.expiration || !body.marketPrice) {
-    showAlert('Completa todos los campos requeridos.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btnCalcIV');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Calculando IV...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/quant/implied-volatility`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-
-    // Si no converge (422), igual mostramos lo que el servidor devolvió y advertimos
-    if(res.status===422 && !Number.isFinite(data.impliedVolatility)) throw new Error(data.message||'El modelo no pudo resolver ese precio.');
-    if (res.status === 422) {
-      const grid = document.getElementById('ivGrid');
-      grid.innerHTML = '';
-      const metrics = [
-        { label: 'Volatilidad Implícita (σ)', value: (data.impliedVolatility * 100).toFixed(4) + '%', neutral: true },
-        { label: 'Método', value: data.method, neutral: true },
-        { label: 'Convergió', value: 'No', neg: true },
-        { label: 'Iteraciones', value: data.iterations, neutral: true },
-        { label: 'Precio del modelo', value: `$${data.modelPrice?.toFixed(6)}`, neutral: true },
-        { label: 'Error de precio', value: data.pricingError?.toFixed(8), neutral: true },
-      ];
-      metrics.forEach(m => {
-        const el = document.createElement('div');
-        el.className = 'metric-card';
-        el.innerHTML = `<div class="label">${m.label}</div><div class="value ${m.pos ? 'pos' : m.neg ? 'neg' : 'neutral'}">${escapeHtml(m.value)}</div>`;
-        grid.appendChild(el);
-      });
-
-      const tbody = document.getElementById('ivTable');
-      tbody.innerHTML = '';
-      const rows = [
-        { label: 'Símbolo', value: body.symbol },
-        { label: 'Tipo', value: body.optionType },
-        { label: 'Spot', value: `$${body.spot}` },
-        { label: 'Strike', value: `$${body.strike}` },
-        { label: 'Vencimiento', value: body.expiration },
-        { label: 'Tasa libre (r)', value: body.rate.toString() },
-        { label: 'Dividendos (q)', value: body.dividendYield.toString() },
-        { label: 'Precio de mercado', value: `$${body.marketPrice}` },
-        { label: 'Suposición inicial (σ)', value: body.initialGuess.toString() },
-        { label: 'Calculado en', value: data.calculatedAt },
-      ];
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.label}</td><td>${r.value}</td>`;
-        tbody.appendChild(tr);
-      });
-
-      document.getElementById('ivNote').textContent = 'El cálculo no convergió dentro del límite de iteraciones. Esto no demuestra que el precio sea imposible.';
-      document.getElementById('ivResult').style.display = 'block';
-      showAlert('IV no convergió (422). Revisa los detalles arriba.', 'warning');
-      btn.disabled = false;
-      btn.textContent = ' Calcular volatilidad implícita';
-      return;
-    }
-
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
-
-    const grid = document.getElementById('ivGrid');
-    grid.innerHTML = '';
-    const metrics = [
-      { label: 'Volatilidad Implícita (σ)', value: (data.impliedVolatility * 100).toFixed(4) + '%', neutral: true },
-      { label: 'Método', value: data.method, neutral: true },
-      { label: 'Convergió', value: data.converged ? 'Sí' : 'No', neutral: true },
-      { label: 'Iteraciones', value: data.iterations, neutral: true },
-      { label: 'Precio del modelo', value: `$${data.modelPrice?.toFixed(6)}`, neutral: true },
-      { label: 'Error de precio', value: data.pricingError?.toFixed(8), neutral: true },
-    ];
-    metrics.forEach(m => {
-      const el = document.createElement('div');
-      el.className = 'metric-card';
-      el.innerHTML = `<div class="label">${m.label}</div><div class="value ${m.pos ? 'pos' : m.neg ? 'neg' : 'neutral'}">${escapeHtml(m.value)}</div>`;
-      grid.appendChild(el);
-    });
-
-    const tbody = document.getElementById('ivTable');
-    tbody.innerHTML = '';
-    const rows = [
-      { label: 'Símbolo', value: body.symbol },
-      { label: 'Tipo', value: body.optionType },
-      { label: 'Spot', value: `$${body.spot}` },
-      { label: 'Strike', value: `$${body.strike}` },
-      { label: 'Vencimiento', value: body.expiration },
-      { label: 'Tasa libre (r)', value: body.rate.toString() },
-      { label: 'Dividendos (q)', value: body.dividendYield.toString() },
-      { label: 'Precio de mercado', value: `$${body.marketPrice}` },
-      { label: 'Suposición inicial (σ)', value: body.initialGuess.toString() },
-      { label: 'Calculado en', value: data.calculatedAt },
-    ];
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.label}</td><td>${r.value}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('ivNote').textContent = `Método: Newton-Raphson con tolerancia 1e-8 y máximo 200 iteraciones.`;
-    document.getElementById('ivResult').style.display = 'block';
-    showAlert('Volatilidad implícita calculada.', 'info');
-  } catch (e) {
-    showAlert('Error calculando IV: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Calcular volatilidad implícita';
-  }
-});
-
 // ── Candlestick Chart ──
+// Estado de la gráfica cargada y fuente de overlays (señales/niveles) que
+// asigna research-ui.js cuando hay una candidata seleccionada.
+window.__candlesChartState = { symbol: null, timeframe: null, periodLabel: null, candles: [] };
+function candleOverlays() {
+  return typeof window.__candleOverlaySource === 'function' ? window.__candleOverlaySource() : null;
+}
+function refreshChartOverlays() {
+  const state = window.__candlesChartState;
+  if (!state || !state.candles.length) return;
+  const container = document.getElementById('candlesChartContainer');
+  if (!container || container.style.display === 'none') return;
+  renderCandlesChart(state.candles, state.timeframe, candleOverlays());
+}
 function formatPrice(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '$0.00';
@@ -1611,7 +1322,7 @@ function formatAxisTime(timestamp, timeframe) {
   return `${day}/${month}/${String(year).slice(-2)}`;
 }
 
-function renderCandlesChart(candles, timeframe) {
+function renderCandlesChart(candles, timeframe, overlays = null) {
   const width = 900;
   const height = 400;
   const padLeft = 88;
@@ -1699,6 +1410,57 @@ function renderCandlesChart(candles, timeframe) {
     }
   });
 
+  // ── Overlays del spread evaluado: niveles de salida y marcadores de señales ──
+  const levelStyles = {
+    target: { color: '#34d399', dash: '10 4', label: 'Objetivo (strike corto)' },
+    stop: { color: '#f87171', dash: '10 4', label: 'Stop (strike largo)' },
+    breakEven: { color: '#cbd5e1', dash: '3 4', label: 'Break-even' },
+  };
+  let triggerLevelShapes = '';
+  let triggerLabels = '';
+  const levelsData = overlays && overlays.levels ? overlays.levels : null;
+  if (levelsData) {
+    for (const key of ['target', 'stop', 'breakEven']) {
+      const value = Number(levelsData[key]);
+      if (!Number.isFinite(value) || value <= min || value >= max) continue;
+      const style = levelStyles[key];
+      const levelY = y(value);
+      triggerLevelShapes += `<line data-trigger-level="${key}" x1="${padLeft}" y1="${levelY.toFixed(2)}" x2="${width - padRight}" y2="${levelY.toFixed(2)}" stroke="${style.color}" stroke-width="1.4" stroke-dasharray="${style.dash}" pointer-events="none"/>`;
+      triggerLabels += `<text x="${width - padRight - 4}" y="${(levelY - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${style.color}">${style.label} ${formatPrice(value)}</text>`;
+    }
+  }
+  const dateKey = value => new Date(value).toISOString().slice(0, 10);
+  const visibleIndex = new Map(candles.map((candle, index) => [dateKey(candle.timestamp), index]));
+  const describeSignalText = (typeof window !== 'undefined' && window.StrategyTriggers && window.StrategyTriggers.describeSignal)
+    ? window.StrategyTriggers.describeSignal
+    : (signal => signal.rule === 'sma_cross' ? 'Entrada (cruce SMA50)' : signal.rule === 'zone_breakout' ? 'Entrada (ruptura de zona)' : 'Salida (cruce SMA20)');
+  const signalNotes = new Map();
+  let markerShapes = '';
+  if (overlays) {
+    const addNote = (timestamp, text) => {
+      const key = dateKey(timestamp);
+      const list = signalNotes.get(key) || [];
+      list.push(text);
+      signalNotes.set(key, list);
+    };
+    for (const signal of (overlays.entries || [])) {
+      const index = visibleIndex.get(dateKey(signal.timestamp));
+      if (!Number.isInteger(index)) continue;
+      const x = xForIndex(index).toFixed(2);
+      const signalY = y(signal.price).toFixed(2);
+      markerShapes += signal.side === 'bullish'
+        ? `<polygon data-trigger-mark="entry" points="${(Number(x) - 5).toFixed(2)},${(Number(signalY) + 14).toFixed(2)} ${(Number(x) + 5).toFixed(2)},${(Number(signalY) + 14).toFixed(2)} ${x},${(Number(signalY) + 5).toFixed(2)}" fill="#22c55e" stroke="#0b131d" stroke-width="0.5" pointer-events="none"/>`
+        : `<polygon data-trigger-mark="entry" points="${(Number(x) - 5).toFixed(2)},${(Number(signalY) - 14).toFixed(2)} ${(Number(x) + 5).toFixed(2)},${(Number(signalY) - 14).toFixed(2)} ${x},${(Number(signalY) - 5).toFixed(2)}" fill="#ef4444" stroke="#0b131d" stroke-width="0.5" pointer-events="none"/>`;
+      addNote(signal.timestamp, describeSignalText(signal));
+    }
+    for (const signal of (overlays.exits || [])) {
+      const index = visibleIndex.get(dateKey(signal.timestamp));
+      if (!Number.isInteger(index)) continue;
+      markerShapes += `<circle data-trigger-mark="exit" cx="${xForIndex(index).toFixed(2)}" cy="${y(signal.price).toFixed(2)}" r="4.5" fill="none" stroke="#fbbf24" stroke-width="1.6" pointer-events="none"/>`;
+      addNote(signal.timestamp, describeSignalText(signal));
+    }
+  }
+
   const volumeValue=candle=>{const value=Number(candle.volume);return Number.isFinite(value)&&value>0?value:0;};
   const volumeTop=298,volumeBottom=380,volumeMax=Math.max(1,...candles.map(volumeValue)),volumeHeight=74;
   const compactVolume=value=>value>=1e9?(value/1e9).toFixed(1)+'B':value>=1e6?(value/1e6).toFixed(1)+'M':value>=1e3?(value/1e3).toFixed(1)+'K':String(Math.round(value));
@@ -1731,10 +1493,12 @@ function renderCandlesChart(candles, timeframe) {
     <g>
       ${gridLines}
       <g>${levelShapes}</g>
+      <g>${triggerLevelShapes}</g>
       <g>${shapes}</g>
       <g>${maShapes}${lastPriceMarkup}</g>
       <g>${volumeMarkup}</g>
-      <g>${maLegend}</g>
+      <g>${maLegend}${triggerLabels}</g>
+      <g>${markerShapes}</g>
       ${xLabels}
       ${yLabels}
       <line id="candleCursor" y1="${padTop}" y2="${height-38}" stroke="#a3b4c7" stroke-dasharray="3 3" pointer-events="none" visibility="hidden" />
@@ -1760,7 +1524,9 @@ function renderCandlesChart(candles, timeframe) {
     if (!target) { hide(); return; }
     const index = Number(target.dataset.candle), candle = candles[index];
     const date = new Date(candle.timestamp).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'});
-    tooltip.innerHTML = '<strong>'+escapeHtml(date)+'</strong><br>'+[['Apertura',formatPrice(candle.open)],['Máximo',formatPrice(candle.high)],['Mínimo',formatPrice(candle.low)],['Cierre',formatPrice(candle.close)],['Volumen',Number(candle.volume||0).toLocaleString('es-MX')]].map(([name,value])=>'<span>'+name+': <b>'+escapeHtml(value)+'</b></span>').join('<br>');
+    const signalsHere = signalNotes.get(dateKey(candle.timestamp));
+    const signalMarkup = signalsHere ? '<br>'+signalsHere.map(text=>'<b>'+escapeHtml(text)+'</b>').join('<br>') : '';
+    tooltip.innerHTML = '<strong>'+escapeHtml(date)+'</strong><br>'+[['Apertura',formatPrice(candle.open)],['Máximo',formatPrice(candle.high)],['Mínimo',formatPrice(candle.low)],['Cierre',formatPrice(candle.close)],['Volumen',Number(candle.volume||0).toLocaleString('es-MX')]].map(([name,value])=>'<span>'+name+': <b>'+escapeHtml(value)+'</b></span>').join('<br>')+signalMarkup;
     tooltip.hidden = false;
     const hostRect = host.getBoundingClientRect(), rect = svg.getBoundingClientRect();
     const cursorX = Number.isFinite(event.clientX) ? event.clientX-hostRect.left : rect.left-hostRect.left+xForIndex(index)*rect.width/width;
@@ -1776,6 +1542,22 @@ function renderCandlesChart(candles, timeframe) {
   svg.onfocusin = inspect;
   svg.onfocusout = hide;
   svg.onkeydown = event => { if (event.key === 'Escape') hide(); };
+
+  const triggerNote = document.getElementById('candlesTriggersNote');
+  if (triggerNote) {
+    if (overlays && overlays.note) triggerNote.textContent = overlays.note;
+    else if (overlays) {
+      const counts = [];
+      if (levelsData) counts.push('niveles objetivo/stop/break-even del spread seleccionado');
+      if ((overlays.entries || []).length) counts.push(overlays.entries.length + ' entrada(s)');
+      if ((overlays.exits || []).length) counts.push(overlays.exits.length + ' salida(s)');
+      triggerNote.textContent = counts.length
+        ? 'Señales en la gráfica: ' + counts.join(' · ') + '. Heurístico y orientativo; no es pronóstico ni recomendación.'
+        : 'Sin señales visibles para la selección actual. Marca "Mostrar señales" y elige una candidata de la tabla (heurístico, no recomendación).';
+    } else {
+      triggerNote.textContent = '';
+    }
+  }
 
 }
 
@@ -1834,7 +1616,8 @@ function renderCandles(data) {
     grid.appendChild(el);
   });
 
-  renderCandlesChart(candles, data.timeframe);
+  window.__candlesChartState = { symbol: data.symbol || null, timeframe: data.timeframe || null, periodLabel, candles };
+  renderCandlesChart(candles, data.timeframe, candleOverlays());
   document.getElementById('candlesNote').textContent = `${data.symbol} · Periodo: ${periodLabel} · Vela: ${candleLabel} · ${candles.length} velas · Del ${new Date(candles[0].timestamp).toLocaleDateString('es-MX')} al ${new Date(last.timestamp).toLocaleDateString('es-MX')}.`;
 }
 
@@ -1887,6 +1670,7 @@ async function loadCandles() {
 }
 document.getElementById('btnLoadCandles').addEventListener('click', loadCandles);
 document.getElementById('chTimeframe').addEventListener('change', loadCandles);
+document.getElementById('chShowTriggers').addEventListener('change', refreshChartOverlays);
 
 
 function renderExecutionSummary(result, orders) {
