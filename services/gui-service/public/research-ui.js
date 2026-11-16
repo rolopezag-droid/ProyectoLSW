@@ -114,7 +114,7 @@
     if(!symbols.length||symbols.length>3||symbols.some(s=>!/^[A-Z0-9.-]{1,12}$/.test(s)))return setStatus('Ingresa de 1 a 3 tickers válidos, separados por comas.','error');
     const btn=$('btnResearchAnalyze');running=true;btn.disabled=true;btn.textContent='Consultando mercado…';$('researchEvidence').hidden=true;
     try{
-      const rate=Number($('bsRate').value),dividend=Number($('bsDividend').value),riskFreeRate=Number.isFinite(rate)?rate:.05,dividendYield=Number.isFinite(dividend)?dividend:0;
+      const rate=Number($('qwRate')?.value),dividend=Number($('qwDividend')?.value),riskFreeRate=Number.isFinite(rate)?rate:.05,dividendYield=Number.isFinite(dividend)?dividend:0;
       const underlyings=[],failures=[];
       for(const symbol of symbols){setStatus(`Consultando velas y cadena de opciones de ${symbol}…`,'loading');try{underlyings.push(await analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield));}catch(error){failures.push(`${symbol}: ${error.message}`);}}
       if(!underlyings.length)throw new Error(failures.join(' · ')||'No se obtuvieron datos de mercado.');

@@ -66,6 +66,17 @@ test('UI registro valida antes de enviar y muestra carga sin duplicar solicitude
   resolve({ok:true,status:202,json:async()=>({status:'confirmation_required',message:'Confirma tu correo.'})});await until(()=>!btn.disabled);
  }finally{dom.window.close();}
 });
+test('UI análisis de investigación lee tasas del workbench y completa sin errores de IDs removidos',async()=>{
+ const {dom,w}=page();try{
+  assert.ok(w.document.getElementById('qwRate'),'el workbench debe existir en el DOM');
+  const btn=w.document.getElementById('btnResearchAnalyze');btn.click();
+  await until(()=>!btn.disabled);
+  const status=w.document.getElementById('researchStatus').textContent;
+  assert.doesNotMatch(status,/Cannot read properties|null/);
+  assert.match(status,/Análisis listo/);
+  await new Promise(r=>setImmediate(r));
+ }finally{dom.window.close();}
+});
 test('UI IV recupera botón tras 422 y gráfica inspecciona una vela sin mover avisos',async()=>{
  const {dom,w}=page();try{
   w.document.querySelector('#quantMethodGrid [data-method="iv"]').click();
