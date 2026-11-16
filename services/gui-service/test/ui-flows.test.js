@@ -12,6 +12,7 @@ function page(register, intercept) {
   if(u.pathname==='/api/supabase/register' && register)return register(opts);
   if(u.pathname==='/api/services/status')return {ok:true,status:200,json:async()=>({})};
   if(u.pathname.endsWith('/broker/quotes'))return {ok:true,status:200,json:async()=>({symbol:u.searchParams.get('symbol'),bid:190,ask:190.4,timestamp:'2026-11-07T08:00:00Z'})};
+  if(u.pathname.endsWith('/options-chain/strikes'))return {ok:true,status:200,json:async()=>({provider:'alpaca',symbol:u.searchParams.get('symbol'),expiration:u.searchParams.get('expiration'),type:u.searchParams.get('type'),strikes:[190,195],count:2})};
   if(u.pathname.endsWith('/options-chain')) {const type=u.searchParams.get('type'),letter=type==='call'?'C':'P';body={contracts:[{type,underlyingSymbol:'AAPL',expiration:'2026-12-18',contractSymbol:'AAPL261218'+letter+'00190000',strike:190,bid:type==='call'?4:2,ask:type==='call'?4.2:2.2},{type,underlyingSymbol:'AAPL',expiration:'2026-12-18',contractSymbol:'AAPL261218'+letter+'00195000',strike:195,bid:type==='call'?2:4,ask:type==='call'?2.2:4.2}],nextPageToken:null};}
   else if(u.pathname.endsWith('/strategies/evaluate'))body=evaluateVerticalSpread(JSON.parse(opts.body));
   else if(u.pathname.endsWith('/broker/spreads'))body={id:'fake-order',status:'accepted'};
@@ -23,6 +24,7 @@ function page(register, intercept) {
   return {ok:true,status:200,json:async()=>body};
  };
  for(const script of w.document.querySelectorAll('script')){if(script.src)w.eval(fs.readFileSync(path.join(__dirname,'../public',new URL(script.src).pathname.replace(/^\//,'')),'utf8'));else w.eval(script.textContent);}
+ w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
  return {dom,w,calls};
 }
 for(const strategy of ['BULL_CALL_SPREAD','BEAR_CALL_SPREAD','BULL_PUT_SPREAD','BEAR_PUT_SPREAD']) {
@@ -66,7 +68,13 @@ test('UI registro valida antes de enviar y muestra carga sin duplicar solicitude
 });
 test('UI IV recupera botón tras 422 y gráfica inspecciona una vela sin mover avisos',async()=>{
  const {dom,w}=page();try{
-  w.document.getElementById('btnCalcIV').click();await until(()=>!w.document.getElementById('btnCalcIV').disabled);assert.ok(!w.document.getElementById('ivGrid').textContent.includes('NaN'));
+  w.document.querySelector('#quantMethodGrid [data-method="iv"]').click();
+  assert.equal(w.document.getElementById('qwIvExtras').hidden,false);
+  const btn=w.document.getElementById('btnCalcQuant');btn.click();
+  await until(()=>!btn.disabled);
+  assert.ok(!w.document.getElementById('quantResult').textContent.includes('NaN'));
+  assert.match(w.document.getElementById('quantResult').textContent,/no convergió/i);
+  assert.match(btn.textContent,/volatilidad implícita/i);
   w.document.getElementById('btnLoadCandles').click();await until(()=>w.document.querySelector('[data-candle]'));
   w.document.querySelector('[data-candle]').dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true,clientX:100,clientY:100}));
   assert.ok(w.document.getElementById('candleTooltip').textContent.includes('Apertura'));assert.equal(w.getComputedStyle(w.document.getElementById('alertContainer')).position,'fixed');
@@ -120,10 +128,14 @@ test('UI exige precio del subyacente antes de iniciar sesión',async()=>{
  }finally{dom.window.close();}
 });
 
-for(const quote of [{symbol:'AAPL',bid:null,ask:190},{symbol:'AAPL',bid:200,ask:190},{symbol:'MSFT',bid:190,ask:191}])test('UI no reutiliza precio anterior ante cotización inválida '+JSON.stringify(quote),async()=>{
+for(const [quote,alertPattern] of [
+ [{symbol:'AAPL',bid:null,ask:190},/Cotizaciones para/],
+ [{symbol:'AAPL',bid:200,ask:190},/Cotizaciones para/],
+ [{symbol:'MSFT',bid:190,ask:191},/no corresponde/],
+])test('UI no reutiliza precio anterior ante cotización inválida '+JSON.stringify(quote),async()=>{
  const {dom,w}=page(null,u=>u.pathname.endsWith('/broker/quotes')?{ok:true,status:200,json:async()=>quote}:null);try{
   w.document.getElementById('saveSpot').value='999';const btn=w.document.getElementById('btnFetchQuotes');btn.click();await until(()=>!btn.disabled);
-  assert.equal(w.document.getElementById('saveSpot').value,'');assert.match(w.document.getElementById('saveSpotSource').textContent,/referencia manual/);assert.match(w.document.getElementById('alertContainer').textContent,/cotización válida/);
+  assert.equal(w.document.getElementById('saveSpot').value,'');assert.match(w.document.getElementById('saveSpotSource').textContent,/referencia manual/);assert.match(w.document.getElementById('alertContainer').textContent,alertPattern);
  }finally{dom.window.close();}
 });
 
