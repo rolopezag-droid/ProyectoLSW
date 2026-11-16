@@ -436,6 +436,17 @@
     .chart-trigger-controls { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; }
     .chart-trigger-controls label { display:flex; gap:0.4rem; align-items:center; font-size:0.9rem; }
     .chart-trigger-controls select { max-width:340px; }
+    /* Acordeones estilo VS Code: encabezado clicable, chevron rotatorio, cuerpo oculto al colapsar */
+    .collapsible-header { cursor:pointer; user-select:none; }
+    .collapsible-header:hover { color:var(--text); }
+    .panel-chevron { appearance:none; background:none; border:0; color:var(--muted); cursor:pointer; font-size:10px; line-height:1; padding:2px 7px 2px 2px; transition:transform .12s ease; flex:none; }
+    .panel-chevron.expanded { transform:rotate(90deg); }
+    .card.is-collapsed > :not(h2) { display:none !important; }
+    .research-panel.is-collapsed > :not(.research-panel-heading) { display:none !important; }
+    .research-panel.is-collapsed > .research-panel-heading { margin-bottom:0; padding-bottom:0; border-bottom-color:transparent; }
+    .collapse-toolbar { display:flex; gap:6px; }
+    .collapse-toolbar-btn { appearance:none; background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:10px; padding:5px 9px; font-weight:600; }
+    .collapse-toolbar-btn:hover { color:var(--text); border-color:var(--accent); }
     @media(max-width:1100px) { .market-split { grid-template-columns:1fr; } .market-split-table { max-height:none; overflow:visible; } }
     @media(max-width:650px) { .method-grid { grid-template-columns:1fr 1fr; } }
     @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; } }
@@ -808,6 +819,7 @@
 <script src="/strategy-triggers.js"></script>
 <script src="/research-ui.js"></script>
 <script src="/quant-workbench.js"></script>
+<script src="/collapsible-panels.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
 const navigation = document.querySelector('.tabs');
