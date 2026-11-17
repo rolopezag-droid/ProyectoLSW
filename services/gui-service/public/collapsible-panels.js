@@ -67,6 +67,9 @@
   }
 
   function makeCollapsible(section) {
+    // Exclusiones: el ticket de órdenes y el workbench siempre visibles y sin acordeón.
+    if (section.classList.contains('order-panel')) return;
+    if (section.closest('#tab-quant')) return;
     const isPanel = section.classList.contains('research-panel');
     const header = section.querySelector(':scope > h2, :scope > .research-panel-heading, :scope > .research-heading');
     if (!header || header.querySelector(':scope > .panel-chevron')) return;
@@ -108,30 +111,10 @@
     return true;
   }
 
-  function addToolbar() {
-    const heading = document.querySelector('.workspace-heading');
-    if (!heading || heading.querySelector('.collapse-toolbar')) return;
-    const toolbar = document.createElement('div');
-    toolbar.className = 'collapse-toolbar';
-    const collapseBtn = document.createElement('button');
-    collapseBtn.type = 'button';
-    collapseBtn.textContent = 'Colapsar todo';
-    collapseBtn.className = 'collapse-toolbar-btn';
-    collapseBtn.addEventListener('click', () => setAll(true));
-    const expandBtn = document.createElement('button');
-    expandBtn.type = 'button';
-    expandBtn.textContent = 'Expandir todo';
-    expandBtn.className = 'collapse-toolbar-btn';
-    expandBtn.addEventListener('click', () => setAll(false));
-    toolbar.append(collapseBtn, expandBtn);
-    heading.append(toolbar);
-  }
-
   function init() {
     state = loadState();
     managed = [];
-    document.querySelectorAll('main .card, aside .card, #researchEvidence .research-panel, main .research-workspace').forEach(makeCollapsible);
-    addToolbar();
+    document.querySelectorAll('main .card, aside .card, #researchEvidence .research-panel').forEach(makeCollapsible);
     syncFluid();
   }
 

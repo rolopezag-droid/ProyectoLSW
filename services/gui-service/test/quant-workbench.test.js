@@ -41,7 +41,7 @@ function page(intercept) {
 test('Workbench: el selector cambia método, muestra campos de IV y ajusta el botón', async () => {
   const { dom, w } = page(); try {
     const chips = w.document.querySelectorAll('#quantMethodGrid .method-chip');
-    assert.equal(chips.length, 4);
+    assert.equal(chips.length, 3);
     assert.equal(w.document.getElementById('qwIvExtras').hidden, true);
     w.document.querySelector('[data-method="iv"]').click();
     assert.equal(w.document.getElementById('qwIvExtras').hidden, false);
@@ -77,16 +77,18 @@ test('Workbench: precios y griegas envían el payload correcto y renderizan resu
   } finally { dom.window.close(); }
 });
 
-test('Workbench: "Los tres" llama a los tres endpoints y apila resultados', async () => {
+test('Workbench: el modo combinado "Los tres" ya no existe y cada método llama un solo endpoint', async () => {
   const { dom, w, calls } = page(); try {
-    w.document.querySelector('[data-method="all"]').click();
+    assert.equal(w.document.querySelector('[data-method="all"]'), null, 'el chip "Los tres" fue eliminado');
+    assert.equal(w.QuantWorkbench.METHODS.all, undefined);
+    w.document.querySelector('[data-method="iv"]').click();
     assert.equal(w.document.getElementById('qwIvExtras').hidden, false);
-    w.document.getElementById('btnCalcQuant').click();
+    const btn = w.document.getElementById('btnCalcQuant');
+    btn.click();
     await until(() => w.document.getElementById('quantResult').textContent.includes('Volatilidad Implícita'));
-    const paths = calls.filter(c => c.url.startsWith('http://localhost:3005/api/v1/quant/') || c.url.startsWith('/api/v1/quant/')).map(c => new URL(c.url, 'http://localhost:3005').pathname);
-    assert.deepEqual(paths, ['/api/v1/quant/prices', '/api/v1/quant/greeks', '/api/v1/quant/implied-volatility']);
-    const text = w.document.getElementById('quantResult').textContent;
-    assert.match(text, /Precio Black-Scholes/); assert.match(text, /Gamma/); assert.match(text, /Newton-Raphson/);
+    const paths = calls.filter(c => c.url.includes('/quant/')).map(c => new URL(c.url, 'http://localhost:3005').pathname);
+    assert.deepEqual(paths, ['/api/v1/quant/implied-volatility']);
+    assert.match(w.document.getElementById('quantResult').textContent, /Newton-Raphson/);
   } finally { dom.window.close(); }
 });
 

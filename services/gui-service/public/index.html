@@ -364,9 +364,9 @@
     .workspace-tag { align-self:center; border:1px solid var(--border); padding:5px 10px; border-radius:4px; font-size:10px; color:var(--muted); }
     .card { padding:20px; border-radius:8px; gap:16px; box-shadow:none; }
     .card h2 { color:var(--text); font-size:13px; font-weight:600; margin:0; }
-    .analysis-layout { display:grid; grid-template-columns:minmax(0,1fr) 350px; gap:20px; align-items:start; }
+    .analysis-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:20px; align-items:start; }
     .analysis-column { min-width:0; display:flex; flex-direction:column; gap:20px; }
-    .order-panel { grid-column:2; grid-row:1; border-top:2px solid var(--accent); }
+    .order-panel { grid-column:2; grid-row:1; border-top:2px solid var(--accent); position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto; }
     .analysis-column { grid-column:1; grid-row:1; }
     #tab-strategy.active { display:block; }
     .strategy-grid { grid-template-columns:1fr 1fr; gap:8px; }
@@ -416,13 +416,10 @@
     .chart-empty strong { font-size:16px; color:#dce7f2; font-weight:500; background:#161e28; padding:4px 12px; }
     .chart-empty span { font-size:11px; background:#161e28; padding:4px 12px; }
     #tab-candles:has(#candlesChartContainer:not([style*="none"])) .chart-empty { display:none; }
-    @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 310px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
-    /* Comparación side-by-side: gráfica a la izquierda, tabla de estrategias a la derecha */
-    .market-split { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:16px; align-items:start; }
-    .market-split-chart { min-width:0; display:flex; flex-direction:column; gap:0.75rem; }
-    .market-split-table { min-width:0; max-height:880px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:12px; background:var(--panel); }
-    .market-split-table .research-workspace { margin-top:0; }
-    .market-split-table .research-table thead th { position:sticky; top:-1px; background:#0d1520; z-index:2; }
+    @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 340px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
+    /* Panel de investigación debajo de la gráfica, en la columna izquierda del workspace */
+    .research-workspace { min-width:0; }
+    .research-table thead th { position:sticky; top:-1px; background:#0d1520; z-index:2; }
     #researchCandidates tbody tr { cursor:pointer; }
     #researchCandidates tbody tr:hover td { background:rgba(56,189,248,.06); }
     #researchCandidates tbody tr.is-selected td { background:rgba(56,189,248,.14); }
@@ -430,14 +427,17 @@
     .method-chip { padding:0.6rem; border:1px solid var(--border); border-radius:8px; text-align:center; font-size:0.85rem; cursor:pointer; user-select:none; background:#101720; font-weight:600; }
     .method-chip:hover { background: var(--panel-hover); }
     .method-chip.active { background:var(--accent); color:#000; border-color:var(--accent); font-weight:700; }
-    .method-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .method-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
     .quant-iv-extras[hidden] { display:none !important; }
     .quant-result-section { margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border); }
+    #quantForm { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    #quantForm .full { grid-column:auto; }
     .chart-trigger-controls { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; }
-    .chart-trigger-controls label { display:flex; gap:0.4rem; align-items:center; font-size:0.9rem; }
+    .chart-trigger-controls label { display:flex; gap:0.4rem; align-items:center; font-size:0.9rem; white-space:nowrap; }
     .chart-trigger-controls select { max-width:340px; }
     /* Acordeones estilo VS Code: encabezado clicable, chevron rotatorio, cuerpo oculto al colapsar */
-    .collapsible-header { cursor:pointer; user-select:none; }
+    .collapsible-header { cursor:pointer; user-select:none; justify-content:flex-start !important; gap:10px; }
+    .collapsible-header > .research-source-status, .collapsible-header > button:not(.panel-chevron) { margin-left:auto; }
     .collapsible-header:hover { color:var(--text); }
     .panel-chevron { appearance:none; background:none; border:0; color:var(--muted); cursor:pointer; font-size:10px; line-height:1; padding:2px 7px 2px 2px; transition:transform .12s ease; flex:none; }
     .panel-chevron.expanded { transform:rotate(90deg); }
@@ -447,16 +447,8 @@
     /* Al plegar se libera espacio: los plegados pasan a barras de ancho completo y los abiertos reacomodan */
     .research-panel.is-collapsed { grid-column: 1 / -1; }
     .research-dashboard.has-collapsed .research-panel:not(.is-collapsed) { grid-column: 1 / -1; }
-    .research-workspace.is-collapsed > :not(.research-heading) { display:none !important; }
-    .market-split:has(.research-workspace.is-collapsed) { grid-template-columns:minmax(0,1fr); }
-    .analysis-layout:has(.order-panel.is-collapsed) { grid-template-columns:minmax(0,1fr); }
-    .analysis-layout:has(.order-panel.is-collapsed) .order-panel { grid-column:auto; grid-row:auto; }
-    .collapse-toolbar { display:flex; gap:6px; }
-    .collapse-toolbar-btn { appearance:none; background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:10px; padding:5px 9px; font-weight:600; }
-    .collapse-toolbar-btn:hover { color:var(--text); border-color:var(--accent); }
-    @media(max-width:1100px) { .market-split { grid-template-columns:1fr; } .market-split-table { max-height:none; overflow:visible; } }
-    @media(max-width:650px) { .method-grid { grid-template-columns:1fr 1fr; } }
-    @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; } }
+    @media(max-width:650px) { .method-grid { grid-template-columns:1fr; } }
+    @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; position:static; } }
     @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } }
     #alertContainer { position:fixed; right:20px; bottom:20px; z-index:1000; width:min(380px,calc(100vw - 32px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
     #alertContainer .alert { position:relative; margin:0; padding:12px 38px 12px 14px; background:#172737; color:#deebf6; border:1px solid #416176; border-left:3px solid #72b4d5; border-radius:5px; box-shadow:0 4px 18px #0005; pointer-events:auto; overflow-wrap:anywhere; }
@@ -632,13 +624,12 @@
     <div id="tab-quant" class="tab-content">
       <div class="card">
         <h2>Análisis cuantitativo</h2>
-        <p class="small-note">Elige el método a aplicar al contrato. Los tres usan el modelo Black-Scholes del Quant Service; la volatilidad implícita se resuelve con Newton-Raphson y respaldo por bisección en el servidor.</p>
+        <p class="small-note">Elige el método a aplicar al contrato. Todos usan el modelo Black-Scholes del Quant Service; la volatilidad implícita se resuelve con Newton-Raphson y respaldo por bisección en el servidor.</p>
 
         <div class="method-grid" id="quantMethodGrid" role="radiogroup" aria-label="Método cuantitativo">
           <div class="method-chip active" data-method="prices" role="radio" aria-checked="true" tabindex="0">Precio Black-Scholes</div>
           <div class="method-chip" data-method="greeks" role="radio" aria-checked="false" tabindex="0">Griegas</div>
           <div class="method-chip" data-method="iv" role="radio" aria-checked="false" tabindex="0">IV Newton-Raphson</div>
-          <div class="method-chip" data-method="all" role="radio" aria-checked="false" tabindex="0">Los tres</div>
         </div>
 
         <form id="quantForm" class="row" style="margin-top:1rem;">
@@ -653,11 +644,11 @@
               <option value="put">Put</option>
             </select>
           </div>
-          <div class="full">
+          <div>
             <label>Precio Spot del subyacente (S)</label>
             <input type="number" id="qwSpot" step="0.01" value="343.87" required />
           </div>
-          <div class="full">
+          <div>
             <label>Strike (K)</label>
             <input type="number" id="qwStrike" step="0.01" value="340" required />
           </div>
@@ -673,7 +664,7 @@
             <label>Rendimiento de dividendos (q, anual)</label>
             <input type="number" id="qwDividend" step="0.0001" value="0" required />
           </div>
-          <div class="full">
+          <div>
             <label>Volatilidad implícita (σ, anual)</label>
             <input type="number" id="qwVolatility" step="0.0001" value="0.25" required />
           </div>
@@ -847,21 +838,17 @@ const emptyTitle = document.createElement('strong'); emptyTitle.textContent = 'D
 emptyTitle.textContent = 'Datos de mercado';
 const emptyText = document.createElement('span'); emptyText.textContent = 'Selecciona un símbolo y consulta la gráfica de Alpaca.';
 emptyChart.append(emptyTitle, emptyText); chartView.querySelector('.card').append(emptyChart);
+// ── Workspace a la izquierda + ticket de órdenes pegajoso a la derecha ──
 analysisColumn.append(chartView);
-[...strategyView.children].filter(node => node !== orderPanel).forEach(node => analysisColumn.append(node));
-layout.append(analysisColumn, orderPanel); strategyView.append(layout);
-// ── Comparación side-by-side: gráfica a la izquierda, panel de investigación a la derecha ──
 const candlesCard = chartView.querySelector(':scope > .card');
 const researchSection = candlesCard ? candlesCard.querySelector(':scope > .research-workspace') : null;
+// El panel de investigación vive debajo de la gráfica, abierto y sin acordeón propio.
 if (candlesCard && researchSection) {
-  const marketSplit = document.createElement('div'); marketSplit.className = 'market-split';
-  const chartColumn = document.createElement('div'); chartColumn.className = 'market-split-chart';
-  const tableColumn = document.createElement('div'); tableColumn.className = 'market-split-table';
-  [...candlesCard.children].filter(node => node !== researchSection).forEach(node => chartColumn.append(node));
-  tableColumn.append(researchSection);
-  marketSplit.append(chartColumn, tableColumn);
-  candlesCard.append(marketSplit);
+  candlesCard.removeChild(researchSection);
+  analysisColumn.append(researchSection);
 }
+[...strategyView.children].filter(node => node !== orderPanel).forEach(node => analysisColumn.append(node));
+layout.append(analysisColumn, orderPanel); strategyView.append(layout);
 </script>
 <script>
 const API_BASE = '';

@@ -37,6 +37,12 @@ test('Acordeón: los paneles de contexto inician colapsados y los flujos princip
     assert.equal(api.isCollapsed(strategyCard), false);
     const chartCard = w.document.getElementById('candlesChart').closest('.card');
     assert.equal(api.isCollapsed(chartCard), false);
+    // El ticket de órdenes, el workbench y el panel de investigación NO son acordeones.
+    assert.equal(strategyCard.querySelector(':scope > h2 > .panel-chevron'), null, 'Nueva operación sin chevron');
+    assert.equal(w.document.querySelector('#tab-quant .card h2 .panel-chevron'), null, 'Análisis cuantitativo sin chevron');
+    assert.equal(w.document.querySelector('main .research-workspace .research-heading .panel-chevron'), null, 'Panel de investigación sin acordeón');
+    assert.equal(api.sections.includes(w.document.querySelector('main .research-workspace')), false);
+    assert.equal(api.sections.includes(strategyCard), false);
     // Chevron y aria en un panel colapsado.
     const chevron = panel(w, 'researchNewsPanel').querySelector('.panel-chevron');
     assert.ok(chevron, 'debe existir el chevron');
@@ -95,18 +101,6 @@ test('Acordeón: el estado elegido persiste en localStorage y se restaura en una
   } finally { first.dom.window.close(); }
 });
 
-test('Acordeón: Colapsar todo / Expandir todo afecta a todos los paneles gestionados', async () => {
-  const { dom, w } = page(); try {
-    const buttons = w.document.querySelectorAll('.workspace-heading .collapse-toolbar button');
-    assert.equal(buttons.length, 2, 'debe existir la barra Colapsar/Expandir todo');
-    buttons[0].click();
-    assert.ok(w.CollapsiblePanels.sections.every(s => w.CollapsiblePanels.isCollapsed(s)));
-    buttons[1].click();
-    assert.ok(w.CollapsiblePanels.sections.every(s => !w.CollapsiblePanels.isCollapsed(s)));
-    await new Promise(r => setImmediate(r));
-  } finally { dom.window.close(); }
-});
-
 test('Acordeón responsivo: plegar paneles marca el dashboard para reacomodar el contenido', async () => {
   const { dom, w } = page(); try {
     const api = w.CollapsiblePanels;
@@ -122,20 +116,15 @@ test('Acordeón responsivo: plegar paneles marca el dashboard para reacomodar el
   } finally { dom.window.close(); }
 });
 
-test('Acordeón responsivo: plegar el panel de investigación libera la columna de la gráfica', async () => {
+test('Acordeón responsivo: la barra Colapsar/Expandir todo ya no existe y el workspace queda abierto', async () => {
   const { dom, w } = page(); try {
-    const api = w.CollapsiblePanels;
+    assert.equal(w.document.querySelector('.workspace-heading .collapse-toolbar'), null, 'sin barra global');
     const workspace = w.document.querySelector('main .research-workspace');
-    assert.ok(workspace, 'el panel de investigación debe existir');
-    assert.ok(api.sections.includes(workspace), 'debe estar gestionado como acordeón');
-    assert.equal(api.isCollapsed(workspace), false, 'inicia abierto');
-    workspace.querySelector('.research-heading').click();
-    assert.equal(api.isCollapsed(workspace), true);
+    assert.ok(workspace, 'el panel de investigación debe estar en el DOM');
     const controls = w.document.querySelector('.research-controls');
-    assert.equal(w.getComputedStyle(controls).display, 'none', 'los controles se ocultan al plegar');
-    workspace.querySelector('.research-heading').click();
-    assert.equal(api.isCollapsed(workspace), false);
-    assert.notEqual(w.getComputedStyle(controls).display, 'none');
+    assert.notEqual(w.getComputedStyle(controls).display, 'none', 'controles de investigación siempre visibles');
+    const orderCard = w.document.getElementById('strategyForm').closest('.card');
+    assert.equal(w.getComputedStyle(orderCard).position, 'sticky', 'ticket de órdenes pegajoso');
     await new Promise(r => setImmediate(r));
   } finally { dom.window.close(); }
 });

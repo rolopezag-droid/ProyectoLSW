@@ -14,7 +14,6 @@
     prices: { label: 'Precio Black-Scholes', button: ' Calcular precio', path: 'prices' },
     greeks: { label: 'Griegas', button: ' Calcular griegas', path: 'greeks' },
     iv: { label: 'IV Newton-Raphson', button: ' Calcular volatilidad implícita', path: 'implied-volatility' },
-    all: { label: 'Los tres', button: ' Calcular los tres análisis', path: null },
   };
 
   function setMethod(method) {
@@ -26,7 +25,7 @@
       chip.setAttribute('aria-checked', String(active));
     });
     const extras = $('qwIvExtras');
-    if (extras) extras.hidden = !(method === 'iv' || method === 'all');
+    if (extras) extras.hidden = method !== 'iv';
     const button = $('btnCalcQuant');
     if (button) button.textContent = METHODS[method].button;
   }
@@ -53,7 +52,7 @@
     if (!Number.isFinite(form.strike) || form.strike <= 0) return 'Ingresa un strike válido.';
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.expiration)) return 'Ingresa un vencimiento YYYY-MM-DD.';
     if (!Number.isFinite(form.volatility) || form.volatility <= 0) return 'Ingresa una volatilidad válida.';
-    if ((method === 'iv' || method === 'all') && (!Number.isFinite(form.marketPrice) || form.marketPrice <= 0)) return 'Para IV, ingresa el precio de mercado de la opción.';
+    if ((method === 'iv') && (!Number.isFinite(form.marketPrice) || form.marketPrice <= 0)) return 'Para IV, ingresa el precio de mercado de la opción.';
     return null;
   }
 
@@ -143,46 +142,39 @@
     }
     button.disabled = true;
     button.innerHTML = '<span class="spinner"></span> Calculando...';
-    const paths = method === 'all' ? ['prices', 'greeks', 'implied-volatility'] : [METHODS[method].path];
+    const path = METHODS[method].path;
+    const name = method;
     const body = { ...form, tolerance: 1e-8, maxIterations: 200 };
-    if (method !== 'iv' && method !== 'all') { delete body.marketPrice; delete body.initialGuess; }
+    if (method !== 'iv') { delete body.marketPrice; delete body.initialGuess; }
     try {
-      const responses = await Promise.all(paths.map(path => callQuant(path, body)));
-      const ivIndex = paths.indexOf('implied-volatility');
+      const { status, ok, data } = await callQuant(path, body);
       let html = '';
-      const errors = [];
-      const notes = [];
-      paths.forEach((path, position) => {
-        const { status, ok, data } = responses[position];
-        const name = path === 'prices' ? 'prices' : path === 'greeks' ? 'greeks' : 'iv';
-        if (name === 'iv') {
-          if (status === 422 && !Number.isFinite(data.impliedVolatility)) {
-            errors.push('IV: ' + (data.message || 'El modelo no pudo resolver ese precio.'));
-            html += section('iv', '<p class="small-note">El cálculo no convergió dentro del límite de iteraciones. Esto no demuestra que el precio sea imposible.</p>', data.message || '422 sin volatilidad implícita.');
-            notes.push('IV no convergió (422).');
-            return;
-          }
-          html += section('iv', metricGrid(ivMetrics(data)) + ivDetailTable(form, data),
+      let errorText = null;
+      let noteText = null;
+      if (name === 'iv') {
+        if (status === 422 && !Number.isFinite(data.impliedVolatility)) {
+          errorText = 'IV: ' + (data.message || 'El modelo no pudo resolver ese precio.');
+          html = section('iv', '<p class="small-note">El cálculo no convergió dentro del límite de iteraciones. Esto no demuestra que el precio sea imposible.</p>', data.message || '422 sin volatilidad implícita.');
+          noteText = 'IV no convergió (422).';
+        } else {
+          html = section('iv', metricGrid(ivMetrics(data)) + ivDetailTable(form, data),
             status === 422 ? 'El cálculo no convergió dentro del límite de iteraciones. Esto no demuestra que el precio sea imposible.' : 'Método: Newton-Raphson con tolerancia 1e-8 y máximo 200 iteraciones, con respaldo por bisección en el servidor.');
-          if (status === 422) notes.push('IV no convergió (422). Revisa los detalles.');
-          return;
+          if (status === 422) noteText = 'IV no convergió (422). Revisa los detalles.';
         }
-        if (!ok) {
-          const detail = data.detail ? data.message + ' Detalle: ' + data.detail : (data.message || 'quant-service respondió ' + status);
-          errors.push(METHODS[name].label + ': ' + detail);
-          html += section(name, `<p class="small-note">No se pudo completar el cálculo (${status}). ${esc(detail)}</p>`);
-          return;
-        }
-        html += section(name, name === 'prices' ? renderPrices(data) : renderGreeks(data), assumptionsNote(form));
-      });
+      } else if (!ok) {
+        const detail = data.detail ? data.message + ' Detalle: ' + data.detail : (data.message || 'quant-service respondió ' + status);
+        errorText = METHODS[name].label + ': ' + detail;
+        html = section(name, `<p class="small-note">No se pudo completar el cálculo (${status}). ${esc(detail)}</p>`);
+      } else {
+        html = section(name, name === 'prices' ? renderPrices(data) : renderGreeks(data), assumptionsNote(form));
+      }
       result.innerHTML = html;
       result.style.display = 'block';
-      note.textContent = method === 'all'
-        ? 'Los tres análisis usan el mismo contrato y supuestos; se ejecutaron en paralelo. Ningún resultado es recomendación.' : '';
-      if (errors.length) {
-        if (typeof showAlert === 'function') showAlert(errors.join(' · '), 'error');
-      } else if (notes.length) {
-        if (typeof showAlert === 'function') showAlert(notes.join(' '), 'warning');
+      note.textContent = '';
+      if (errorText) {
+        if (typeof showAlert === 'function') showAlert(errorText, 'error');
+      } else if (noteText) {
+        if (typeof showAlert === 'function') showAlert(noteText, 'warning');
       } else if (typeof showAlert === 'function') {
         showAlert('Cálculo completado con ' + METHODS[method].label.toLowerCase() + '.', 'info');
       }
