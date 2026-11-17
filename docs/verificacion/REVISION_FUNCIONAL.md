@@ -1,5 +1,10 @@
 # Revisión funcional de ProyectoLSW
 
+## Ajuste CSS del Panel de Investigación: sin scroll interno y filtros alineados
+Fecha: 2026-11-17. Ajuste puntual de CSS puro, sin lógica JS ni IDs.
+
+El contenedor del Panel de Investigación (`.workspace-view[data-view="side"] > .research-workspace`) ya no tiene `max-height:920px` ni `overflow-y:auto`: crece natural (`height:auto; overflow:visible`) y usa solo el scroll principal de la ventana, igual que el resto de tarjetas. La tabla interna conserva solo su scroll horizontal sin límite de altura (`.research-table-wrap`), y la cabecera sticky del thead sigue anclada al scroll de la ventana. La fila de filtros de investigación (`.research-filter-grid`) usa `align-items:end` para que Probabilidad mínima, Ganancia/riesgo mínimo, Diferencial Bid/Ask máx. y Filtro de tendencia queden alineados por su base aunque alguna etiqueta ocupe dos líneas. Suite completa `npm test` 187/187. Archivos: `services/gui-service/public/index.html`.
+
 ## Ajustes UX: menú lateral plegable, ficha Mercado compacta y selector de disposición en la cabecera
 Fecha: 2026-11-17. Solicitud de Roberto: tres ajustes de layout, Vanilla JS + CSS, IDs intactos.
 
