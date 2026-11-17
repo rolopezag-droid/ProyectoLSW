@@ -1,5 +1,16 @@
 # Revisión funcional de ProyectoLSW
 
+## Ajustes UX: menú lateral plegable, ficha Mercado compacta y selector de disposición en la cabecera
+Fecha: 2026-11-17. Solicitud de Roberto: tres ajustes de layout, Vanilla JS + CSS, IDs intactos.
+
+**1) Menú lateral plegable** (`aside` con pestañas Estrategia/Análisis cuantitativo/Gráfica): el script de composición inserta arriba `#btnToggleSidebar` (`⟨ Ocultar menú` / `⟩`, `aria-expanded`, `aria-label`). Al colapsar, `aside` toma `is-collapsed` (pestañas y cajón de servicios ocultos, padding estrecho) y `.container` toma `sidebar-collapsed` (`grid-template-columns:46px minmax(0,1fr)`) para ceder el ancho al área central; bajo 650px el menú colapsado sigue navegable (pestañas horizontales visibles). Preferencia persistida en localStorage (`ui_sidebar_collapsed`), respetada al recargar.
+
+**2) Ficha `Mercado · Alpaca` colapsada compacta**: causa raíz corregida — `#tab-candles .card { min-height:440px }` persistía al colapsar dejando una caja vacía alta. Nueva regla `main .card.is-collapsed:not(.order-panel) { min-height:0 !important; height:auto; padding:12px 16px; }`: la ficha colapsada queda como barra horizontal compacta, igual que `Historial local de Estrategias`, y el Panel de Investigación sube a ocupar el espacio vertical. (Excluye el ticket de órdenes para conservar su pestaña vertical de 46px con su propio padding.)
+
+**3) Selector de disposición Lado a lado / Apilado**: el toggle existente (`#btnWorkspaceView`, persistencia en `ui_workspace_view`) se movió a la cabecera del área de análisis (`Mercado · Alpaca`, junto al título; visible incluso con la ficha colapsada) y la vista lado a lado quedó en `grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)`; apilado = `1fr`. La gráfica SVG sigue escalando con `viewBox="0 0 900 400"` + `width:100%` sin deformarse ni recalcular al alternar modo o plegar paneles.
+
+Verificación: suite completa `npm test` **187 pruebas aprobadas, cero fallidas** (184 previas + 3 nuevas en `collapsible.test.js`: menú lateral alterna/persiste, preferencia colapsada respetada al recargar, ficha Mercado colapsada compacta con selector accesible). Verificación en vivo :3005 con botón, CSS y markup servidos. Límites: revisión visual interactiva pendiente del usuario. Archivos: `services/gui-service/public/index.html`, `services/gui-service/test/collapsible.test.js`.
+
 ## Ticket "Nueva operación" plegable
 Fecha: 2026-11-16. Solicitud de Roberto: poder ocultar el panel lateral de órdenes con un clic para dar el 100% del ancho a la gráfica y la tabla comparativa.
 

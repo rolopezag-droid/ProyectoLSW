@@ -6,13 +6,14 @@ const { JSDOM } = require('jsdom');
 
 async function until(predicate) { for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setImmediate(r)); } throw Error('La interfaz no completó la acción.'); }
 
-function page(orderCollapsed) {
+function page(orderCollapsed, sidebarCollapsed) {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   const dom = new JSDOM(html, { url: 'http://localhost:3005', runScripts: 'outside-only' }), w = dom.window;
   w.structuredClone = structuredClone;
   Object.defineProperty(w, 'crypto', { value: require('node:crypto').webcrypto });
   w.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
   if (orderCollapsed) w.localStorage.setItem('ui_order_panel_collapsed', '1');
+  if (sidebarCollapsed) w.localStorage.setItem('ui_sidebar_collapsed', '1');
   for (const script of w.document.querySelectorAll('script')) {
     if (script.src) w.eval(fs.readFileSync(path.join(__dirname, '../public', new URL(script.src).pathname.replace(/^\//, '')), 'utf8'));
     else w.eval(script.textContent);
@@ -22,6 +23,59 @@ function page(orderCollapsed) {
 }
 
 const panel = (w, id) => w.document.getElementById(id);
+
+test('Menú lateral plegable: alterna a tira delgada, oculta pestañas y persiste', async () => {
+  const { dom, w } = page(); try {
+    const aside = w.document.querySelector('aside');
+    const btn = w.document.getElementById('btnToggleSidebar');
+    const container = w.document.querySelector('.container');
+    const tabs = w.document.querySelector('.tabs');
+    assert.ok(btn, 'el botón del menú lateral debe existir');
+    assert.equal(aside.classList.contains('is-collapsed'), false);
+    assert.match(btn.textContent, /Ocultar menú/);
+    btn.click();
+    assert.equal(aside.classList.contains('is-collapsed'), true);
+    assert.equal(container.classList.contains('sidebar-collapsed'), true, 'el área central gana el ancho');
+    assert.equal(btn.getAttribute('aria-expanded'), 'false');
+    assert.equal(w.getComputedStyle(tabs).display, 'none', 'pestañas ocultas en la tira');
+    assert.equal(w.localStorage.getItem('ui_sidebar_collapsed'), '1');
+    btn.click();
+    assert.equal(aside.classList.contains('is-collapsed'), false);
+    assert.equal(container.classList.contains('sidebar-collapsed'), false);
+    assert.notEqual(w.getComputedStyle(tabs).display, 'none');
+    assert.equal(w.localStorage.getItem('ui_sidebar_collapsed'), '0');
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
+
+test('Menú lateral plegable: la preferencia colapsada se respeta al recargar', async () => {
+  const { dom, w } = page(false, true); try {
+    assert.equal(w.document.querySelector('aside').classList.contains('is-collapsed'), true);
+    assert.equal(w.document.querySelector('.container').classList.contains('sidebar-collapsed'), true);
+    assert.equal(w.document.getElementById('btnToggleSidebar').getAttribute('aria-expanded'), 'false');
+    w.document.getElementById('btnToggleSidebar').click();
+    assert.equal(w.document.querySelector('aside').classList.contains('is-collapsed'), false);
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
+
+test('Ficha Mercado colapsada: barra compacta sin altura vacía, igual que Historial local', async () => {
+  const { dom, w } = page(); try {
+    const api = w.CollapsiblePanels;
+    const chartCard = w.document.getElementById('candlesChart').closest('.card');
+    api.setCollapsed(chartCard, true);
+    const style = w.getComputedStyle(chartCard);
+    assert.notEqual(style.minHeight, '440px', 'sin la altura mínima vacía al colapsar');
+    assert.equal(style.paddingTop, '12px', 'padding de barra horizontal compacta');
+    assert.equal(w.getComputedStyle(w.document.getElementById('candlesChartContainer')).display, 'none', 'cuerpo oculto');
+    // El selector de disposición vive en la cabecera y sigue accesible en la ficha colapsada.
+    const viewBtn = w.document.getElementById('btnWorkspaceView');
+    assert.ok(viewBtn, 'el selector de disposición debe existir en la cabecera del área de análisis');
+    assert.equal(viewBtn.closest('h2').textContent.includes('Mercado'), true);
+    api.setCollapsed(chartCard, false);
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
 
 test('Ticket de órdenes plegable: alterna a pestaña lateral, expande el análisis y persiste', async () => {
   const { dom, w } = page(); try {

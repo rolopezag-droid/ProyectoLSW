@@ -354,6 +354,13 @@
     .dot { width:6px; height:6px; box-shadow:none!important; }
     .container { display:grid; grid-template-columns:180px minmax(0,1fr); max-width:none; padding:0; gap:0; }
     aside { padding:22px 14px; background:#111923; border-right:1px solid var(--border); min-width:0; }
+    /* Menú lateral plegable: tira delgada que cede el ancho al área central */
+    .sidebar-toggle { appearance:none; background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:11px; font-weight:600; padding:6px 8px; width:100%; white-space:nowrap; margin-bottom:14px; }
+    .sidebar-toggle:hover { color:var(--text); border-color:var(--accent); }
+    .container.sidebar-collapsed { grid-template-columns:46px minmax(0,1fr); }
+    aside.is-collapsed { padding:10px 5px; }
+    aside.is-collapsed .tabs, aside.is-collapsed .service-drawer { display:none; }
+    aside.is-collapsed .sidebar-toggle { width:auto; }
     main { min-width:0; padding:26px; }
     .tabs { display:flex; flex-direction:column; margin:0 0 30px; padding:0; border:0; gap:6px; overflow:visible; }
     .tab-btn { text-align:left; white-space:normal; border:0; border-radius:6px; font-size:12px; padding:12px; }
@@ -418,6 +425,8 @@
     aside .btn { min-height:28px; padding:5px 8px; font-size:10px; }
     aside .service-chip { font-size:10px; }
     #tab-candles .card { min-height:440px; }
+    /* Colapsado: ficha horizontal compacta (igual que Historial local) para que el Panel de Investigación suba */
+    main .card.is-collapsed:not(.order-panel) { min-height:0 !important; height:auto; padding:12px 16px; }
     #tab-candles .row { grid-template-columns:1fr 1fr; }
     #candlesChart { border-radius:4px!important; }
     .chart-empty { display:flex; min-height:240px; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:#a4b4c7; background:repeating-linear-gradient(0deg,transparent,transparent 47px,#253344 48px),repeating-linear-gradient(90deg,transparent,transparent 79px,#253344 80px); border:1px solid var(--border); border-radius:4px; }
@@ -427,7 +436,7 @@
     @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 340px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
     /* Split configurable: gráfica y panel de investigación lado a lado o apilados */
     .workspace-view { display:grid; gap:20px; min-width:0; align-items:start; }
-    .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); }
+    .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); }
     .workspace-view[data-view="side"] > .research-workspace { border:1px solid var(--border); border-radius:8px; padding:14px; background:var(--panel); max-height:920px; overflow-y:auto; }
     @media(max-width:1100px) { .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1fr); } .workspace-view[data-view="side"] > .research-workspace { max-height:none; overflow:visible; } }
     .research-workspace { min-width:0; }
@@ -461,7 +470,7 @@
     .research-dashboard.has-collapsed .research-panel:not(.is-collapsed) { grid-column: 1 / -1; }
     @media(max-width:650px) { .method-grid { grid-template-columns:1fr; } }
     @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; position:static; } }
-    @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } }
+    @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } aside.is-collapsed .tabs { display:flex; } aside.is-collapsed .sidebar-toggle { width:100%; } }
     #alertContainer { position:fixed; right:20px; bottom:20px; z-index:1000; width:min(380px,calc(100vw - 32px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
     #alertContainer .alert { position:relative; margin:0; padding:12px 38px 12px 14px; background:#172737; color:#deebf6; border:1px solid #416176; border-left:3px solid #72b4d5; border-radius:5px; box-shadow:0 4px 18px #0005; pointer-events:auto; overflow-wrap:anywhere; }
     #alertContainer .alert-error { background:#302025; border-color:#71434c; border-left-color:#ef8b91; color:#ffdce0; }
@@ -709,7 +718,7 @@
     <!-- ── Gráfica de Candles ── -->
     <div id="tab-candles" class="tab-content">
       <div class="card">
-        <h2>Mercado · Alpaca</h2>
+        <h2>Mercado · Alpaca <button type="button" class="btn-order-toggle" id="btnWorkspaceView" title="Alterna entre ver la gráfica y el panel de investigación lado a lado o apilados">Ver apilado</button></h2>
         <p class="small-note">Elige un ticker antes de mostrar la gráfica: se cargan las velas históricas de Alpaca para el símbolo que selecciontes.</p>
 
         <form id="candlesForm" class="row">
@@ -760,7 +769,7 @@
           <div class="small-note" id="candlesNote"></div>
         </div>
         <section class="research-workspace" aria-labelledby="researchTitle">
-          <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div><button type="button" class="btn btn-secondary" id="btnWorkspaceView" title="Alterna entre ver la gráfica y este panel lado a lado o apilados">Ver apilado</button></div>
+          <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
           <div class="research-controls">
             <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 3</span></label>
             <input id="researchSymbols" value="AAPL" maxlength="40" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
@@ -899,6 +908,26 @@ if (orderToggleBtn) {
     orderCollapsed = false; applyOrderState();
   });
 }
+// ── Menú lateral plegable: tira delgada que cede el ancho al área central ──
+const sidebarToggleBtn = document.createElement('button');
+sidebarToggleBtn.type = 'button';
+sidebarToggleBtn.id = 'btnToggleSidebar';
+sidebarToggleBtn.className = 'sidebar-toggle';
+sidebarToggleBtn.setAttribute('aria-expanded', 'true');
+sidebarToggleBtn.setAttribute('aria-label', 'Ocultar o mostrar el menú lateral');
+let sidebarCollapsed = false;
+try { sidebarCollapsed = localStorage.getItem('ui_sidebar_collapsed') === '1'; } catch {}
+const containerEl = document.querySelector('.container');
+const applySidebarState = () => {
+  side.classList.toggle('is-collapsed', sidebarCollapsed);
+  if (containerEl) containerEl.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  sidebarToggleBtn.setAttribute('aria-expanded', String(!sidebarCollapsed));
+  sidebarToggleBtn.textContent = sidebarCollapsed ? '⟩' : '⟨ Ocultar menú';
+  try { localStorage.setItem('ui_sidebar_collapsed', sidebarCollapsed ? '1' : '0'); } catch {}
+};
+side.insertBefore(sidebarToggleBtn, side.firstChild);
+applySidebarState();
+sidebarToggleBtn.addEventListener('click', () => { sidebarCollapsed = !sidebarCollapsed; applySidebarState(); });
 </script>
 <script>
 const API_BASE = '';
