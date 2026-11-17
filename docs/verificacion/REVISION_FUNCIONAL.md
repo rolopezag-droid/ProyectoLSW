@@ -1,5 +1,16 @@
 # Revisión funcional de ProyectoLSW
 
+## Pulido visual: pestaña de orden, botones homogéneos y scrollbars del tema oscuro
+Fecha: 2026-11-17. Ajustes de acabado CSS, sin lógica JS ni IDs.
+
+**Pestaña colapsada de "Nueva operación"**: el título quedó envuelto en `span.card-title-text` y al colapsar se oculta, dejando una única etiqueta vertical (el botón `⟨ Nueva operación` con `writing-mode:vertical-rl; transform:rotate(180deg)` centrado en la tira de 46px, lectura de abajo hacia arriba); `overflow:hidden` en el panel colapsado elimina la scrollbar horizontal blanca. Bajo 1000px la etiqueta vuelve a horizontal. El JS no cambió (mismos textos según estado).
+
+**Botones de control homogéneos** (`Ocultar menú`, `Ocultar/Desplegar` y `Ver apilado/Ver lado a lado`): estilo unificado sutil — fondo `#161f2c`, borde `1px solid rgba(255,255,255,0.12)`, texto gris con hover suave (`#202b38`, borde `rgba(255,255,255,0.2)`); se eliminaron los hovers con `--accent` (verde) y el doble estilo que generaba `.card h2 button` sobre `.btn-order-toggle` (regla con especificidad superior `.card h2 .btn-order-toggle`).
+
+**Scrollbars del tema oscuro**: reglas globales `::-webkit-scrollbar` (10px), track `#0d131a`, thumb `#263345` con `border-radius:6px` y hover `#33425c`, `::-webkit-scrollbar-corner`, y `scrollbar-width:thin; scrollbar-color:#263345 #0d131a` para Firefox — aplican a toda la página incluida la tabla `#researchCandidates` con scroll horizontal; ya no aparecen barras nativas blancas.
+
+Suite completa `npm test` **187/187**. Archivos: `services/gui-service/public/index.html`.
+
 ## Ajuste CSS del Panel de Investigación: sin scroll interno y filtros alineados
 Fecha: 2026-11-17. Ajuste puntual de CSS puro, sin lógica JS ni IDs.
 
