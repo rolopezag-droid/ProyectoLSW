@@ -43,16 +43,23 @@
     return section.classList.contains('is-collapsed');
   }
 
+  function syncFluid() {
+    document.querySelectorAll('.research-dashboard').forEach(board => {
+      board.classList.toggle('has-collapsed', Array.from(board.querySelectorAll(':scope > .research-panel.is-collapsed')).length > 0);
+    });
+  }
+
   function setCollapsed(section, collapsed, persist = true) {
     section.classList.toggle('is-collapsed', collapsed);
-    const chevron = section.querySelector(':scope > h2 > .panel-chevron, :scope > .research-panel-heading > .panel-chevron');
+    const chevron = section.querySelector(':scope > h2 > .panel-chevron, :scope > .research-panel-heading > .panel-chevron, :scope > .research-heading > .panel-chevron');
     if (chevron) chevron.classList.toggle('expanded', !collapsed);
-    const header = section.querySelector(':scope > h2, :scope > .research-panel-heading');
+    const header = section.querySelector(':scope > h2, :scope > .research-panel-heading, :scope > .research-heading');
     if (header) header.setAttribute('aria-expanded', String(!collapsed));
     if (persist) {
       const key = section.__collapseKey;
       if (key) { state[key] = collapsed; saveState(); }
     }
+    syncFluid();
   }
 
   function toggle(section) {
@@ -61,7 +68,7 @@
 
   function makeCollapsible(section) {
     const isPanel = section.classList.contains('research-panel');
-    const header = section.querySelector(':scope > h2, :scope > .research-panel-heading');
+    const header = section.querySelector(':scope > h2, :scope > .research-panel-heading, :scope > .research-heading');
     if (!header || header.querySelector(':scope > .panel-chevron')) return;
     const chevron = document.createElement('button');
     chevron.type = 'button';
@@ -86,6 +93,7 @@
     managed.forEach(section => setCollapsed(section, collapsed, false));
     managed.forEach(section => { state[section.__collapseKey] = collapsed; });
     saveState();
+    syncFluid();
   }
 
   function applyState(json) {
@@ -122,8 +130,9 @@
   function init() {
     state = loadState();
     managed = [];
-    document.querySelectorAll('main .card, aside .card, #researchEvidence .research-panel').forEach(makeCollapsible);
+    document.querySelectorAll('main .card, aside .card, #researchEvidence .research-panel, main .research-workspace').forEach(makeCollapsible);
     addToolbar();
+    syncFluid();
   }
 
   const api = { init, toggle, setCollapsed, isCollapsed, setAll, applyState, get sections() { return managed.slice(); } };

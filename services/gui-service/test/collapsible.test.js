@@ -106,3 +106,36 @@ test('Acordeón: Colapsar todo / Expandir todo afecta a todos los paneles gestio
     await new Promise(r => setImmediate(r));
   } finally { dom.window.close(); }
 });
+
+test('Acordeón responsivo: plegar paneles marca el dashboard para reacomodar el contenido', async () => {
+  const { dom, w } = page(); try {
+    const api = w.CollapsiblePanels;
+    const dashboard = w.document.querySelector('.research-dashboard');
+    assert.ok(dashboard, 'debe existir el tablero de paneles');
+    api.setAll(false); // partir de todo abierto para observar la transición
+    assert.equal(dashboard.classList.contains('has-collapsed'), false);
+    api.setCollapsed(panel(w, 'researchNewsPanel'), true);
+    assert.equal(dashboard.classList.contains('has-collapsed'), true, 'con algo plegado los abiertos van a lo ancho');
+    api.setCollapsed(panel(w, 'researchNewsPanel'), false);
+    assert.equal(dashboard.classList.contains('has-collapsed'), false);
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
+
+test('Acordeón responsivo: plegar el panel de investigación libera la columna de la gráfica', async () => {
+  const { dom, w } = page(); try {
+    const api = w.CollapsiblePanels;
+    const workspace = w.document.querySelector('main .research-workspace');
+    assert.ok(workspace, 'el panel de investigación debe existir');
+    assert.ok(api.sections.includes(workspace), 'debe estar gestionado como acordeón');
+    assert.equal(api.isCollapsed(workspace), false, 'inicia abierto');
+    workspace.querySelector('.research-heading').click();
+    assert.equal(api.isCollapsed(workspace), true);
+    const controls = w.document.querySelector('.research-controls');
+    assert.equal(w.getComputedStyle(controls).display, 'none', 'los controles se ocultan al plegar');
+    workspace.querySelector('.research-heading').click();
+    assert.equal(api.isCollapsed(workspace), false);
+    assert.notEqual(w.getComputedStyle(controls).display, 'none');
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});

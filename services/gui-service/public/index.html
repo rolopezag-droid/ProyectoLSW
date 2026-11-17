@@ -444,6 +444,13 @@
     .card.is-collapsed > :not(h2) { display:none !important; }
     .research-panel.is-collapsed > :not(.research-panel-heading) { display:none !important; }
     .research-panel.is-collapsed > .research-panel-heading { margin-bottom:0; padding-bottom:0; border-bottom-color:transparent; }
+    /* Al plegar se libera espacio: los plegados pasan a barras de ancho completo y los abiertos reacomodan */
+    .research-panel.is-collapsed { grid-column: 1 / -1; }
+    .research-dashboard.has-collapsed .research-panel:not(.is-collapsed) { grid-column: 1 / -1; }
+    .research-workspace.is-collapsed > :not(.research-heading) { display:none !important; }
+    .market-split:has(.research-workspace.is-collapsed) { grid-template-columns:minmax(0,1fr); }
+    .analysis-layout:has(.order-panel.is-collapsed) { grid-template-columns:minmax(0,1fr); }
+    .analysis-layout:has(.order-panel.is-collapsed) .order-panel { grid-column:auto; grid-row:auto; }
     .collapse-toolbar { display:flex; gap:6px; }
     .collapse-toolbar-btn { appearance:none; background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:10px; padding:5px 9px; font-weight:600; }
     .collapse-toolbar-btn:hover { color:var(--text); border-color:var(--accent); }
