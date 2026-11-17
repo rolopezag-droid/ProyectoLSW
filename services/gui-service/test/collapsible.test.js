@@ -6,12 +6,13 @@ const { JSDOM } = require('jsdom');
 
 async function until(predicate) { for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setImmediate(r)); } throw Error('La interfaz no completó la acción.'); }
 
-function page() {
+function page(orderCollapsed) {
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   const dom = new JSDOM(html, { url: 'http://localhost:3005', runScripts: 'outside-only' }), w = dom.window;
   w.structuredClone = structuredClone;
   Object.defineProperty(w, 'crypto', { value: require('node:crypto').webcrypto });
   w.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });
+  if (orderCollapsed) w.localStorage.setItem('ui_order_panel_collapsed', '1');
   for (const script of w.document.querySelectorAll('script')) {
     if (script.src) w.eval(fs.readFileSync(path.join(__dirname, '../public', new URL(script.src).pathname.replace(/^\//, '')), 'utf8'));
     else w.eval(script.textContent);
@@ -21,6 +22,53 @@ function page() {
 }
 
 const panel = (w, id) => w.document.getElementById(id);
+
+test('Ticket de órdenes plegable: alterna a pestaña lateral, expande el análisis y persiste', async () => {
+  const { dom, w } = page(); try {
+    const card = w.document.getElementById('strategyForm').closest('.card');
+    const btn = w.document.getElementById('btnToggleOrderPanel');
+    const layout = w.document.querySelector('.analysis-layout');
+    assert.ok(btn, 'el botón de toggle debe existir');
+    assert.equal(btn.getAttribute('aria-expanded'), 'true');
+    assert.equal(btn.getAttribute('aria-controls'), 'strategyForm');
+    assert.equal(card.classList.contains('is-collapsed'), false, 'inicia desplegado');
+    assert.match(btn.textContent, /Ocultar/);
+    // Colapsar: pestaña estrecha, contenido oculto y análisis a todo el ancho.
+    btn.click();
+    assert.equal(card.classList.contains('is-collapsed'), true);
+    assert.equal(layout.classList.contains('order-panel-collapsed'), true, 'el área de análisis se expande');
+    assert.equal(btn.getAttribute('aria-expanded'), 'false');
+    assert.match(btn.textContent, /Nueva operación/);
+    const form = w.document.getElementById('strategyForm');
+    assert.equal(w.getComputedStyle(form).display, 'none', 'el contenido del ticket se oculta');
+    assert.equal(w.getComputedStyle(card).position, 'sticky', 'la pestaña sigue pegajosa');
+    assert.equal(w.localStorage.getItem('ui_order_panel_collapsed'), '1');
+    // Los IDs del formulario sobreviven intactos para volver a operar.
+    assert.equal(w.document.getElementById('strategyGrid').children.length, 4);
+    // Desplegar de nuevo.
+    btn.click();
+    assert.equal(card.classList.contains('is-collapsed'), false);
+    assert.equal(layout.classList.contains('order-panel-collapsed'), false);
+    assert.match(btn.textContent, /Ocultar/);
+    assert.equal(w.localStorage.getItem('ui_order_panel_collapsed'), '0');
+    assert.notEqual(w.getComputedStyle(form).display, 'none');
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
+
+test('Ticket de órdenes plegable: la preferencia colapsada se respeta al recargar', async () => {
+  const { dom, w } = page(true); try {
+    const card = w.document.getElementById('strategyForm').closest('.card');
+    const btn = w.document.getElementById('btnToggleOrderPanel');
+    assert.equal(card.classList.contains('is-collapsed'), true, 'arranca plegado según la preferencia');
+    assert.equal(w.document.querySelector('.analysis-layout').classList.contains('order-panel-collapsed'), true);
+    assert.match(btn.textContent, /Nueva operación/);
+    assert.equal(btn.getAttribute('aria-expanded'), 'false');
+    btn.click();
+    assert.equal(card.classList.contains('is-collapsed'), false);
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
 
 test('Acordeón: los paneles de contexto inician colapsados y los flujos principales abiertos', async () => {
   const { dom, w } = page(); try {

@@ -1,5 +1,12 @@
 # Revisión funcional de ProyectoLSW
 
+## Ticket "Nueva operación" plegable
+Fecha: 2026-11-16. Solicitud de Roberto: poder ocultar el panel lateral de órdenes con un clic para dar el 100% del ancho a la gráfica y la tabla comparativa.
+
+Botón compacto `⟩ Ocultar` / `⟨ Nueva operación` en la cabecera del ticket (`#btnToggleOrderPanel`, `aria-expanded`, `aria-controls="strategyForm"`). Al colapsar, `.order-panel` toma la clase `is-collapsed` (se reduce a una pestaña vertical estrecha de 46px con el título en `writing-mode:vertical-rl`; el contenido se oculta con la regla ya existente `.card.is-collapsed > :not(h2)`) y `.analysis-layout` toma `order-panel-collapsed` (`grid-template-columns:minmax(0,1fr) auto`) para que el área de análisis se expanda; debajo de 1000px la pestaña vuelve a modo horizontal. Clic en la pestaña plegada completa también despliega (con guarda contra doble toggle del botón). Preferencia persistida en localStorage (`ui_order_panel_collapsed`), respetada al recargar. Todos los IDs del formulario, chips de estrategia y controles permanecen intactos; el acordeón del módulo `collapsible-panels.js` sigue excluyendo el ticket (sin chevron duplicado). La gráfica SVG no requiere recálculo: escala con su `viewBox="0 0 900 400"` + `width:100%`.
+
+Verificación: suite completa `npm test` **184 pruebas aprobadas, cero fallidas** (182 previas + 2 nuevas en `collapsible.test.js`: alternancia con persistencia y preferencia colapsada respetada al recargar, con aserciones de aria, ocultamiento del formulario, sticky y expansión del layout). Verificación en vivo :3005 con el botón y CSS servidos. Límites: revisión visual interactiva pendiente del usuario. Archivos: `services/gui-service/public/index.html`, `services/gui-service/test/collapsible.test.js`.
+
 ## Conexión Quant Workbench → gráfica y tabla comparativa
 Fecha: 2026-11-16. Implementación de los 3 puntos pendientes: (1) selector de método ya existente y verificado; (2) gráfica refleja el método elegido; (3) tabla comparativa lado a lado con métricas derivadas del método.
 
