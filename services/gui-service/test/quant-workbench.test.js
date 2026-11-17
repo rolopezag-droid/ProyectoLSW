@@ -38,6 +38,44 @@ function page(intercept) {
   return { dom, w, calls, setIVReject: value => { interceptIVReject = value; } };
 }
 
+test('Workbench: un cálculo exitoso publica __workbenchContext y un fallo lo limpia', async () => {
+  const { dom, w } = page(u => {
+    if (u.pathname.endsWith('/quant/greeks')) return { ok: false, status: 500, json: async () => ({ message: 'quant-service sin modelo' }) };
+    return null;
+  }); try {
+    w.document.getElementById('btnCalcQuant').click();
+    await until(() => w.document.getElementById('quantResult').textContent.includes('Precio teórico'));
+    const ctx = w.__workbenchContext;
+    assert.ok(ctx, 'el contexto debe publicarse tras un cálculo exitoso');
+    assert.equal(ctx.method, 'prices');
+    assert.equal(ctx.symbol, 'AAPL');
+    assert.equal(ctx.strike, 340);
+    assert.equal(ctx.expiration, '2026-12-18');
+    assert.equal(ctx.data.price, 12.3456);
+    assert.match(ctx.token, /^wb-/);
+    w.document.querySelector('[data-method="greeks"]').click();
+    w.document.getElementById('btnCalcQuant').click();
+    await until(() => w.document.getElementById('quantResult').textContent.includes('No se pudo completar'));
+    assert.equal(w.__workbenchContext, null, 'un cálculo fallido limpia el contexto');
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
+
+test('Workbench: IV sin convergencia (422) no publica contexto y el botón aplicar avisa sin cálculo', async () => {
+  const { dom, w, setIVReject } = page(); try {
+    setIVReject(true);
+    w.document.querySelector('[data-method="iv"]').click();
+    w.document.getElementById('btnCalcQuant').click();
+    await until(() => w.document.getElementById('quantResult').textContent.includes('no convergió'));
+    assert.equal(w.__workbenchContext, null);
+    assert.ok(w.document.getElementById('btnApplyQuantToTable'), 'el botón aplicar debe existir');
+    w.document.getElementById('btnApplyQuantToTable').click();
+    await until(() => w.document.getElementById('researchStatus').textContent.includes('Primero calcula'));
+    assert.match(w.document.getElementById('researchStatus').textContent, /Primero calcula un método/);
+    await new Promise(r => setImmediate(r));
+  } finally { dom.window.close(); }
+});
+
 test('Workbench: el selector cambia método, muestra campos de IV y ajusta el botón', async () => {
   const { dom, w } = page(); try {
     const chips = w.document.querySelectorAll('#quantMethodGrid .method-chip');

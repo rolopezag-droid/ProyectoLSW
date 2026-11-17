@@ -129,6 +129,47 @@
     return `<section class="quant-result-section"><h3 style="color:var(--accent);margin-bottom:0.5rem;">${METHODS[method].label}</h3>${content}${note ? `<div class="small-note" style="margin-top:0.5rem;">${esc(note)}</div>` : ''}</section>`;
   }
 
+  // ── Contexto del último cálculo exitoso: lo consumen la gráfica (overlays por
+  // método, vía research-ui.js) y la tabla comparativa (botón "Aplicar método"). ──
+  function setWorkbenchContext(form, method, data) {
+    window.__workbenchContext = {
+      token: 'wb-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
+      method,
+      symbol: form.symbol,
+      spot: form.spot,
+      strike: form.strike,
+      expiration: form.expiration,
+      rate: form.rate,
+      dividendYield: form.dividendYield,
+      volatility: form.volatility,
+      optionType: form.optionType,
+      data,
+      at: new Date().toISOString(),
+    };
+    // Una columna de la tabla calculada con otro método queda obsoleta: se retira.
+    if (window.__workbenchTableMetrics && window.__workbenchTableMetrics.method !== method) {
+      window.__workbenchTableMetrics = null;
+      if (typeof window.__renderResearchTable === 'function') { try { window.__renderResearchTable(); } catch {} }
+    }
+  }
+
+  function clearWorkbenchContext() {
+    window.__workbenchContext = null;
+  }
+
+  function syncChartOverlays() {
+    if (typeof refreshChartOverlays === 'function') { try { refreshChartOverlays(); } catch {} }
+  }
+
+  async function applyToTable() {
+    const collector = typeof window !== 'undefined' ? window.__applyWorkbenchToTable : null;
+    if (typeof collector !== 'function') {
+      if (typeof showAlert === 'function') showAlert('La tabla comparativa aún no está disponible; recarga la página.', 'error');
+      return;
+    }
+    await collector();
+  }
+
   async function run(methodOverride) {
     const method = methodOverride || currentMethod;
     const form = readForm();
@@ -148,6 +189,9 @@
     if (method !== 'iv') { delete body.marketPrice; delete body.initialGuess; }
     try {
       const { status, ok, data } = await callQuant(path, body);
+      const succeeded = name === 'iv'
+        ? status === 200 && data.converged !== false && Number.isFinite(data.impliedVolatility)
+        : ok;
       let html = '';
       let errorText = null;
       let noteText = null;
@@ -171,6 +215,8 @@
       result.innerHTML = html;
       result.style.display = 'block';
       note.textContent = '';
+      if (succeeded) setWorkbenchContext(form, method, data); else clearWorkbenchContext();
+      syncChartOverlays();
       if (errorText) {
         if (typeof showAlert === 'function') showAlert(errorText, 'error');
       } else if (noteText) {
@@ -181,6 +227,8 @@
     } catch (error) {
       if (typeof showAlert === 'function') showAlert('Error de conexión con quant-service: ' + error.message, 'error');
       if (result) { result.style.display = 'none'; result.innerHTML = ''; }
+      clearWorkbenchContext();
+      syncChartOverlays();
     } finally {
       button.disabled = false;
       button.textContent = METHODS[method].button;
@@ -217,10 +265,12 @@
     if (calc) calc.addEventListener('click', () => run());
     const prefill = $('btnPrefillQuant');
     if (prefill) prefill.addEventListener('click', prefillFromMarket);
+    const applyBtn = $('btnApplyQuantToTable');
+    if (applyBtn) applyBtn.addEventListener('click', () => { applyToTable(); });
     setMethod(currentMethod);
   });
 
-  const api = { setMethod, readForm, run, prefillFromMarket, METHODS };
+  const api = { setMethod, readForm, run, prefillFromMarket, applyToTable, METHODS, setWorkbenchContext, clearWorkbenchContext };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   window.QuantWorkbench = api;
 })();

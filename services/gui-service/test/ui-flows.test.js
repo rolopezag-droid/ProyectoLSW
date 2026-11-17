@@ -185,3 +185,45 @@ test('UI conserva padre si falla evaluación y reintenta sin duplicarlo',async()
   btn.click();await until(()=>w.document.getElementById('saveStatus').textContent.includes('guardados'));assert.equal(calls.filter(c=>c.url==='/api/v1/spreads').length,1);assert.equal(calls.filter(c=>c.url.endsWith('/evaluations')).length,2);assert.equal(btn.disabled,true);
  }finally{dom.window.close();}
 });
+
+test('UI aplica el método del workbench a la tabla comparativa (columna dinámica, cap 20)',async()=>{
+ const fresh=new Date().toISOString();
+ const {dom,w,calls}=page(null,(u,opts)=>{
+  if(u.pathname.endsWith('/broker/quotes'))return {ok:true,status:200,json:async()=>({symbol:u.searchParams.get('symbol'),referencePrice:190.2,referenceSource:'midpoint',referenceTimestamp:fresh})};
+  if(u.pathname.endsWith('/options-chain/strikes'))return null;
+  if(u.pathname.endsWith('/options-chain')){
+   const type=u.searchParams.get('type'),letter=type==='call'?'C':'P';
+   return {ok:true,status:200,json:async()=>({contracts:[
+    {type,underlyingSymbol:'AAPL',expiration:'2026-12-18',contractSymbol:'AAPL261218'+letter+'00190000',strike:190,bid:type==='call'?4:2,ask:type==='call'?4.2:2.2,timestamp:fresh},
+    {type,underlyingSymbol:'AAPL',expiration:'2026-12-18',contractSymbol:'AAPL261218'+letter+'00195000',strike:195,bid:type==='call'?2:4,ask:type==='call'?2.2:4.2,timestamp:fresh}
+   ],nextPageToken:null})};
+  }
+  if(u.pathname.endsWith('/quant/prices'))return {ok:true,status:200,json:async()=>({model:'black-scholes',symbol:JSON.parse(opts.body||'{}').symbol,price:12.3456,currency:'USD',assumptions:{timeToMaturityYears:0.25},calculatedAt:'2026-11-15T00:00:00Z'})};
+  return null;
+ });try{
+  const analyze=w.document.getElementById('btnResearchAnalyze');analyze.click();
+  await until(()=>!analyze.disabled&&!w.document.getElementById('researchEvidence').hidden);
+  const rowCount=w.document.querySelectorAll('#researchCandidates tr[data-candidate]').length;
+  assert.ok(rowCount>=1&&rowCount<=20,'debe haber candidatas visibles para aplicar el método');
+  // Cálculo exitoso en el workbench (endpoint prices del stub) y luego aplicar.
+  w.document.getElementById('btnCalcQuant').click();
+  await until(()=>w.document.getElementById('quantResult').textContent.includes('Precio teórico'));
+  assert.ok(w.__workbenchContext,'el workbench debe haber publicado el contexto');
+  const quantCallsBefore=calls.filter(c=>c.url.endsWith('/quant/prices')).length;
+  w.document.getElementById('btnApplyQuantToTable').click();
+  await until(()=>!w.document.getElementById('researchMethodHead').hidden);
+  const quantCallsApplied=calls.filter(c=>c.url.endsWith('/quant/prices')).length-quantCallsBefore;
+  assert.ok(quantCallsApplied>=1&&quantCallsApplied<=20,'una llamada por candidata visible, máximo 20');
+  assert.match(w.document.getElementById('researchMethodHead').textContent,/Precio BS \(pata larga\)/);
+  const cell=w.document.querySelector('#researchCandidates tr[data-candidate] td:last-child');
+  assert.match(cell.textContent,/12\.35/,'la métrica del stub aparece en la columna');
+  assert.match(w.document.getElementById('researchStatus').textContent,/aplicado a \d+ candidata/);
+  // El overlay del método queda disponible para la gráfica (nota con la fuente).
+  w.__candlesChartState={symbol:'AAPL',timeframe:'1Day',periodLabel:'test',candles:[{timestamp:'2026-11-06T15:00:00Z',open:100,high:102,low:99,close:101,volume:123}]};
+  const overlays=w.__candleOverlaySource();
+  assert.ok(overlays&&overlays.method&&overlays.method.lines.length===1,'overlay del método presente');
+  assert.match(overlays.method.lines[0].label,/BS pata larga/);
+  assert.match(overlays.note,/Método Workbench/);
+  await new Promise(r=>setImmediate(r));
+ }finally{dom.window.close();}
+});

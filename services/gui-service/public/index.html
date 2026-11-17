@@ -417,7 +417,11 @@
     .chart-empty span { font-size:11px; background:#161e28; padding:4px 12px; }
     #tab-candles:has(#candlesChartContainer:not([style*="none"])) .chart-empty { display:none; }
     @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 340px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
-    /* Panel de investigación debajo de la gráfica, en la columna izquierda del workspace */
+    /* Split configurable: gráfica y panel de investigación lado a lado o apilados */
+    .workspace-view { display:grid; gap:20px; min-width:0; align-items:start; }
+    .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); }
+    .workspace-view[data-view="side"] > .research-workspace { border:1px solid var(--border); border-radius:8px; padding:14px; background:var(--panel); max-height:920px; overflow-y:auto; }
+    @media(max-width:1100px) { .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1fr); } .workspace-view[data-view="side"] > .research-workspace { max-height:none; overflow:visible; } }
     .research-workspace { min-width:0; }
     .research-table thead th { position:sticky; top:-1px; background:#0d1520; z-index:2; }
     #researchCandidates tbody tr { cursor:pointer; }
@@ -686,6 +690,7 @@
         <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
           <button type="button" class="btn btn-primary" id="btnCalcQuant"> Calcular precio</button>
           <button type="button" class="btn btn-secondary" id="btnPrefillQuant" title="Toma S, K, vencimiento y σ de la gráfica o de la candidata seleccionada en la tabla comparativa">Tomar datos de la gráfica/candidata</button>
+          <button type="button" class="btn btn-secondary" id="btnApplyQuantToTable" title="Calcula la métrica del método actual (precio BS, delta o IV de la pata larga) para las candidatas visibles de la tabla comparativa, máximo 20">Aplicar método a la tabla</button>
         </div>
 
         <div id="quantResult" style="margin-top:1.5rem; display:none;"></div>
@@ -747,7 +752,7 @@
           <div class="small-note" id="candlesNote"></div>
         </div>
         <section class="research-workspace" aria-labelledby="researchTitle">
-          <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
+          <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div><button type="button" class="btn btn-secondary" id="btnWorkspaceView" title="Alterna entre ver la gráfica y este panel lado a lado o apilados">Ver apilado</button></div>
           <div class="research-controls">
             <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 3</span></label>
             <input id="researchSymbols" value="AAPL" maxlength="40" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
@@ -794,7 +799,7 @@
               <div class="research-panel-heading"><div><span class="research-panel-kicker">05 · Riesgo y strikes</span><h3 id="researchStrategiesTitle">Comparación de estrategias</h3></div><span class="research-source-status">Opciones Alpaca</span></div>
               <p class="research-panel-description">Ordenadas por score combinado orientativo. El score fundamental puede ajustar el orden cuando hay suficientes métricas; no cambia las probabilidades mostradas.</p>
               <details class="research-method"><summary>Cómo se calcula el score y qué límites tiene</summary><p>Score base = probabilidad histórica × ganancia/riesgo × factor técnico (1.1 alineada, 1.0 mixta, 0.9 contraria; factor 1 si se desactiva técnico) ÷ (1 + diferencial relativo Bid/Ask). Cuando se selecciona fundamentales, el score base se multiplica por un factor de 0.80 a 1.20 derivado de un score fundamental de 0 a 100. El score fundamental pondera crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B; normaliza los datos disponibles y requiere al menos 50% de cobertura. Los umbrales son una heurística general sin ajuste sectorial ni calibración. No altera la probabilidad histórica ni Black‑Scholes. La probabilidad histórica usa ventanas traslapadas y su IC Wilson puede subestimar incertidumbre. Black‑Scholes usa volatilidad realizada como proxy, no volatilidad implícita. Ninguna cifra es pronóstico calibrado ni recomendación.</p></details>
-              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th id="researchMethodHead" hidden>Método</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
             </section>
             <section class="research-panel research-panel-wide" aria-labelledby="researchJournalTitle">
               <div class="research-panel-heading"><div><span class="research-panel-kicker">06 · Registro</span><h3 id="researchJournalTitle">Bitácora del análisis</h3></div><span class="research-source-status">Supabase</span></div>
@@ -838,17 +843,33 @@ const emptyTitle = document.createElement('strong'); emptyTitle.textContent = 'D
 emptyTitle.textContent = 'Datos de mercado';
 const emptyText = document.createElement('span'); emptyText.textContent = 'Selecciona un símbolo y consulta la gráfica de Alpaca.';
 emptyChart.append(emptyTitle, emptyText); chartView.querySelector('.card').append(emptyChart);
-// ── Workspace a la izquierda + ticket de órdenes pegajoso a la derecha ──
-analysisColumn.append(chartView);
+// ── Split configurable (lado a lado / apilado) + ticket de órdenes pegajoso ──
 const candlesCard = chartView.querySelector(':scope > .card');
 const researchSection = candlesCard ? candlesCard.querySelector(':scope > .research-workspace') : null;
-// El panel de investigación vive debajo de la gráfica, abierto y sin acordeón propio.
+let workspaceView = null;
 if (candlesCard && researchSection) {
   candlesCard.removeChild(researchSection);
-  analysisColumn.append(researchSection);
+  workspaceView = document.createElement('div');
+  workspaceView.className = 'workspace-view';
+  let savedView = 'side';
+  try { if (localStorage.getItem('ui_workspace_view') === 'stacked') savedView = 'stacked'; } catch {}
+  workspaceView.dataset.view = savedView;
+  workspaceView.append(chartView, researchSection);
+  analysisColumn.append(workspaceView);
 }
 [...strategyView.children].filter(node => node !== orderPanel).forEach(node => analysisColumn.append(node));
 layout.append(analysisColumn, orderPanel); strategyView.append(layout);
+const workspaceViewBtn = document.getElementById('btnWorkspaceView');
+if (workspaceViewBtn && workspaceView) {
+  const syncViewLabel = () => { workspaceViewBtn.textContent = workspaceView.dataset.view === 'side' ? 'Ver apilado' : 'Ver lado a lado'; };
+  syncViewLabel();
+  workspaceViewBtn.addEventListener('click', () => {
+    const nextView = workspaceView.dataset.view === 'side' ? 'stacked' : 'side';
+    workspaceView.dataset.view = nextView;
+    try { localStorage.setItem('ui_workspace_view', nextView); } catch {}
+    syncViewLabel();
+  });
+}
 </script>
 <script>
 const API_BASE = '';
@@ -1435,6 +1456,31 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
       triggerLabels += `<text x="${width - padRight - 4}" y="${(levelY - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${style.color}">${style.label} ${formatPrice(value)}</text>`;
     }
   }
+
+  // ── Overlay del método del Quant Workbench: línea(s) violeta(s) y banda opcional ──
+  let methodLineShapes = '', methodBandShapes = '', methodLabels = '';
+  if (overlays && overlays.method) {
+    const methodColor = '#a78bfa';
+    const band = overlays.method.band;
+    if (band && Number.isFinite(band.lower) && Number.isFinite(band.upper) && band.upper > min && band.lower < max) {
+      const bandTop = Math.max(y(band.upper), padTop), bandBottom = Math.min(y(band.lower), height - padBottom);
+      methodBandShapes += `<rect data-method-band="iv" x="${padLeft}" y="${bandTop.toFixed(2)}" width="${plotW}" height="${Math.max(bandBottom - bandTop, 1).toFixed(2)}" fill="${methodColor}" fill-opacity="0.08" pointer-events="none"/>`;
+      for (const edge of ['upper', 'lower']) {
+        const edgeValue = Number(band[edge]);
+        if (!Number.isFinite(edgeValue) || edgeValue <= min || edgeValue >= max) continue;
+        const edgeY = y(edgeValue).toFixed(2);
+        methodBandShapes += `<line data-method-band="${edge}" x1="${padLeft}" y1="${edgeY}" x2="${width - padRight}" y2="${edgeY}" stroke="${methodColor}" stroke-width="1.2" stroke-dasharray="6 5" pointer-events="none"/>`;
+        methodLabels += `<text x="${width - padRight - 4}" y="${(Number(edgeY) - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${methodColor}">${edge === 'upper' ? '+1σ' : '−1σ'} ${band.label} ${formatPrice(edgeValue)}</text>`;
+      }
+    }
+    (overlays.method.lines || []).forEach((methodLine, lineIndex) => {
+      const value = Number(methodLine.value);
+      if (!Number.isFinite(value) || value <= min || value >= max) return;
+      const lineY = y(value).toFixed(2);
+      methodLineShapes += `<line data-method-level="${lineIndex}" x1="${padLeft}" y1="${lineY}" x2="${width - padRight}" y2="${lineY}" stroke="${methodColor}" stroke-width="1.6" pointer-events="none"/>`;
+      methodLabels += `<text x="${width - padRight - 4}" y="${(Number(lineY) - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${methodColor}">${methodLine.label} ${formatPrice(value)}</text>`;
+    });
+  }
   const dateKey = value => new Date(value).toISOString().slice(0, 10);
   const visibleIndex = new Map(candles.map((candle, index) => [dateKey(candle.timestamp), index]));
   const describeSignalText = (typeof window !== 'undefined' && window.StrategyTriggers && window.StrategyTriggers.describeSignal)
@@ -1499,11 +1545,13 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
     <g>
       ${gridLines}
       <g>${levelShapes}</g>
+      <g>${methodBandShapes}</g>
       <g>${triggerLevelShapes}</g>
+      <g>${methodLineShapes}</g>
       <g>${shapes}</g>
       <g>${maShapes}${lastPriceMarkup}</g>
       <g>${volumeMarkup}</g>
-      <g>${maLegend}${triggerLabels}</g>
+      <g>${maLegend}${triggerLabels}${methodLabels}</g>
       <g>${markerShapes}</g>
       ${xLabels}
       ${yLabels}
@@ -1555,6 +1603,7 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
     else if (overlays) {
       const counts = [];
       if (levelsData) counts.push('niveles objetivo/stop/break-even del spread seleccionado');
+      if (overlays.method && (overlays.method.lines?.length || overlays.method.band)) counts.push('overlay del método del workbench');
       if ((overlays.entries || []).length) counts.push(overlays.entries.length + ' entrada(s)');
       if ((overlays.exits || []).length) counts.push(overlays.exits.length + ' salida(s)');
       triggerNote.textContent = counts.length
