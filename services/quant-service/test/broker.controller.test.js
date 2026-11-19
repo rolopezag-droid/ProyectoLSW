@@ -55,3 +55,15 @@ for (const [name, timeframe] of [ ['no-admitido', '1Min'], ['desconocido', 'inva
     assert.equal(h.calls.length, 0);
   });
 }
+
+test('velas rechaza fechas imposibles, futuras, invertidas y límites inseguros', async () => {
+  for (const query of [
+    { start: '2026-02-30' }, { end: '9999-01-01' }, { start: '2026-02-01', end: '2026-01-01' },
+    { limit: '0' }, { limit: '10001' }, { limit: '1.5' }, { sort: 'otro' }, { pageToken: ['a','b'] },
+  ]) {
+    const h = createHarness();
+    const response = await h.query({ symbol: 'AAPL', ...query });
+    assert.equal(response.statusCode, 400);
+    assert.equal(h.calls.length, 0);
+  }
+});

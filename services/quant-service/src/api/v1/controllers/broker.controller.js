@@ -5,6 +5,7 @@ const {
   alpacaSecretKey,
   alpacaTradingBaseUrl,
   alpacaDataBaseUrl,
+  alpacaStocksFeed,
   alpacaOptionsFeed,
 } = require('../../../config/env');
 
@@ -14,10 +15,19 @@ const broker = createBroker({
   secretKey: alpacaSecretKey,
   tradingBaseUrl: alpacaTradingBaseUrl,
   dataBaseUrl: alpacaDataBaseUrl,
+  stockFeed: alpacaStocksFeed,
   optionsFeed: alpacaOptionsFeed,
 });
 
 const ALLOWED_TIMEFRAMES = ['15Min', '1Hour', '1Day', '1Week', '1Month', '3Month', '6Month', '12Month'];
+const MAX_CANDLES = 10000;
+
+function validMarketDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2}))?$/.test(value)) return false;
+  const datePart = value.slice(0, 10);
+  const calendarDate = new Date(datePart + 'T00:00:00Z');
+  return Number.isFinite(calendarDate.getTime()) && calendarDate.toISOString().slice(0, 10) === datePart && Number.isFinite(Date.parse(value));
+}
 
 const getAccount = async (_request, response) => {
   try {
@@ -65,9 +75,9 @@ const getOptionChain = async (request, response) => {
 
 const getCandles = async (request, response) => {
   try {
-    const { symbol, timeframe, limit, start, end, sort } = request.query;
+    const { symbol, timeframe, limit, start, end, sort, pageToken } = request.query;
 
-    if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
+    if (typeof symbol !== 'string' || !/^[A-Z0-9.-]{1,12}$/i.test(symbol)) {
       return response.status(400).json({ message: 'symbol debe ser un ticker válido.' });
     }
 
@@ -77,7 +87,20 @@ const getCandles = async (request, response) => {
       });
     }
     const normalizedTimeframe = timeframe === undefined ? '1Day' : timeframe;
-    const normalizedLimit = Math.min(Math.max(Number(limit) || 100, 1), 10000);
+    if (limit !== undefined && (typeof limit !== 'string' || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > MAX_CANDLES)) {
+      return response.status(400).json({ message: `limit debe ser un entero entre 1 y ${MAX_CANDLES}.` });
+    }
+    for (const [name, value] of [['start', start], ['end', end]]) {
+      if (value !== undefined && (!validMarketDate(value) || Date.parse(value) > Date.now())) {
+        return response.status(400).json({ message: `${name} debe ser una fecha válida no futura.` });
+      }
+    }
+    if (start !== undefined && end !== undefined && Date.parse(start) >= Date.parse(end)) {
+      return response.status(400).json({ message: 'start debe ser anterior a end.' });
+    }
+    if (sort !== undefined && !['asc', 'desc'].includes(sort)) return response.status(400).json({ message: 'sort debe ser asc o desc.' });
+    if (pageToken !== undefined && (typeof pageToken !== 'string' || !pageToken || pageToken.length > 4096)) return response.status(400).json({ message: 'pageToken no es válido.' });
+    const normalizedLimit = limit === undefined ? 100 : Number(limit);
 
     const bars = await broker.getCandles({
       symbol,
@@ -86,12 +109,25 @@ const getCandles = async (request, response) => {
       start,
       end,
       sort,
+      ...(pageToken ? { pageToken } : {}),
     });
 
     return response.json(bars);
   } catch (error) {
     return response.status(error.status || 502).json({
       message: 'No se pudo obtener las velas del ticker.',
+      detail: error.message,
+    });
+  }
+};
+
+const getNews = async (request, response) => {
+  try {
+    const { symbols, start, end, limit, sort } = request.query;
+    return response.json(await broker.getNews({ symbols, start, end, limit, sort }));
+  } catch (error) {
+    return response.status(error.status || 502).json({
+      message: 'No se pudieron consultar noticias de Alpaca.',
       detail: error.message,
     });
   }
@@ -166,4 +202,4 @@ const getOptionStrikes = async (request, response) => {
     return response.status(error.status || 502).json({ message: 'No se pudo consultar los strikes.', detail: error.message });
   }
 };
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getCandles, createOrder, createSpread };
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getCandles, getNews, createOrder, createSpread };

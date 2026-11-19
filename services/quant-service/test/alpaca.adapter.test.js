@@ -126,7 +126,7 @@ test('obtiene velas (candles) historicas de Alpaca para un ticker', async () => 
     dataBaseUrl: 'https://data.example',
     fetchImplementation: async (url) => {
       requests.push(url);
-      assert.equal(url, 'https://data.example/v2/stocks/AAPL/bars?timeframe=1Day&limit=100&sort=asc');
+      assert.equal(url, 'https://data.example/v2/stocks/AAPL/bars?timeframe=1Day&feed=iex&limit=100&sort=asc');
       return createResponse({
         bars: [
           { t: '2026-10-01T20:00:00Z', o: 178.26, h: 179.1, l: 177.9, c: 178.5, v: 1118, n: 65, vw: 178.23 },
@@ -154,6 +154,73 @@ test('obtiene velas (candles) historicas de Alpaca para un ticker', async () => 
   });
   assert.equal(result.symbol, 'AAPL');
   assert.equal(result.timeframe, '1Day');
+  assert.equal(result.feed, 'iex');
+});
+
+test('pagina velas de forma acotada y reporta cobertura real', async () => {
+  const urls = [];
+  const candle = i => ({ t: `2025-01-0${i}T00:00:00Z`, o: 100, h: 102, l: 99, c: 101, v: 100 });
+  const adapter = new AlpacaAdapter({ keyId:'fake', secretKey:'fake', tradingBaseUrl:'https://paper.example', dataBaseUrl:'https://data.example', fetchImplementation:async url=>{
+    urls.push(new URL(url));
+    return createResponse(urls.length === 1 ? { bars:[candle(1),candle(2)], next_page_token:'next' } : { bars:[candle(3)], next_page_token:null });
+  }});
+  const result = await adapter.getCandles({ symbol:'AAPL', limit:4, sort:'asc' });
+  assert.equal(urls.length,2);
+  assert.equal(urls[1].searchParams.get('page_token'),'next');
+  assert.equal(urls[1].searchParams.get('limit'),'2');
+  assert.equal(result.requestedBars,4);
+  assert.equal(result.retrievedBars,3);
+  assert.equal(result.firstTimestamp,candle(1).t);
+  assert.equal(result.lastTimestamp,candle(3).t);
+  assert.equal(result.complete,true);
+  assert.equal(result.limited,false);
+});
+
+test('velas identifica token repetido, límite, fallos de red y respuesta incompleta', async () => {
+  const bar = { t:'2025-01-01T00:00:00Z', o:100, h:102, l:99, c:101, v:10 };
+  for (const kind of ['repeated_token','limit_reached','provider_error','invalid_response','invalid_bars']) {
+    let calls = 0;
+    const adapter = new AlpacaAdapter({ keyId:'fake', secretKey:'fake', tradingBaseUrl:'https://paper.example', dataBaseUrl:'https://data.example', fetchImplementation:async()=>{
+      calls++;
+      if (calls === 1) return createResponse({ bars:[bar], next_page_token:'same' });
+      if (kind === 'provider_error') throw new Error('fallo de red simulado');
+      if (kind === 'invalid_response') return createResponse({});
+      if (kind === 'invalid_bars') return createResponse({ bars:[{t:'invalid'}], next_page_token:null });
+      return createResponse({ bars:[], next_page_token:'same' });
+    }});
+    const result = await adapter.getCandles({ symbol:'AAPL', limit:kind==='limit_reached'?1:4 });
+    assert.equal(result.complete,false,kind);
+    assert.equal(result.partialReason,kind);
+    assert.equal(result.retrievedBars,1);
+    assert.ok(calls <= 2);
+  }
+});
+
+test('velas vacías no se rellenan y se declaran completas cuando no hay más páginas', async () => {
+  const adapter = new AlpacaAdapter({keyId:'fake',secretKey:'fake',tradingBaseUrl:'https://paper.example',dataBaseUrl:'https://data.example',fetchImplementation:async()=>createResponse({bars:null,next_page_token:null})});
+  const result = await adapter.getCandles({symbol:'AAPL'});
+  assert.deepEqual(result.bars,[]);
+  assert.equal(result.complete,true);
+  assert.equal(result.firstTimestamp,null);
+  assert.equal(result.retrievedBars,0);
+});
+
+test('una página sin indicador de continuación no se presenta como completa', async () => {
+  const bar = { t:'2025-01-01T00:00:00Z', o:100, h:102, l:99, c:101, v:10 };
+  const adapter = new AlpacaAdapter({keyId:'fake',secretKey:'fake',tradingBaseUrl:'https://paper.example',dataBaseUrl:'https://data.example',fetchImplementation:async()=>createResponse({bars:[bar]})});
+  const result = await adapter.getCandles({symbol:'AAPL'});
+  assert.equal(result.retrievedBars,1);
+  assert.equal(result.complete,false);
+  assert.equal(result.partialReason,'invalid_response');
+});
+
+test('rechaza registros fuera de rango, futuros o sin volumen en vez de fabricarlos', async () => {
+  const valid = { t:'2025-01-02T00:00:00Z', o:100, h:102, l:99, c:101, v:10 };
+  const adapter = new AlpacaAdapter({keyId:'fake',secretKey:'fake',tradingBaseUrl:'https://paper.example',dataBaseUrl:'https://data.example',fetchImplementation:async()=>createResponse({bars:[valid,{...valid,t:'2024-12-31T00:00:00Z'},{...valid,t:'9999-01-01T00:00:00Z'},{...valid,t:'2025-01-03T00:00:00Z',v:null}],next_page_token:null})});
+  const result = await adapter.getCandles({symbol:'AAPL',start:'2025-01-01',end:'2025-02-01'});
+  assert.equal(result.retrievedBars,1);
+  assert.equal(result.complete,false);
+  assert.equal(result.partialReason,'invalid_bars');
 });
 
 test('crea una orden de mercado en la cuenta paper de Alpaca', async () => {

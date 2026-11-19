@@ -7,6 +7,7 @@ class AlpacaAdapter extends BrokerAdapter {
     secretKey,
     tradingBaseUrl,
     dataBaseUrl,
+    stockFeed = 'iex',
     optionsFeed = 'indicative',
     fetchImplementation = fetch,
   }) {
@@ -15,6 +16,7 @@ class AlpacaAdapter extends BrokerAdapter {
     this.secretKey = secretKey;
     this.tradingBaseUrl = tradingBaseUrl.replace(/\/$/, '');
     this.dataBaseUrl = dataBaseUrl.replace(/\/$/, '');
+    this.stockFeed = stockFeed;
     this.optionsFeed = optionsFeed;
     this.fetch = fetchImplementation;
   }
@@ -85,39 +87,104 @@ class AlpacaAdapter extends BrokerAdapter {
     return result;
   }
 
-  async getCandles({ symbol, timeframe = '1Day', limit = 100, start, end, sort } = {}) {
+  async getCandles({ symbol, timeframe = '1Day', limit = 100, start, end, sort, pageToken } = {}) {
     if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
       const error = new Error('symbol debe ser un ticker válido.');
       error.status = 400;
       throw error;
     }
+    const requestedBars = Math.min(Math.max(Number(limit) || 100, 1), 10000);
     const params = new URLSearchParams({
       timeframe,
-      limit: String(Math.min(Math.max(Number(limit) || 100, 1), 10000)),
+      feed: this.stockFeed,
+      limit: String(Math.min(requestedBars, 1000)),
     });
     if (start) params.set('start', start);
     if (end) params.set('end', end);
     if (sort) params.set('sort', sort);
-    const response = await this.request(
-      this.dataBaseUrl,
-      `/v2/stocks/${encodeURIComponent(symbol.toUpperCase())}/bars?${params.toString()}`,
-    );
-    const bars = (response.bars || []).map((bar) => ({
-      timestamp: bar.t,
-      open: bar.o,
-      high: bar.h,
-      low: bar.l,
-      close: bar.c,
-      volume: bar.v,
-      tradeCount: bar.n ?? null,
-      vwap: bar.vw ?? null,
-    }));
+    const bars = [], seen = new Set(), timestamps = new Set();
+    let token = pageToken || null, pages = 0, partialReason = null;
+    if (token) seen.add(token);
+    do {
+      if (token) params.set('page_token', token);
+      params.set('limit', String(Math.min(1000, requestedBars - bars.length)));
+      let response;
+      try {
+        response = await this.request(this.dataBaseUrl, `/v2/stocks/${encodeURIComponent(symbol.toUpperCase())}/bars?${params.toString()}`);
+      } catch (error) {
+        if (!pages) throw error;
+        partialReason = 'provider_error';
+        break;
+      }
+      pages += 1;
+      if (!response || !Object.prototype.hasOwnProperty.call(response, 'bars') || (response.bars !== null && !Array.isArray(response.bars))) {
+        partialReason = 'invalid_response';
+        break;
+      }
+      for (const bar of response.bars || []) {
+        const time = bar && Date.parse(bar.t);
+        if (!bar || !Number.isFinite(time) || time > Date.now() || (start && time < Date.parse(start)) || (end && time > Date.parse(end)) || ![bar.o, bar.h, bar.l, bar.c].every(value => Number.isFinite(value) && value > 0) || !Number.isFinite(bar.v) || bar.v < 0 || bar.h < bar.l || bar.o > bar.h || bar.o < bar.l || bar.c > bar.h || bar.c < bar.l || timestamps.has(time)) {
+          partialReason = 'invalid_bars';
+          continue;
+        }
+        if (bars.length >= requestedBars) { partialReason = 'provider_limit_exceeded'; break; }
+        timestamps.add(time);
+        bars.push({ timestamp: bar.t, open: bar.o, high: bar.h, low: bar.l, close: bar.c,
+          volume: bar.v, tradeCount: bar.n ?? null, vwap: bar.vw ?? null });
+      }
+      if (!Object.prototype.hasOwnProperty.call(response, 'next_page_token')) { partialReason = 'invalid_response'; token = null; break; }
+      const next = response.next_page_token ?? null;
+      if (next !== null && (typeof next !== 'string' || !next || next.length > 4096)) { partialReason = 'invalid_token'; token = null; break; }
+      token = next;
+      if (partialReason || !token) break;
+      if (seen.has(token)) { partialReason = 'repeated_token'; break; }
+      seen.add(token);
+      if (bars.length >= requestedBars) { partialReason = 'limit_reached'; break; }
+      if (pages >= 100) { partialReason = 'page_limit'; break; }
+    } while (token);
+    const dates = bars.map(bar => bar.timestamp).sort((a, b) => Date.parse(a) - Date.parse(b));
 
     return {
       provider: 'alpaca',
       symbol: symbol.toUpperCase(),
       timeframe,
+      feed: this.stockFeed,
       bars,
+      nextPageToken: token,
+      requestedBars,
+      retrievedBars: bars.length,
+      firstTimestamp: dates[0] || null,
+      lastTimestamp: dates.at(-1) || null,
+      complete: !partialReason,
+      limited: !!partialReason,
+      partialReason,
+      pages,
+      capturedAt: new Date().toISOString(),
+    };
+  }
+
+  async getNews({ symbols, start, end, limit = 50, sort = 'desc' } = {}) {
+    const list = Array.isArray(symbols) ? symbols : String(symbols || '').split(',').filter(Boolean);
+    const normalized = [...new Set(list.map(value => String(value).trim().toUpperCase()))];
+    if (!normalized.length || normalized.length > 10 || normalized.some(value => !/^[A-Z0-9.-]{1,12}$/.test(value))) {
+      const error = new Error('symbols debe incluir entre 1 y 10 tickers válidos.');
+      error.status = 400;
+      throw error;
+    }
+    if (sort !== 'asc' && sort !== 'desc') {
+      const error = new Error('sort debe ser asc o desc.');
+      error.status = 400;
+      throw error;
+    }
+    const pageLimit = Math.min(Math.max(Number(limit) || 50, 1), 50);
+    const params = new URLSearchParams({ symbols: normalized.join(','), sort, limit: String(pageLimit), include_content: 'false' });
+    if (start) params.set('start', start);
+    if (end) params.set('end', end);
+    const response = await this.request(this.dataBaseUrl, `/v1beta1/news?${params.toString()}`);
+    return {
+      provider: 'alpaca',
+      symbols: normalized,
+      articles: response.news || response.articles || [],
       nextPageToken: response.next_page_token ?? null,
       capturedAt: new Date().toISOString(),
     };
