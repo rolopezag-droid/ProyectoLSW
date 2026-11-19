@@ -1,5 +1,5 @@
 # options-research-journal Specification
-## Requirements
+## ADDED Requirements
 ### Requirement: Comparar spreads verticales
 The system SHALL evaluate Bull Call, Bear Call, Bull Put, and Bear Put for a selected underlying using one expiration and valid two-leg quotes.
 #### Scenario: Compare all supported strategies

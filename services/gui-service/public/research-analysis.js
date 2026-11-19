@@ -86,9 +86,10 @@
       }
       return groups.map(group=>{
         const lastPivot=group.pivots.reduce((latest,pivot)=>pivot.index>latest.index?pivot:latest,group.pivots[0]);
-        const crossed=sorted.slice(lastPivot.index+rightBars+1).find(bar=>kind==='support'?bar.close<group.lower-buffer:bar.close>group.upper+buffer);
         const breached=kind==='support'?spot<group.lower-buffer:spot>group.upper+buffer;
-        return {kind,level:group.mean,lower:group.lower,upper:group.upper,touchCount:group.pivots.length,lastTest:lastPivot.timestamp,confirmedAt:lastPivot.confirmedAt,distanceFromPrice:Math.abs(spot-group.mean),distanceAtr:Math.abs(spot-group.mean)/atr,status:breached?'breached':'active',breakoutAt:breached?(crossed?.timestamp||sorted.at(-1).timestamp):null,breakoutDirection:breached?(kind==='support'?'down':'up'):null};
+        // El estado es una fotografía actual: no inferir retroactivamente la fecha
+        // de ruptura usando los pivotes y el ATR calculados al final de la muestra.
+        return {kind,level:group.mean,lower:group.lower,upper:group.upper,touchCount:group.pivots.length,lastTest:lastPivot.timestamp,confirmedAt:lastPivot.confirmedAt,distanceFromPrice:Math.abs(spot-group.mean),distanceAtr:Math.abs(spot-group.mean)/atr,status:breached?'breached':'active',breakoutAt:null,breakoutDirection:breached?(kind==='support'?'down':'up'):null};
       }).sort((a,b)=>a.distanceFromPrice-b.distanceFromPrice).slice(0,maxPerSide);
     };
     return {available:true,method:'confirmed-swing-pivots-clustered-by-atr',pivotWindow:{left:leftBars,right:rightBars},zoneAtrTolerance,breakoutAtrBuffer,atr,latestClose:spot,confirmedThrough:sorted.at(-1).timestamp,sampleBars:sorted.length,supports:makeZones('support'),resistances:makeZones('resistance')};

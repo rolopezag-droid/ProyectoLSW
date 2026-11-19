@@ -410,13 +410,69 @@
     aside .btn { min-height:28px; padding:5px 8px; font-size:10px; }
     aside .service-chip { font-size:10px; }
     #tab-candles .card { min-height:440px; }
-    #tab-candles .row { grid-template-columns:1fr 1fr; }
+    #tab-candles .row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    #candlesForm > div, #candlesForm input, #candlesForm select { min-width:0; }
     #candlesChart { border-radius:4px!important; }
     .chart-empty { display:flex; min-height:240px; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:#a4b4c7; background:repeating-linear-gradient(0deg,transparent,transparent 47px,#253344 48px),repeating-linear-gradient(90deg,transparent,transparent 79px,#253344 80px); border:1px solid var(--border); border-radius:4px; }
     .chart-empty strong { font-size:16px; color:#dce7f2; font-weight:500; background:#161e28; padding:4px 12px; }
     .chart-empty span { font-size:11px; background:#161e28; padding:4px 12px; }
     #tab-candles:has(#candlesChartContainer:not([style*="none"])) .chart-empty { display:none; }
     @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 310px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
+    .research-workspace { min-width:0; }
+    .research-table thead th { position:sticky; top:-1px; background:#0d1520; z-index:2; }
+    #researchCandidates tr[data-candidate] { cursor:pointer; }
+    #researchCandidates tr[data-candidate]:hover td { background:rgba(56,189,248,.06); }
+    #researchCandidates tr.is-selected td { background:rgba(56,189,248,.14); }
+    .chart-trigger-controls { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; }
+    .chart-trigger-controls label { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; min-width:0; font-size:0.9rem; white-space:normal; }
+    .chart-trigger-controls select { max-width:340px; }
+    .signal-mode { min-width:0; padding:14px; border:1px solid var(--border); border-radius:8px; background:rgba(10,16,23,.42); }
+    .signal-mode h3, .signal-mode legend { color:var(--text); font-size:13px; font-weight:650; }
+    .signal-mode p { margin-top:6px; }
+    .signal-mode-candidate { border-left:3px solid #a78bfa; }
+    .signal-mode-technical { border-left:3px solid var(--accent); }
+    .signal-mode fieldset { border:0; min-width:0; }
+    .signal-indicator-options { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .signal-indicator-option, .candidate-toggle { display:flex; align-items:center; gap:8px; margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:7px; background:rgba(10,16,23,.48); color:var(--text); font-size:12px; line-height:1.4; cursor:pointer; }
+    .signal-mode input[type="checkbox"] { width:16px; height:16px; flex:0 0 16px; margin:0; padding:0; accent-color:var(--accent); }
+    .signal-mode-candidate input[type="checkbox"] { accent-color:#a78bfa; }
+    .signal-mode input[type="checkbox"]:focus-visible, .signal-detail-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    #candidateSignalStatus { color:#bfcce0; }
+    .signal-history { min-width:0; }
+    .signal-table-wrap { overflow-x:auto; max-width:100%; border:1px solid var(--border); border-radius:6px; }
+    .signal-table { display:table; width:100%; min-width:760px; table-layout:fixed; border:0; font-size:12px; }
+    .signal-table th, .signal-table td { padding:10px 12px; white-space:normal; overflow-wrap:anywhere; vertical-align:top; }
+    .signal-table th { font-size:10px; }
+    .signal-table .signal-source { display:block; margin-top:4px; color:var(--muted); font-size:11px; font-weight:400; }
+    .signal-table .signal-type { font-weight:700; text-transform:capitalize; }
+    .signal-type-alcista { color:#77ddb8; } .signal-type-bajista { color:#f49aa2; } .signal-type-salida { color:#f6cf79; }
+    .signal-detail-toggle { border:1px solid #52647a; border-radius:5px; padding:6px 9px; color:var(--text); background:#253344; font-size:12px; cursor:pointer; }
+    .signal-detail-toggle:hover { background:#33465b; }
+    .signal-detail-row[hidden] { display:none; }
+    .signal-detail-row td, .signal-table tr.signal-detail-row:hover td { background:#101b28; }
+    .signal-detail-content { display:grid; gap:10px; padding:6px; line-height:1.55; }
+    .signal-detail-content p { margin:0; }
+    .signal-detail-values { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:8px; }
+    .signal-detail-values div { min-width:0; padding:8px; border:1px solid var(--border); border-radius:5px; }
+    .signal-detail-values dt { color:var(--muted); font-size:11px; }
+    .signal-detail-values dd { margin-top:2px; overflow-wrap:anywhere; }
+    .strategy-explanation { margin-top:14px; padding:14px; border:1px solid var(--border); border-radius:8px; background:rgba(10,16,23,.42); }
+    .strategy-explanation[hidden] { display:none; }
+    .strategy-explanation h4 { color:var(--text); font-size:14px; margin-bottom:8px; }
+    .strategy-explanation .research-method { margin:8px 0; }
+    .strategy-explanation .research-method summary, .strategy-comparison summary { font-size:12px; color:var(--text); }
+    .strategy-explanation .research-method p, .strategy-comparison p { font-size:12px; line-height:1.6; color:#c6d3e0; }
+    .strategy-explanation dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:8px; margin:10px 0; }
+    .strategy-explanation dl div { min-width:0; border:1px solid var(--border); border-radius:5px; padding:8px; }
+    .strategy-explanation dt { color:var(--muted); font-size:11px; } .strategy-explanation dd { overflow-wrap:anywhere; font-size:12px; }
+    .strategy-explanation ul { padding-left:20px; color:#c6d3e0; font-size:12px; }
+    .strategy-explanation code { white-space:normal; overflow-wrap:anywhere; }
+    .strategy-validation { color:#f6cf79; font-size:12px; line-height:1.5; }
+    .strategy-validation[data-state="verified"] { color:#77ddb8; }
+    .strategy-comparison { margin-top:12px; }
+    .strategy-comparison .research-table { min-width:900px; }
+    .strategy-comparison .research-table td { white-space:normal; vertical-align:top; overflow-wrap:anywhere; }
+    .strategy-explain-button { min-width:105px; padding:6px 9px; font-size:11px; }
     @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; } }
     @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } }
     #alertContainer { position:fixed; right:20px; bottom:20px; z-index:1000; width:min(380px,calc(100vw - 32px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
@@ -796,20 +852,65 @@
 <option value="3Month">3 Meses</option>
 <option value="6Month">6 Meses</option>
 <option value="12Month">1 Año</option>
+<option value="custom">Rango personalizado</option>
 </select>
           </div>
-
+          <div><label for="chStart">Fecha inicial (UTC)</label><input type="date" id="chStart" aria-describedby="chRangeHint chRangeStatus" /></div>
+          <div><label for="chEnd">Fecha final (UTC, inclusiva)</label><input type="date" id="chEnd" aria-describedby="chRangeHint chRangeStatus" /></div>
+          <div><label for="chCandleTimeframe">Temporalidad de vela</label><select id="chCandleTimeframe"><option value="auto">Automática según periodo</option><option value="15Min">15 minutos</option><option value="1Hour">1 hora</option><option value="1Day">1 día</option><option value="1Week">1 semana</option><option value="1Month">1 mes</option></select></div>
+          <div><label for="chLimit">Máximo de velas (1–2000)</label><input id="chLimit" type="number" min="1" max="2000" step="1" value="1000" /></div>
         </form>
+        <p class="small-note" id="chRangeHint">Los periodos predefinidos muestran sus fechas efectivas. Al editar cualquiera de las fechas se activa automáticamente el rango personalizado, por días completos UTC.</p>
+        <p class="small-note" id="chRangeStatus" role="status" aria-live="polite"></p>
 
         <button type="button" class="btn btn-primary btn-block" id="btnLoadCandles"> Mostrar gráfica</button>
+
+        <section class="signal-mode signal-mode-technical" aria-labelledby="technicalSignalsTitle">
+          <fieldset aria-labelledby="technicalSignalsTitle">
+            <legend id="technicalSignalsTitle">Señales técnicas independientes · velas diarias</legend>
+            <p class="small-note">Se calculan con las velas de la gráfica, sin seleccionar una candidata.</p>
+            <div class="signal-indicator-options">
+              <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="sma_up" checked /> SMA50 alcista + SMA20</label>
+              <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="sma_down" checked /> SMA50 bajista + SMA20</label>
+              <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="rsi" checked /> RSI14 (30/70)</label>
+              <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="resistance" checked /> Ruptura de resistencia</label>
+              <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="support" checked /> Ruptura de soporte</label>
+            </div>
+          </fieldset>
+        </section>
+        <section class="signal-mode signal-mode-candidate" aria-labelledby="candidateSignalsTitle">
+          <h3 id="candidateSignalsTitle">Entradas y salidas de candidata · opcional</h3>
+          <p class="small-note" id="candidateSignalStatus" role="status">Ninguna candidata seleccionada. El análisis técnico independiente sigue disponible.</p>
+          <div class="chart-trigger-controls">
+            <label class="candidate-toggle"><input type="checkbox" id="chShowTriggers" /> Mostrar entradas/salidas orientativas</label>
+            <label>Candidata evaluada
+              <select id="chTriggerStrategy" aria-label="Candidata evaluada para señales en la gráfica">
+                <option value="">— Ninguna seleccionada —</option>
+              </select>
+            </label>
+          </div>
+        </section>
+        <div class="chart-trigger-controls">
+          <label>Máximo de marcadores visibles <select id="chMarkerLimit"><option value="10">10</option><option value="50">50</option><option value="100" selected>100</option><option value="250">250</option><option value="all">Todos</option></select></label>
+          <label>Consultar fecha UTC <input type="date" id="chSignalDate" /></label>
+          <button type="button" class="btn btn-secondary" id="btnClearSignalDate">Ver todas las fechas</button>
+        </div>
+        <p class="small-note">Marcadores: verde alcista, rojo bajista, amarillo salida; M = medias, R = RSI, Z = zona, E/X = entrada/salida de candidata. Las señales se confirman al cierre; el timestamp identifica el inicio de la vela del proveedor. Son observaciones históricas, no operaciones ejecutadas ni órdenes automáticas. ATR14 mide volatilidad y aporta el margen de ruptura. RSI 30/70 es heurístico.</p>
 
         <div id="candlesChartContainer" style="display:none;">
           <div class="small-note" id="candlesMeta" style="margin-bottom:0.75rem;"></div>
           <div class="results-grid" id="candlesMetricsGrid"></div>
           <svg id="candlesChart" viewBox="0 0 900 400" style="width:100%; height:auto; display:block; background:var(--panel); border:1px solid var(--border); border-radius:12px;"></svg>
           <div class="small-note" id="candlesLevelsNote"></div>
+          <div class="small-note" id="candlesTriggersNote"></div>
           <div class="small-note" id="candlesNote"></div>
         </div>
+        <section class="signal-history" aria-labelledby="signalTableTitle">
+          <h3 id="signalTableTitle">Historial de señales</h3>
+          <p class="small-note" id="signalSummary" role="status">Carga una gráfica diaria para calcular las señales.</p>
+          <p class="small-note">Fecha y hora de inicio de la vela en UTC; la señal se confirma al cierre. Abre la explicación para consultar condiciones y valores completos.</p>
+          <div class="signal-table-wrap" role="region" aria-label="Historial de señales; desplazamiento horizontal si es necesario" tabindex="0"><table class="signal-table"><colgroup><col style="width:9%" /><col style="width:22%" /><col style="width:25%" /><col style="width:12%" /><col style="width:13%" /><col style="width:19%" /></colgroup><thead><tr><th scope="col">Ticker</th><th scope="col">Vela (UTC)</th><th scope="col">Indicador y origen</th><th scope="col">Tipo</th><th scope="col">Precio cierre</th><th scope="col">Detalle</th></tr></thead><tbody id="signalTableBody"><tr><td colspan="6">Sin señales para el periodo y las reglas seleccionadas</td></tr></tbody></table></div>
+        </section>
         <section class="research-workspace" aria-labelledby="researchTitle">
           <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
           <div class="research-controls">
@@ -856,9 +957,25 @@
             </section>
             <section class="research-panel research-panel-wide" aria-labelledby="researchStrategiesTitle">
               <div class="research-panel-heading"><div><span class="research-panel-kicker">05 · Riesgo y strikes</span><h3 id="researchStrategiesTitle">Comparación de estrategias</h3></div><span class="research-source-status">Opciones Alpaca</span></div>
-              <p class="research-panel-description">Ordenadas por score combinado orientativo. El score fundamental puede ajustar el orden cuando hay suficientes métricas; no cambia las probabilidades mostradas.</p>
+              <p class="research-panel-description">Ordenadas por score combinado orientativo. Las cifras del ranking son preliminares hasta contrastarlas con Quant en el detalle. El score fundamental puede ajustar el orden cuando hay suficientes métricas; no cambia las probabilidades mostradas.</p>
               <details class="research-method"><summary>Cómo se calcula el score y qué límites tiene</summary><p>Score base = probabilidad histórica × ganancia/riesgo × factor técnico (1.1 alineada, 1.0 mixta, 0.9 contraria; factor 1 si se desactiva técnico) ÷ (1 + diferencial relativo Bid/Ask). Cuando se selecciona fundamentales, el score base se multiplica por un factor de 0.80 a 1.20 derivado de un score fundamental de 0 a 100. El score fundamental pondera crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B; normaliza los datos disponibles y requiere al menos 50% de cobertura. Los umbrales son una heurística general sin ajuste sectorial ni calibración. No altera la probabilidad histórica ni Black‑Scholes. La probabilidad histórica usa ventanas traslapadas y su IC Wilson puede subestimar incertidumbre. Black‑Scholes usa volatilidad realizada como proxy, no volatilidad implícita. Ninguna cifra es pronóstico calibrado ni recomendación.</p></details>
-              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <p class="strategy-validation" id="researchBsCaveat" hidden>La probabilidad Black‑Scholes del panel presenta una discrepancia conocida en la CDF normal; no se considera una probabilidad validada. No participa en el score. Consulta la auditoría de la fase 2A.</p>
+              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <section id="researchCandidateExplanation" class="strategy-explanation" aria-labelledby="researchCandidateTitle" hidden>
+                <h4 id="researchCandidateTitle">Candidata seleccionada</h4>
+                <p id="researchCandidateValidation" class="strategy-validation" role="status" aria-live="polite"></p>
+                <details class="research-method"><summary>¿Por qué esta estrategia?</summary><div id="researchCandidateWhy"></div></details>
+                <details class="research-method"><summary>¿Por qué estas patas?</summary><div id="researchCandidateLegs"></div></details>
+                <details class="research-method"><summary>Ver cálculos financieros</summary><div id="researchCandidateCalculations"></div></details>
+                <details class="research-method"><summary>¿Cómo se calculó el score?</summary><div id="researchCandidateScore"></div></details>
+              </section>
+              <details id="researchComparison" class="research-method strategy-comparison">
+                <summary>Comparar las cuatro estrategias</summary>
+                <label for="researchCompareSymbol">Empresa analizada</label><select id="researchCompareSymbol"></select>
+                <p>Comparación entre candidatas visibles tras los filtros y el límite de 20 por ticker; una estrategia ausente puede haber quedado fuera de esa muestra.</p>
+                <p id="researchCompareStatus" class="strategy-validation" role="status" aria-live="polite"></p>
+                <div id="researchCompareResults"></div>
+              </details>
             </section>
             <section class="research-panel research-panel-wide" aria-labelledby="researchJournalTitle">
               <div class="research-panel-heading"><div><span class="research-panel-kicker">06 · Registro</span><h3 id="researchJournalTitle">Bitácora del análisis</h3></div><span class="research-source-status">Supabase</span></div>
@@ -878,6 +995,8 @@
 <script src="/market-period.js"></script>
 <script src="/strategy-selection.js"></script>
 <script src="/research-analysis.js"></script>
+<script src="/strategy-triggers.js"></script>
+<script src="/strategy-explanation.js"></script>
 <script src="/research-ui.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
@@ -1043,11 +1162,13 @@ async function fetchAutomaticSelection() {
   });
   if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
   const quoteRes = await quotePromise;
+  if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
   const q = quoteRes.data || {};
+  if(q.symbol && q.symbol.toUpperCase()!==symbol) throw new Error('La cotización no corresponde a la empresa seleccionada; no hay cotización válida del subyacente.');
   let spotPrice = null;
   const bid=Number(q.bid), ask=Number(q.ask), ref=Number(q.referencePrice);
-  if(Number.isFinite(ref) && ref>0) spotPrice = ref;
-  else if(Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>0) spotPrice=(bid+ask)/2;
+  if(quoteRes.ok && Number.isFinite(ref) && ref>0) spotPrice = ref;
+  else if(quoteRes.ok && Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>=bid) spotPrice=(bid+ask)/2;
   const result=selectVertical(contracts,strategy,symbol,expiration,spotPrice);
   if(stillCurrent() && Number.isFinite(spotPrice) && spotPrice>0) {
     document.getElementById('saveSpot').value=spotPrice.toFixed(2);
@@ -1057,6 +1178,7 @@ async function fetchAutomaticSelection() {
   } else if(stillCurrent()) {
     document.getElementById('saveSpot').value='';
     document.getElementById('saveSpotSource').textContent='No se obtuvo el precio de la acción. Ingresa una referencia manual para guardar.';
+    result.spotWarning='Sin cotización válida del subyacente; ingresa una referencia manual.';
   }
   document.getElementById('strikeLong').value=result.long.strike;
   document.getElementById('strikeShort').value=result.short.strike;
@@ -1069,7 +1191,7 @@ async function fetchAutomaticSelection() {
 document.getElementById('saveSpot').addEventListener('input',()=>{document.getElementById('saveSpotSource').textContent='Precio de referencia ingresado manualmente.';});
 document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
   const btn=document.getElementById('btnFetchQuotes'); btn.disabled=true;
-  try { const result=await fetchAutomaticSelection();showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'.','info'); }
+  try { const result=await fetchAutomaticSelection();showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'. '+(result.spotWarning||''),'info'); }
   catch(error){showAlert(error.message,'error');}
   finally{btn.disabled=false;}
 });
@@ -1593,6 +1715,15 @@ document.getElementById('btnCalcIV').addEventListener('click', async () => {
 });
 
 // ── Candlestick Chart ──
+window.__candlesChartState = { symbol: null, timeframe: null, periodLabel: null, candles: [] };
+function candleOverlays() {
+  return typeof window.__candleOverlaySource === 'function' ? window.__candleOverlaySource() : null;
+}
+function refreshChartOverlays() {
+  const state = window.__candlesChartState;
+  if (!state || !state.candles.length || document.getElementById('candlesChartContainer').style.display === 'none') return;
+  renderCandlesChart(state.candles, state.timeframe, candleOverlays());
+}
 function formatPrice(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '$0.00';
@@ -1601,17 +1732,17 @@ function formatPrice(value) {
 
 function formatAxisTime(timestamp, timeframe) {
   const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
   if (/Min|Hour/.test(timeframe)) return `${hours}:${minutes}`;
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const year = date.getUTCFullYear();
   if (/Month/.test(timeframe)) return `${month}/${year}`;
   return `${day}/${month}/${String(year).slice(-2)}`;
 }
 
-function renderCandlesChart(candles, timeframe) {
+function renderCandlesChart(candles, timeframe, overlays = null) {
   const width = 900;
   const height = 400;
   const padLeft = 88;
@@ -1699,6 +1830,63 @@ function renderCandlesChart(candles, timeframe) {
     }
   });
 
+  // ── Overlays del spread evaluado: niveles de salida y marcadores de señales ──
+  const levelStyles = {
+    target: { color: '#34d399', dash: '10 4', label: 'Objetivo (strike corto)' },
+    stop: { color: '#f87171', dash: '10 4', label: 'Stop (strike largo)' },
+    breakEven: { color: '#cbd5e1', dash: '3 4', label: 'Break-even' },
+  };
+  let triggerLevelShapes = '';
+  let triggerLabels = '';
+  const levelsData = overlays && overlays.levels ? overlays.levels : null;
+  if (levelsData) {
+    for (const key of ['target', 'stop', 'breakEven']) {
+      const value = Number(levelsData[key]);
+      if (!Number.isFinite(value) || value <= min || value >= max) continue;
+      const style = levelStyles[key];
+      const levelY = y(value);
+      triggerLevelShapes += `<line data-trigger-level="${key}" x1="${padLeft}" y1="${levelY.toFixed(2)}" x2="${width - padRight}" y2="${levelY.toFixed(2)}" stroke="${style.color}" stroke-width="1.4" stroke-dasharray="${style.dash}" pointer-events="none"/>`;
+      triggerLabels += `<text x="${width - padRight - 4}" y="${(levelY - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${style.color}">${style.label} ${formatPrice(value)}</text>`;
+    }
+  }
+
+  // Las señales conservan el timestamp original de su vela, incluida su precisión.
+  const dateKey = value => value;
+  const visibleIndex = new Map(candles.map((candle, index) => [dateKey(candle.timestamp), index]));
+  const describeSignalText = (typeof window !== 'undefined' && window.StrategyTriggers && window.StrategyTriggers.describeSignal)
+    ? window.StrategyTriggers.describeSignal
+    : (signal => signal.rule === 'sma_cross' ? 'Entrada (cruce SMA50)' : signal.rule === 'zone_breakout' ? 'Entrada (ruptura de zona)' : 'Salida (cruce SMA20)');
+  const signalNotes = new Map();
+  let markerShapes = '';
+  if (overlays) {
+    const addNote = (timestamp, text) => {
+      const key = dateKey(timestamp);
+      const list = signalNotes.get(key) || [];
+      list.push(text);
+      signalNotes.set(key, list);
+    };
+    const markerCounts = new Map();
+    const visibleSignals = overlays.visibleSignals || [...(overlays.entries || []), ...(overlays.exits || [])];
+    for (const signal of visibleSignals) {
+      const index = visibleIndex.get(dateKey(signal.timestamp));
+      if (!Number.isInteger(index)) continue;
+      const offset = markerCounts.get(index) || 0;
+      markerCounts.set(index, offset + 1);
+      const x = xForIndex(index) + (offset % 3 - 1) * 11;
+      const isExit = signal.type === 'salida' || signal.rule === 'sma20_against';
+      const bullish = signal.type === 'alcista' || signal.side === 'bullish';
+      const color = isExit ? '#fbbf24' : bullish ? '#22c55e' : '#ef4444';
+      const signalY = Math.max(padTop + 12, Math.min(height - padBottom - 12, y(signal.price) + (isExit ? 0 : bullish ? 15 : -15) + Math.floor(offset / 3) * 12));
+      const code = signal.category === 'candidate' ? (isExit ? 'X' : 'E') : signal.rule === 'sma_cross' ? 'M' : signal.rule === 'rsi_cross' ? 'R' : 'Z';
+      const detail = `${signal.category === 'candidate' ? 'Candidata' : 'Señal técnica'} · ${signal.indicator || code} · ${new Date(signal.timestamp).toISOString()} · ${formatPrice(signal.price)} · ${describeSignalText(signal)} · ${signal.exactRule || ''} Confirmada al cierre.`;
+      const shape = isExit
+        ? `<circle cx="${x}" cy="${signalY}" r="7" fill="#0b131d" stroke="${color}" stroke-width="2"/>`
+        : `<polygon points="${x-8},${signalY+(bullish?6:-6)} ${x+8},${signalY+(bullish?6:-6)} ${x},${signalY+(bullish?-7:7)}" fill="${color}" stroke="#0b131d" stroke-width="1"/>`;
+      markerShapes += `<g data-trigger-mark="${isExit ? 'exit' : signal.category === 'candidate' ? 'entry' : 'technical'}" data-signal-time="${escapeHtml(dateKey(signal.timestamp))}" pointer-events="none"><title>${escapeHtml(detail)}</title>${shape}<text x="${x}" y="${signalY+3}" text-anchor="middle" font-size="8" font-weight="bold" fill="${isExit ? color : '#0b131d'}">${code}</text></g>`;
+      addNote(signal.timestamp, detail);
+    }
+  }
+
   const volumeValue=candle=>{const value=Number(candle.volume);return Number.isFinite(value)&&value>0?value:0;};
   const volumeTop=298,volumeBottom=380,volumeMax=Math.max(1,...candles.map(volumeValue)),volumeHeight=74;
   const compactVolume=value=>value>=1e9?(value/1e9).toFixed(1)+'B':value>=1e6?(value/1e6).toFixed(1)+'M':value>=1e3?(value/1e3).toFixed(1)+'K':String(Math.round(value));
@@ -1725,14 +1913,16 @@ function renderCandlesChart(candles, timeframe) {
 
   const svg = document.getElementById('candlesChart');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Gráfica de velas con soportes y resistencias activos cuando están disponibles, medias móviles simples de 20, 50 y 200 periodos y volumen; pasa el cursor para consultar fecha y datos de cada vela.');
-  const hits = candles.map((candle,index) => '<rect data-candle="'+index+'" tabindex="0" role="button" aria-label="'+escapeHtml(new Date(candle.timestamp).toLocaleString('es-MX') + ', cierre ' + formatPrice(candle.close))+'" x="'+(padLeft+index*step)+'" y="'+padTop+'" width="'+step+'" height="'+(height-padTop-38)+'" fill="transparent" />').join('');
+  svg.setAttribute('aria-label', 'Gráfica de velas con medias y volumen. Marcadores M: medias, R: RSI, Z: zona, E: entrada de candidata, X: salida; verde alcista, rojo bajista y amarillo salida. Pasa el cursor por una vela para ver su explicación.');
+  const hits = candles.map((candle,index) => '<rect data-candle="'+index+'" tabindex="0" role="button" aria-label="'+escapeHtml(marketPeriod.formatUtc(candle.timestamp) + ', cierre ' + formatPrice(candle.close))+'" x="'+(padLeft+index*step)+'" y="'+padTop+'" width="'+step+'" height="'+(height-padTop-38)+'" fill="transparent" />').join('');
   svg.innerHTML = `
     <g>
       ${gridLines}
       <g>${levelShapes}</g>
+      <g>${triggerLevelShapes}</g>
       <g>${shapes}</g>
       <g>${maShapes}${lastPriceMarkup}</g>
+      <g>${markerShapes}${triggerLabels}</g>
       <g>${volumeMarkup}</g>
       <g>${maLegend}</g>
       ${xLabels}
@@ -1759,8 +1949,10 @@ function renderCandlesChart(candles, timeframe) {
     const target = event.target.closest('[data-candle]');
     if (!target) { hide(); return; }
     const index = Number(target.dataset.candle), candle = candles[index];
-    const date = new Date(candle.timestamp).toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'});
-    tooltip.innerHTML = '<strong>'+escapeHtml(date)+'</strong><br>'+[['Apertura',formatPrice(candle.open)],['Máximo',formatPrice(candle.high)],['Mínimo',formatPrice(candle.low)],['Cierre',formatPrice(candle.close)],['Volumen',Number(candle.volume||0).toLocaleString('es-MX')]].map(([name,value])=>'<span>'+name+': <b>'+escapeHtml(value)+'</b></span>').join('<br>');
+    const date = marketPeriod.formatUtc(candle.timestamp);
+    const signalsHere = signalNotes.get(dateKey(candle.timestamp));
+    const signalMarkup = signalsHere ? '<br>'+signalsHere.map(text=>'<b>'+escapeHtml(text)+'</b>').join('<br>') : '';
+    tooltip.innerHTML = '<strong>'+escapeHtml(date)+'</strong><br>'+[['Apertura',formatPrice(candle.open)],['Máximo',formatPrice(candle.high)],['Mínimo',formatPrice(candle.low)],['Cierre',formatPrice(candle.close)],['Volumen',Number(candle.volume||0).toLocaleString('es-MX')]].map(([name,value])=>'<span>'+name+': <b>'+escapeHtml(value)+'</b></span>').join('<br>')+signalMarkup;
     tooltip.hidden = false;
     const hostRect = host.getBoundingClientRect(), rect = svg.getBoundingClientRect();
     const cursorX = Number.isFinite(event.clientX) ? event.clientX-hostRect.left : rect.left-hostRect.left+xForIndex(index)*rect.width/width;
@@ -1776,7 +1968,7 @@ function renderCandlesChart(candles, timeframe) {
   svg.onfocusin = inspect;
   svg.onfocusout = hide;
   svg.onkeydown = event => { if (event.key === 'Escape') hide(); };
-
+  document.getElementById('candlesTriggersNote').textContent = overlays?.note || '';
 }
 
 function renderCandles(data) {
@@ -1790,14 +1982,22 @@ function renderCandles(data) {
 
   if (!candles.length) {
     container.style.display = 'none';
-    const message = `No se encontraron velas para ${data.symbol || 'este ticker'} en el periodo ${periodLabel}.`;
+    window.__candlesChartState = { symbol: data.symbol || null, timeframe: data.timeframe || null, periodLabel, candles: [] };
+    const partial = data.complete === false;
+    document.getElementById('signalSummary').textContent = partial ? `Consulta incompleta (${data.partialReason || 'motivo no indicado'}); no se recuperaron velas.` : 'Sin velas para el periodo consultado.';
+    document.getElementById('signalTableBody').innerHTML = '<tr><td colspan="6">Sin señales para el periodo y las reglas seleccionadas</td></tr>';
+    const message = partial ? `Consulta incompleta para ${data.symbol || 'este ticker'}: ${data.partialReason || 'motivo no indicado'}; no se recuperaron velas.` : `No se encontraron velas para ${data.symbol || 'este ticker'} en el periodo ${periodLabel}.`;
     note.textContent = message;
     showAlert(message, 'error');
     return false;
   }
 
   container.style.display = 'block';
-  meta.innerHTML = `Símbolo <strong>${escapeHtml(data.symbol)}</strong> · Periodo ${escapeHtml(periodLabel)} · Velas de ${escapeHtml(candleLabel)} · ${candles.length} velas · Capturadas ${escapeHtml(data.capturedAt || '')}`;
+  const reasons = { limit_reached:'se alcanzó el máximo de velas', page_limit:'se alcanzó el límite de páginas', provider_error:'falló una página del proveedor', repeated_token:'el proveedor repitió un token', invalid_response:'respuesta incompleta del proveedor', invalid_bars:'el proveedor devolvió velas inválidas', invalid_token:'token de continuación inválido', provider_limit_exceeded:'el proveedor excedió el límite solicitado' };
+  const reason = data.partialReason ? `${reasons[data.partialReason] || 'motivo no reconocido'}: ${data.partialReason}` : 'motivo no indicado';
+  const coverage = data.complete === true ? 'consulta completa' : data.complete === false ? `consulta limitada/parcial (${reason})` : 'cobertura no informada';
+  const requestedRange = data.requestedQuery ? ` · Rango solicitado ${marketPeriod.formatUtc(data.requestedQuery.start, { milliseconds:true })} a ${marketPeriod.formatUtc(data.requestedQuery.end, { milliseconds:true })}` : '';
+  meta.innerHTML = `Símbolo <strong>${escapeHtml(data.symbol)}</strong> · Periodo ${escapeHtml(periodLabel)}${escapeHtml(requestedRange)} · Velas de ${escapeHtml(candleLabel)} · ${candles.length} velas · Solicitadas ${escapeHtml(data.requestedBars ?? 'no informado')} · Recuperadas ${escapeHtml(data.retrievedBars ?? candles.length)} · Fuente ${escapeHtml(data.provider || 'Alpaca')} / ${escapeHtml(data.feed || 'feed no informado')} · ${escapeHtml(coverage)} · Primer registro ${escapeHtml(data.firstTimestamp || candles[0].timestamp)} · Último registro ${escapeHtml(data.lastTimestamp || candles.at(-1).timestamp)} · Capturadas ${escapeHtml(data.capturedAt || '')}`;
 
   const last = candles[candles.length - 1];
   const prev = candles[candles.length - 2];
@@ -1834,11 +2034,36 @@ function renderCandles(data) {
     grid.appendChild(el);
   });
 
-  renderCandlesChart(candles, data.timeframe);
-  document.getElementById('candlesNote').textContent = `${data.symbol} · Periodo: ${periodLabel} · Vela: ${candleLabel} · ${candles.length} velas · Del ${new Date(candles[0].timestamp).toLocaleDateString('es-MX')} al ${new Date(last.timestamp).toLocaleDateString('es-MX')}.`;
+  window.__candlesChartState = { symbol: data.symbol || null, timeframe: data.timeframe || null, periodLabel, candles };
+  renderCandlesChart(candles, data.timeframe, candleOverlays());
+  document.getElementById('candlesNote').textContent = `${data.symbol} · Periodo: ${periodLabel} · Vela: ${candleLabel} · ${candles.length} velas · Del ${marketPeriod.formatUtc(candles[0].timestamp)} al ${marketPeriod.formatUtc(last.timestamp)}.`;
 }
 
 let candleRequestVersion = 0;
+function showRange(query, label) {
+  document.getElementById('chRangeStatus').textContent = `${label}: ${marketPeriod.formatUtc(query.start, { milliseconds:true })} — ${marketPeriod.formatUtc(query.end, { milliseconds:true })}. La fecha final de un rango personalizado es inclusiva; si es hoy, se limita a 16 minutos antes de la consulta.`;
+}
+function updateRangePreview({ populatePreset = false } = {}) {
+  const period = document.getElementById('chTimeframe').value;
+  const start = document.getElementById('chStart'), end = document.getElementById('chEnd');
+  try {
+    const query = marketPeriod(period, new Date(), { start: start.value, end: end.value });
+    if (populatePreset && period !== 'custom') { start.value = query.start.slice(0, 10); end.value = query.end.slice(0, 10); }
+    showRange(query, period === 'custom' ? 'Rango personalizado previsto' : 'Periodo predefinido previsto');
+  } catch (error) {
+    document.getElementById('chRangeStatus').textContent = error.message;
+  }
+}
+function invalidateCandles() {
+  candleRequestVersion += 1;
+  window.__candlesChartState = { symbol: null, timeframe: null, periodLabel: null, candles: [] };
+  document.getElementById('candlesChartContainer').style.display = 'none';
+  document.getElementById('signalSummary').textContent = 'La configuración cambió; pulsa Mostrar gráfica para consultar las señales.';
+  document.getElementById('signalTableBody').innerHTML = '<tr><td colspan="6">Sin señales para el periodo y las reglas seleccionadas</td></tr>';
+  const btn = document.getElementById('btnLoadCandles');
+  btn.disabled = false;
+  btn.textContent = 'Mostrar gráfica';
+}
 async function loadCandles() {
   const symbol = document.getElementById('chSymbol').value.trim().toUpperCase();
   const period = document.getElementById('chTimeframe').value;
@@ -1856,25 +2081,38 @@ async function loadCandles() {
   const requestVersion = ++candleRequestVersion;
   const btn = document.getElementById('btnLoadCandles');
   document.getElementById('candlesChartContainer').style.display = 'none';
+  window.__candlesChartState = { symbol: null, timeframe: null, periodLabel: null, candles: [] };
+  document.getElementById('signalSummary').textContent = 'Consultando velas…';
+  document.getElementById('signalTableBody').innerHTML = '<tr><td colspan="6">Sin señales para el periodo y las reglas seleccionadas</td></tr>';
   document.querySelector('.chart-empty strong').textContent = 'Consultando ' + symbol;
   document.querySelector('.chart-empty span').textContent = 'Periodo: ' + document.getElementById('chTimeframe').selectedOptions[0].textContent;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Cargando velas...';
 
   try {
-    const query = marketPeriod(period);
+    const query = marketPeriod(period, new Date(), { start: document.getElementById('chStart').value, end: document.getElementById('chEnd').value, timeframe: document.getElementById('chCandleTimeframe').value, limit: document.getElementById('chLimit').value });
+    if (period !== 'custom') {
+      document.getElementById('chStart').value = query.start.slice(0, 10);
+      document.getElementById('chEnd').value = query.end.slice(0, 10);
+    }
+    showRange(query, 'Rango enviado a Quant');
     const params = new URLSearchParams({symbol, ...query});
     const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/candles?${params}`);
     const data = await res.json().catch(() => ({}));
     if (requestVersion !== candleRequestVersion) return;
-    if (!res.ok) throw new Error(data.message || `quant-service respondió ${res.status}`);
+    if (!res.ok) throw new Error(data.detail ? `${data.message || 'Error de velas'}. ${data.detail}` : data.message || `quant-service respondió ${res.status}`);
+    if (!Array.isArray(data.bars)) throw new Error('Respuesta incompleta del servidor: falta la lista de velas.');
+    if (data.symbol !== symbol || data.timeframe !== query.timeframe) throw new Error('La respuesta de velas no corresponde al ticker o temporalidad solicitados.');
+    if (data.bars.some(bar => !bar || !Number.isFinite(Date.parse(bar.timestamp)) || ![bar.open,bar.high,bar.low,bar.close].every(Number.isFinite) || bar.high < bar.low || bar.open > bar.high || bar.open < bar.low || bar.close > bar.high || bar.close < bar.low)) throw new Error('La respuesta contiene velas incompletas o inválidas.');
     data.periodLabel = periodLabel;
-    if (!Array.isArray(data.bars) || data.bars.length === 0) { renderCandles(data); return; }
+    data.requestedQuery = query;
+    if (data.bars.length === 0) { renderCandles(data); return; }
     renderCandles(data);
-    showAlert(`Gráfica de ${data.symbol}: periodo de ${periodLabel} cargado desde Alpaca.`, 'info');
+    showAlert(data.complete === false ? `Gráfica parcial de ${data.symbol}: ${data.partialReason || 'cobertura incompleta'}. Revisa los metadatos antes de interpretar señales.` : `Gráfica de ${data.symbol}: periodo de ${periodLabel} cargado desde Alpaca.`, 'info');
   } catch (e) {
     if (requestVersion !== candleRequestVersion) return;
     showAlert(e.message, 'error');
+    document.getElementById('signalSummary').textContent = 'No se pudieron calcular señales: ' + e.message;
     log('Error candles: ' + e.message);
   } finally {
     if (requestVersion === candleRequestVersion) {
@@ -1886,7 +2124,24 @@ async function loadCandles() {
   }
 }
 document.getElementById('btnLoadCandles').addEventListener('click', loadCandles);
-document.getElementById('chTimeframe').addEventListener('change', loadCandles);
+document.getElementById('candlesForm').addEventListener('submit', event => { event.preventDefault(); loadCandles(); });
+document.getElementById('chTimeframe').addEventListener('change', () => {
+  const custom = document.getElementById('chTimeframe').value === 'custom';
+  updateRangePreview({ populatePreset: !custom });
+  if (custom) invalidateCandles(); else loadCandles();
+});
+for (const id of ['chStart', 'chEnd']) {
+  const handleDateChange = () => {
+    document.getElementById('chTimeframe').value = 'custom';
+    invalidateCandles();
+    updateRangePreview();
+  };
+  document.getElementById(id).addEventListener('input', handleDateChange);
+  document.getElementById(id).addEventListener('change', handleDateChange);
+}
+for (const id of ['chCandleTimeframe', 'chLimit']) document.getElementById(id).addEventListener('change', () => { invalidateCandles(); updateRangePreview({ populatePreset: true }); });
+updateRangePreview({ populatePreset: true });
+document.getElementById('chShowTriggers').addEventListener('change', refreshChartOverlays);
 
 
 function renderExecutionSummary(result, orders) {
@@ -2060,7 +2315,7 @@ document.getElementById('chkAutoCycle').addEventListener('change', (event) => {
 for (const [source, target] of [['symbol', 'chSymbol'], ['chSymbol', 'symbol']]) {
   document.getElementById(source).addEventListener('change', event => {
     document.getElementById(target).value = event.target.value;
-    document.getElementById('candlesChartContainer').style.display = 'none';
+    invalidateCandles();
     document.querySelector('.chart-empty strong').textContent = 'Datos de mercado · ' + event.target.value;
     document.getElementById('resultsCard').style.display = 'none';
     lastEvaluatedInput = null;
