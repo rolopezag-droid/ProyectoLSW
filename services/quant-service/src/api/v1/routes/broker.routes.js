@@ -7,6 +7,7 @@ router.get('/account', brokerController.getAccount);
 router.get('/quotes', brokerController.getQuote);
 router.get('/options-chain', brokerController.getOptionChain);
 router.get('/options-chain/strikes', brokerController.getOptionStrikes);
+router.get('/options-chain/quote', brokerController.getOptionQuote);
 router.get('/candles', brokerController.getCandles);
 router.get('/news', brokerController.getNews);
 router.post('/orders', brokerController.createOrder);
