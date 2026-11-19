@@ -202,4 +202,51 @@ const getOptionStrikes = async (request, response) => {
     return response.status(error.status || 502).json({ message: 'No se pudo consultar los strikes.', detail: error.message });
   }
 };
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getCandles, getNews, createOrder, createSpread };
+
+const getOptionQuote = async (request, response) => {
+  try {
+    const { symbol, expiration, type, strike } = request.query;
+    if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
+      return response.status(400).json({ message: 'symbol debe ser un ticker válido.' });
+    }
+    if (expiration && !/^\d{4}-\d{2}-\d{2}$/.test(expiration)) {
+      return response.status(400).json({ message: 'expiration debe usar YYYY-MM-DD.' });
+    }
+    if (type !== undefined && !['call', 'put'].includes(type)) {
+      return response.status(400).json({ message: 'type debe ser call o put.' });
+    }
+    if (strike === undefined || strike === null || strike === '') {
+      return response.status(400).json({ message: 'strike es obligatorio.' });
+    }
+    const strikeNum = Number(strike);
+    if (!Number.isFinite(strikeNum) || strikeNum <= 0) {
+      return response.status(400).json({ message: 'strike debe ser un número positivo.' });
+    }
+
+    const contracts = await broker.getOptionChain({ symbol, expiration, type, limit: 1000 });
+    const contract = (contracts.contracts || []).find(c => Number(c.strike) === strikeNum);
+    if (!contract) {
+      return response.status(404).json({ message: `No se encontró contrato para strike ${strikeNum}.` });
+    }
+    return response.json({
+      provider: 'alpaca',
+      symbol: symbol.toUpperCase(),
+      expiration: contract.expiration_date,
+      type: contract.type,
+      strike: Number(contract.strike),
+      contractSymbol: contract.contractSymbol,
+      bid: contract.bid ?? null,
+      ask: contract.ask ?? null,
+      bidSize: contract.bidSize ?? null,
+      askSize: contract.askSize ?? null,
+      timestamp: contract.timestamp ?? null,
+    });
+  } catch (error) {
+    return response.status(error.status || 502).json({
+      message: 'No se pudo consultar la cotización del contrato.',
+      detail: error.message,
+    });
+  }
+};
+
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getOptionQuote, getCandles, getNews, createOrder, createSpread };

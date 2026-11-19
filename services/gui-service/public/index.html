@@ -1204,10 +1204,71 @@ async function fetchAutomaticSelection() {
   return result;
 }
 document.getElementById('saveSpot').addEventListener('input',()=>{document.getElementById('saveSpotSource').textContent='Precio de referencia ingresado manualmente.';});
+
+async function fetchOptionQuote(strike, side) {
+  const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+  const expiration = document.getElementById('expiration').value.trim();
+  const type = selectedStrategy.includes('CALL') ? 'call' : 'put';
+  const priceInput = side === 'buy' ? document.getElementById('priceLong') : document.getElementById('priceShort');
+  const note = side === 'buy' ? document.getElementById('strikeLongNote') : document.getElementById('strikeShortNote');
+
+  if (!symbol || !expiration) return;
+
+  try {
+    const params = new URLSearchParams({ symbol, expiration, type, strike });
+    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/options-chain/quote?${params}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || `quant-service respondió ${res.status}`);
+    const price = side === 'buy' ? data.ask : data.bid;
+    if (Number.isFinite(price) && price > 0) {
+      priceInput.value = price.toFixed(2);
+      note.textContent = `Prima ${side === 'buy' ? 'Ask (compra)' : 'Bid (venta)'} cargada desde Alpaca para strike ${strike}.`;
+    } else {
+      note.textContent = `No hay ${side === 'buy' ? 'Ask' : 'Bid'} disponible para strike ${strike}.`;
+    }
+  } catch (error) {
+    note.textContent = 'Error cargando prima: ' + error.message;
+    log('Error option quote: ' + error.message);
+  }
+}
+
 document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
   const btn=document.getElementById('btnFetchQuotes'); btn.disabled=true;
-  try { const result=await fetchAutomaticSelection();showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'. '+(result.spotWarning||''),'info'); }
-  catch(error){showAlert(error.message,'error');}
+  try {
+    if(document.getElementById('chkAutoStrikes').checked) {
+      const result=await fetchAutomaticSelection();
+      showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'. '+(result.spotWarning||''),'info');
+    } else {
+      // Solo obtener precio de referencia del subyacente y primas de los strikes seleccionados.
+      const symbol=document.getElementById('symbol').value.trim().toUpperCase();
+      const expiration = document.getElementById('expiration').value.trim();
+      const type = selectedStrategy.includes('CALL') ? 'call' : 'put';
+      if (!symbol || !expiration) throw new Error('Ingresa símbolo y vencimiento.');
+
+      // Precio de referencia del subyacente (spot)
+      const qRes = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/quotes?symbol=${encodeURIComponent(symbol)}`);
+      const qData = await qRes.json().catch(() => ({}));
+      let spotPrice = null;
+      const bid=Number(qData.bid), ask=Number(qData.ask), ref=Number(qData.referencePrice);
+      if(Number.isFinite(ref) && ref>0) spotPrice = ref;
+      else if(Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>0&&ask>=bid) spotPrice=(bid+ask)/2;
+      if(Number.isFinite(spotPrice) && spotPrice>0) {
+        document.getElementById('saveSpot').value=spotPrice.toFixed(2);
+        const src=qData.referenceSource==='latest_trade'?'última operación':'promedio Bid/Ask';
+        document.getElementById('saveSpotSource').textContent=`Referencia Alpaca · ${symbol} · ${src}${qData.referenceTimestamp?' · '+qData.referenceTimestamp:''}.`;
+      }
+
+      // Prima de compra (Ask) para el strike Long seleccionado
+      const strikeLong = document.getElementById('strikeLong').value.trim();
+      if (strikeLong) await fetchOptionQuote(strikeLong, 'buy');
+
+      // Prima de venta (Bid) para el strike Short seleccionado
+      const strikeShort = document.getElementById('strikeShort').value.trim();
+      if (strikeShort) await fetchOptionQuote(strikeShort, 'sell');
+
+      showAlert('Cotizaciones cargadas: strikes y primas actualizados desde Alpaca.','info');
+    }
+  } catch(error){showAlert(error.message,'error');}
   finally{btn.disabled=false;}
 });
 
