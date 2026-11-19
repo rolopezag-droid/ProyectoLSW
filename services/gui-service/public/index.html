@@ -646,20 +646,12 @@
         <div class="card">
           <h2>Automatización (opcional)</h2>
           <label style="display:flex; gap:0.5rem; align-items:center; font-size:0.9rem;">
-            <input type="checkbox" id="chkStopLoss" disabled title="Alpaca no admite stops por pata en esta orden multileg" style="width:auto;" />
-            Stop por pata no disponible en órdenes multileg
-          </label>
-          <label style="display:flex; gap:0.5rem; align-items:center; font-size:0.9rem;">
-            <input type="checkbox" id="chkAutoStrikes" style="width:auto;" />
-            Selección automática de strikes y primas desde Alpaca
-          </label>
-          <label style="display:flex; gap:0.5rem; align-items:center; font-size:0.9rem;">
             <input type="checkbox" id="chkAutoCycle" style="width:auto;" />
             Ciclo automático de ejecución Paper (solo mientras esta pestaña esté abierta)
           </label>
           <div id="optCycleContainer" style="display:none;">
             <label>Intervalo del ciclo (horas)</label>
-            <input type="number" id="optCycleHours" value="24" min="1" max="168" />
+            <input type="number" id="optCycleHours" value="1" min="0.1" max="168" step="0.1" />
           </div>
         </div>
         </div>
@@ -1154,55 +1146,6 @@ function clearStrategyQuotes() {
   document.getElementById('resultsCard').style.display='none';
 }
 for(const id of ['symbol','chSymbol','expiration']) document.getElementById(id).addEventListener('change',()=>{clearStrategyQuotes();stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;});
-async function fetchAutomaticSelection() {
-  const strategy=selectedStrategy;
-  const symbol=document.getElementById('symbol').value.trim().toUpperCase();
-  const expiration=document.getElementById('expiration').value.trim();
-  clearStrategyQuotes();
-  const contextVersion=quoteContextVersion;
-  if(!symbol||!expiration) throw new Error('Ingresa símbolo y vencimiento.');
-  const type=strategy.includes('CALL')?'call':'put';
-  const stillCurrent=()=>contextVersion===quoteContextVersion && strategy===selectedStrategy && symbol===document.getElementById('symbol').value && expiration===document.getElementById('expiration').value.trim();
-  const quotePromise = fetch(`${QUANT_SERVICE_URL}/api/v1/broker/quotes?symbol=${encodeURIComponent(symbol)}`)
-    .then(async res => { const data = await res.json().catch(()=>({})); return {ok:res.ok,data}; })
-    .catch(() => ({ok:false,data:{}}));
-  const contracts=await selectVertical.collectOptionChain(async pageToken=>{
-    const params=new URLSearchParams({symbol,expiration,type,limit:'200'});
-    if(pageToken) params.set('pageToken',pageToken);
-    const res=await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/options-chain?${params}`);
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.detail||data.message||'No se pudo consultar Alpaca.');
-    return data;
-  });
-  if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
-  const quoteRes = await quotePromise;
-  if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
-  const q = quoteRes.data || {};
-  const quotedSymbol=String(q.symbol||'').trim().toUpperCase();
-  if(quotedSymbol && quotedSymbol!==symbol) throw new Error('La cotización recibida es de '+quotedSymbol+' y no corresponde a '+symbol+'; no hay cotización válida del subyacente.');
-  let spotPrice = null;
-  const bid=Number(q.bid), ask=Number(q.ask), ref=Number(q.referencePrice);
-  if(quoteRes.ok && Number.isFinite(ref) && ref>0) spotPrice = ref;
-  else if(quoteRes.ok && Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>=bid) spotPrice=(bid+ask)/2;
-  const result=selectVertical(contracts,strategy,symbol,expiration,spotPrice);
-  if(stillCurrent() && Number.isFinite(spotPrice) && spotPrice>0) {
-    document.getElementById('saveSpot').value=spotPrice.toFixed(2);
-    const src=q.referenceSource==='latest_trade'?'última operación':'promedio Bid/Ask';
-    document.getElementById('saveSpotSource').textContent=`Referencia Alpaca · ${symbol} · ${src}${q.referenceTimestamp?' · '+q.referenceTimestamp:''}.`;
-    result.underlyingPrice=spotPrice;
-  } else if(stillCurrent()) {
-    document.getElementById('saveSpot').value='';
-    document.getElementById('saveSpotSource').textContent='No se obtuvo el precio de la acción. Ingresa una referencia manual para guardar.';
-    result.spotWarning='Sin cotización válida del subyacente; ingresa una referencia manual.';
-  }
-  document.getElementById('strikeLong').value=result.long.strike;
-  document.getElementById('strikeShort').value=result.short.strike;
-  document.getElementById('priceLong').value=result.long.ask;
-  document.getElementById('priceShort').value=result.short.bid;
-  if(Number.isFinite(spotPrice)) log(`${strategy}: spot ${spotPrice.toFixed(2)}; compra ${result.long.contractSymbol} Ask ${result.long.ask}; venta ${result.short.contractSymbol} Bid ${result.short.bid}`);
-  else log(`${strategy}: compra ${result.long.contractSymbol} Ask ${result.long.ask}; venta ${result.short.contractSymbol} Bid ${result.short.bid}`);
-  return result;
-}
 document.getElementById('saveSpot').addEventListener('input',()=>{document.getElementById('saveSpotSource').textContent='Precio de referencia ingresado manualmente.';});
 
 async function fetchOptionQuote(strike, side) {
@@ -1235,49 +1178,39 @@ async function fetchOptionQuote(strike, side) {
 document.getElementById('btnFetchQuotes').addEventListener('click',async()=>{
   const btn=document.getElementById('btnFetchQuotes'); btn.disabled=true;
   try {
-    if(document.getElementById('chkAutoStrikes').checked) {
-      const result=await fetchAutomaticSelection();
-      showAlert('Cotizaciones para '+selectedStrategy+': '+(result.category==='debit'?'débito':'crédito')+' por acción $'+result.net.toFixed(2)+'. '+(result.spotWarning||''),'info');
-    } else {
-      // Solo obtener precio de referencia del subyacente y primas de los strikes seleccionados.
-      const symbol=document.getElementById('symbol').value.trim().toUpperCase();
-      const expiration = document.getElementById('expiration').value.trim();
-      const type = selectedStrategy.includes('CALL') ? 'call' : 'put';
-      if (!symbol || !expiration) throw new Error('Ingresa símbolo y vencimiento.');
+    const symbol=document.getElementById('symbol').value.trim().toUpperCase();
+    const expiration = document.getElementById('expiration').value.trim();
+    const type = selectedStrategy.includes('CALL') ? 'call' : 'put';
+    if (!symbol || !expiration) throw new Error('Ingresa símbolo y vencimiento.');
 
-      // Precio de referencia del subyacente (spot)
-      const qRes = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/quotes?symbol=${encodeURIComponent(symbol)}`);
-      const qData = await qRes.json().catch(() => ({}));
-      let spotPrice = null;
-      const bid=Number(qData.bid), ask=Number(qData.ask), ref=Number(qData.referencePrice);
-      if(Number.isFinite(ref) && ref>0) spotPrice = ref;
-      else if(Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>0&&ask>=bid) spotPrice=(bid+ask)/2;
-      if(Number.isFinite(spotPrice) && spotPrice>0) {
-        document.getElementById('saveSpot').value=spotPrice.toFixed(2);
-        const src=qData.referenceSource==='latest_trade'?'última operación':'promedio Bid/Ask';
-        document.getElementById('saveSpotSource').textContent=`Referencia Alpaca · ${symbol} · ${src}${qData.referenceTimestamp?' · '+qData.referenceTimestamp:''}.`;
-      }
-
-      // Prima de compra (Ask) para el strike Long seleccionado
-      const strikeLong = document.getElementById('strikeLong').value.trim();
-      if (strikeLong) await fetchOptionQuote(strikeLong, 'buy');
-
-      // Prima de venta (Bid) para el strike Short seleccionado
-      const strikeShort = document.getElementById('strikeShort').value.trim();
-      if (strikeShort) await fetchOptionQuote(strikeShort, 'sell');
-
-      showAlert('Cotizaciones cargadas: strikes y primas actualizados desde Alpaca.','info');
+    // Precio de referencia del subyacente (spot)
+    const qRes = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/quotes?symbol=${encodeURIComponent(symbol)}`);
+    const qData = await qRes.json().catch(() => ({}));
+    let spotPrice = null;
+    const bid=Number(qData.bid), ask=Number(qData.ask), ref=Number(qData.referencePrice);
+    if(Number.isFinite(ref) && ref>0) spotPrice = ref;
+    else if(Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>0&&ask>=bid) spotPrice=(bid+ask)/2;
+    if(Number.isFinite(spotPrice) && spotPrice>0) {
+      document.getElementById('saveSpot').value=spotPrice.toFixed(2);
+      const src=qData.referenceSource==='latest_trade'?'última operación':'promedio Bid/Ask';
+      document.getElementById('saveSpotSource').textContent=`Referencia Alpaca · ${symbol} · ${src}${qData.referenceTimestamp?' · '+qData.referenceTimestamp:''}.`;
     }
+
+    // Prima de compra (Ask) para el strike Long seleccionado
+    const strikeLong = document.getElementById('strikeLong').value.trim();
+    if (strikeLong) await fetchOptionQuote(strikeLong, 'buy');
+
+    // Prima de venta (Bid) para el strike Short seleccionado
+    const strikeShort = document.getElementById('strikeShort').value.trim();
+    if (strikeShort) await fetchOptionQuote(strikeShort, 'sell');
+
+    showAlert('Cotizaciones cargadas: strikes y primas actualizados desde Alpaca.','info');
   } catch(error){showAlert(error.message,'error');}
   finally{btn.disabled=false;}
 });
 
 // ── Evaluar estrategia ──
 document.getElementById('btnEvaluate').addEventListener('click', async () => {
-  let automaticSelection;
-  if(document.getElementById('chkAutoStrikes').checked) {
-    try { automaticSelection=await fetchAutomaticSelection(); } catch(error) { showAlert(error.message,'error'); return; }
-  }
   const symbol = document.getElementById('symbol').value.trim().toUpperCase();
   const expiration = document.getElementById('expiration').value.trim();
   const strikeLong = Number(document.getElementById('strikeLong').value);
@@ -1321,8 +1254,6 @@ document.getElementById('btnEvaluate').addEventListener('click', async () => {
       },
     ],
   };
-
-  if(automaticSelection) body.legs=automaticSelection.legs;
 
   // Validación previa de débito/crédito neto vs width
   const width = Math.abs(strikeShort - strikeLong);
@@ -2041,15 +1972,13 @@ async function executePaperOnce() {
     showAlert('Ingresa símbolo y vencimiento primero.', 'error');
     return;
   }
-  if (!document.getElementById('chkAutoStrikes').checked) {
-    if (!strikeLong || !strikeShort) {
-      showAlert('Ingresa ambos strikes.', 'error');
-      return;
-    }
-    if (!priceLong || !priceShort) {
-      showAlert('Ingresa ambos precios (compra y venta). Usa "Obtener cotizaciones" o escríbelos manualmente.', 'error');
-      return;
-    }
+  if (!strikeLong || !strikeShort) {
+    showAlert('Ingresa ambos strikes.', 'error');
+    return;
+  }
+  if (!priceLong || !priceShort) {
+    showAlert('Ingresa ambos precios (compra y venta). Usa "Obtener cotizaciones" o escríbelos manualmente.', 'error');
+    return;
   }
 
   const optionType = strategy.includes('CALL') ? 'call' : 'put';
@@ -2057,11 +1986,6 @@ async function executePaperOnce() {
     { type: optionType, side: 'buy', strike: strikeLong, price: Number(priceLong) },
     { type: optionType, side: 'sell', strike: strikeShort, price: Number(priceShort) },
   ];
-
-  if (document.getElementById('chkAutoStrikes').checked) {
-    try { legs = (await fetchAutomaticSelection()).legs; }
-    catch(error) { stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;showAlert(error.message,'error');return; }
-  }
 
   const body = {
     strategyType: strategy,
@@ -2085,9 +2009,7 @@ async function executePaperOnce() {
     const result = await res.json();
     if (!res.ok) throw new Error(result.message || `quant-service respondió ${res.status}`);
 
-    const useStopLoss = document.getElementById('chkStopLoss').checked;
     const buildContractSymbol = leg => leg.contractSymbol || result.symbol+result.expiration.slice(2).replaceAll('-','')+(leg.type==='put'?'P':'C')+String(Math.round(leg.strike*1000)).padStart(8,'0');
-    if (useStopLoss) log('Aviso: el stop-loss por pata no aplica igual en una orden MLEG; se enviará como MLEG límite.');
     const orderLegs=result.legs.map(leg=>({symbol:buildContractSymbol(leg),qty:result.quantity,side:leg.side,limitPrice:leg.price,price:leg.price}));
     const fingerprint=JSON.stringify({symbol:result.symbol,legs:orderLegs.map(({symbol,qty,side,price})=>({symbol,qty,side,price}))});
     if(fingerprint!==paperOrderFingerprint || !paperClientOrderId) {
@@ -2159,7 +2081,7 @@ let autoCycleTimer = null;
 
 function startAutoCycle() {
   if (autoCycleTimer) return;
-  const hours = Math.min(Math.max(Number(document.getElementById('optCycleHours').value) || 24, 1), 168);
+  const hours = Math.min(Math.max(Number(document.getElementById('optCycleHours').value) || 0.1, 0.1), 168);
   autoCycleTimer = setInterval(() => { runPaperExecution(); }, hours * 3600000);
 }
 
@@ -2268,9 +2190,10 @@ function validateStrikesByStrategy() {
   const sh = Number(document.getElementById('strikeShort').value);
   if(!Number.isFinite(s)||!Number.isFinite(sh)) return true;
   const isBull = selectedStrategy.startsWith('BULL');
-  if(isBull){ if(s>=sh){ showAlert('Para '+selectedStrategy+' el strike Long debe ser MENOR que el Short.','error'); return false; } }
+  /*if(isBull){ if(s>=sh){ showAlert('Para '+selectedStrategy+' el strike Long debe ser MENOR que el Short.','error'); return false; } }
   else { if(s<=sh){ showAlert('Para '+selectedStrategy+' el strike Long debe ser MAYOR que el Short.','error'); return false; } }
   return true;
+  */
 }
 
 document.getElementById('symbol').addEventListener('change', loadStrikes);
@@ -2293,4 +2216,4 @@ log('Dashboard listo. Estado de servicios comprobado mediante health checks.');
 </script>
 
 </body>
-</html>
+</html

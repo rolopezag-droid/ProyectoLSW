@@ -24,7 +24,7 @@ function buildSpreadOrder({symbol,legs,qty,quantity,type='limit',limitPrice,clie
   const signedNet=parsed.reduce((sum,l)=>sum+(l.side==='buy'?l.price:-l.price),0);
   const net=Number(signedNet.toFixed(2));
   if(clientOrderId!==undefined&&(typeof clientOrderId!=='string'||! /^[A-Za-z0-9_-]{1,48}$/.test(clientOrderId))) fail('clientOrderId inválido.');
-  const order = {order_class:'mleg',qty:String(quantityValue),type:orderType,time_in_force:String(timeInForce||'day'),...(clientOrderId?{client_order_id:clientOrderId}:{}),legs:legs.map(l=>({symbol:l.symbol,ratio_qty:'1',side:String(l.side).toLowerCase(),position_intent:String(l.side).toLowerCase()==='buy'?'buy_to_open':'sell_to_open'}))};
+  const order = {order_class:'mleg',qty:String(quantityValue),type:orderType,time_in_force:String(timeInForce||'day'),...(clientOrderId?{client_order_id:clientOrderId}:{}),legs:legs.map(l=>({symbol:l.symbol,ratio_qty:'1',side:String(l.side).toLowerCase()}))};
   if(orderType==='limit') {
     if(net===0 || Math.abs(net)>=result.width) fail('El precio neto redondeado debe ser positivo y menor que el ancho en valor absoluto.');
     const lp = limitPrice!==undefined ? Number(limitPrice) : net;
