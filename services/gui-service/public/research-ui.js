@@ -2,6 +2,12 @@
   let currentSnapshot=null,accessToken=null,running=false,modulesDirty=false;
   let researchVersion=0,selectionVersion=0,comparisonVersion=0;
   const evaluationCache=new WeakMap();
+  // Caché runtime de velas diarias por ticker para señales/prefill. Vive FUERA del
+  // snapshot persistido: la bitácora de Supabase no se engorda con las velas.
+  window.__researchMarketCache = window.__researchMarketCache || {};
+  // Métrica por candidata derivada del método del Quant Workbench. Solo vista:
+  // nunca se persiste en el snapshot de Supabase.
+  window.__workbenchTableMetrics = window.__workbenchTableMetrics || null;
   let selectedCandidateIndex = null;
   const $=id=>document.getElementById(id);
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -9,6 +15,8 @@
   const moneyCompact=value=>Number.isFinite(value)?new Intl.NumberFormat('es-MX',{style:'currency',currency:'USD',notation:'compact',maximumFractionDigits:2}).format(value):'—';
   const pct=value=>Number.isFinite(value)?(value*100).toFixed(1)+'%':'Insuficientes';
   const percentPoints=value=>Number.isFinite(value)?(value>0?'+':'')+value.toFixed(2)+'%':'—';
+  const yearsToExpiration=expiration=>{const ms=Date.parse(expiration+'T00:00:00Z')-Date.now();return Number.isFinite(ms)&&ms>0?ms/31536000000:null;};
+  const fmtWorkbenchMetric=(method,value)=>method==='prices'?money(value):method==='greeks'?value.toFixed(3):method==='iv'?(value*100).toFixed(1)+'%':String(value);
   const setStatus=(text,state='')=>{$('researchStatus').textContent=text;$('researchStatus').dataset.state=state;};
   const readModules=()=>({technical:$('researchModuleTechnical').checked,blackScholes:$('researchModuleBlackScholes').checked,financial:$('researchModuleFinancial').checked,movers:$('researchModuleMovers').checked,news:$('researchModuleNews').checked});
   async function json(url,options={}){
@@ -22,7 +30,7 @@
       return json('/api/v1/broker/options-chain?'+params);
     });
   }
-  async function analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield){
+  async function analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield,version){
     const end=new Date(),start=new Date(end);start.setUTCDate(start.getUTCDate()-370);
     const params=new URLSearchParams({symbol,timeframe:'1Day',start:start.toISOString(),end:end.toISOString(),limit:'1000',sort:'asc'});
     const [barsData,quote,calls,puts]=await Promise.all([
@@ -37,6 +45,7 @@
     const contracts=[...calls,...puts];
     const previous=bars.at(-2);
     const changePct=last&&previous&&Number.isFinite(last.close)&&Number.isFinite(previous.close)&&previous.close!==0?(last.close/previous.close-1)*100:null;
+    if(version===researchVersion)window.__researchMarketCache[symbol]={bars,fetchedAt:new Date().toISOString(),realizedVolatility:technical?.annualizedVolatility??null,spot,expiration};
     const spotSource=usesQuote?(quote.referenceSource||'referencia de cotización sin método'):'último cierre de vela',spotTimestamp=usesQuote?(quote.referenceTimestamp||null):(last?.timestamp||null),spotSymbol=usesQuote?(quote.symbol||null):symbol;
     const underlying={symbol:spotSymbol,price:spot,source:spotSource,timestamp:spotTimestamp};
     const candidates=ResearchAnalysis.compareStrategies(contracts,{symbol,expiration,spot,bars,includeTechnical:modules.technical,includeBlackScholes:modules.blackScholes,riskFreeRate,dividendYield}).map(candidate=>window.StrategyExplanation.attachEvidence(candidate,contracts,underlying));
@@ -95,7 +104,7 @@
     const best=snapshot.candidates.find(candidate=>Number.isFinite(candidate.score));if(best)items.push(`Mayor score combinado preliminar antes de los filtros de tabla: ${best.symbol} ${best.strategy.replace('_SPREAD','').replaceAll('_',' ')}; prob. histórica ${pct(best.probability.probability)}${best.blackScholes?`; Black‑Scholes ${pct(best.blackScholes.probability)} (CDF con discrepancia auditada)` : ''}. Abre el detalle para verificar la candidata; las probabilidades no se ajustan con fundamentales.`);else if(snapshot.candidates.length)items.push('No hay un score calculable con los datos disponibles.');
     $('researchCoreSummary').innerHTML=`<ul class="research-summary-list">${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ul>`;
   }
-  // Mantener los índices originales para sincronizar tabla, gráfica y explicaciones.
+  // Índices originales compartidos por tabla, explicaciones y método cuantitativo.
   function filteredRows(snapshot){
     const minP=Number($('researchMinProb').value)/100,minRR=Number($('researchMinRR').value),maxSpread=Number($('researchMaxSpread').value),trendFilter=snapshot.modules.technical?$('researchTrendFilter').value:'all';
     const rows=snapshot.candidates.map((candidate,index)=>({candidate,index})).filter(({candidate:c})=>(minP===0||Number.isFinite(c.probability.probability)&&c.probability.probability>=minP)&&c.riskReward>=minRR&&c.liquidityScore<=maxSpread&&(trendFilter==='all'||c.technicalTrend===c.side)).slice(0,100);
@@ -274,7 +283,12 @@
       $('researchNews').innerHTML=news.status==='available'&&news.articles.length?news.articles.slice(0,20).map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada';return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}</strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div>${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):'<p class="research-panel-description">No hay artículos disponibles para los tickers y periodo consultados.</p>';
     }
     const {rows,filters}=filteredRows(snapshot);
-    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF con discrepancia auditada`:`${c.blackScholes?.reason||''}`,scoreTitle=snapshot.modules.financial&&c.fundamentalScore!==null?`Score base ${c.baseScore?.toFixed(3)} × factor fundamental ${c.fundamentalFactor.toFixed(2)}. No modifica probabilidades.`:'Score orientativo de estrategia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${position+1}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td>${esc(c.technicalTrend||'No incluido')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td>${pct(c.probability.probability)}</td><td title="${esc(bsTitle)}">${esc(bsLabel)}</td><td>${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td>${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td></tr>`;}).join('')||'<tr><td colspan="15">No hay candidatas que cumplan los filtros seleccionados.</td></tr>';
+    const wbMetrics=window.__workbenchTableMetrics,wbCtx=window.__workbenchContext;
+    const wbActive=!!(wbMetrics&&wbCtx&&wbMetrics.token===wbCtx.token);
+    const wbHead=$('researchMethodHead');
+    wbHead.hidden=!wbActive;if(wbActive)wbHead.textContent=wbMetrics.label;
+    const wbCell=index=>!wbActive?'':!Number.isFinite(wbMetrics.values[index])?'<td>—</td>':`<td title="${esc(wbMetrics.label+' calculada con el método del Quant Workbench. Métrica informativa; no es pronóstico ni recomendación.')}">${esc(fmtWorkbenchMetric(wbMetrics.method,wbMetrics.values[index]))}</td>`;
+    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF con discrepancia auditada`:`${c.blackScholes?.reason||''}`,scoreTitle=snapshot.modules.financial&&c.fundamentalScore!==null?`Score base ${c.baseScore?.toFixed(3)} × factor fundamental ${c.fundamentalFactor.toFixed(2)}. No modifica probabilidades.`:'Score orientativo de estrategia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${position+1}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td>${esc(c.technicalTrend||'No incluido')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td>${pct(c.probability.probability)}</td><td title="${esc(bsTitle)}">${esc(bsLabel)}</td><td>${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td>${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td>${wbCell(index)}</tr>`;}).join('')||`<tr><td colspan="${wbActive?16:15}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
     $('researchEvidence').hidden=false;
     snapshot.filters=filters;
     $('researchBsCaveat').hidden=!snapshot.modules.blackScholes;
@@ -289,6 +303,7 @@
   function invalidateResearchContext(showMessage=true){
     researchVersion++;selectionVersion++;comparisonVersion++;
     currentSnapshot=null;selectedCandidateIndex=null;modulesDirty=false;
+    window.__researchMarketCache={};window.__workbenchTableMetrics=null;
     $('researchEvidence').hidden=true;$('researchCandidateExplanation').hidden=true;
     $('researchCandidates').innerHTML='';$('researchCompareResults').innerHTML='';
     $('chTriggerStrategy').innerHTML='<option value="">— Ninguna seleccionada —</option>';
@@ -305,9 +320,9 @@
     invalidateResearchContext(false);const version=researchVersion;
     const btn=$('btnResearchAnalyze');running=true;btn.disabled=true;btn.textContent='Consultando mercado…';$('researchEvidence').hidden=true;
     try{
-      const rate=Number($('bsRate').value),dividend=Number($('bsDividend').value),riskFreeRate=Number.isFinite(rate)?rate:.05,dividendYield=Number.isFinite(dividend)?dividend:0;
+      const rate=Number($('qwRate')?.value),dividend=Number($('qwDividend')?.value),riskFreeRate=Number.isFinite(rate)?rate:.05,dividendYield=Number.isFinite(dividend)?dividend:0;
       const underlyings=[],failures=[];
-      for(const symbol of symbols){if(version!==researchVersion)return;setStatus(`Consultando velas y cadena de opciones de ${symbol}…`,'loading');try{underlyings.push(await analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield));}catch(error){failures.push(`${symbol}: ${error.message}`);}if(version!==researchVersion)return;}
+      for(const symbol of symbols){if(version!==researchVersion)return;setStatus(`Consultando velas y cadena de opciones de ${symbol}…`,'loading');try{underlyings.push(await analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield,version));}catch(error){failures.push(`${symbol}: ${error.message}`);}if(version!==researchVersion)return;}
       if(!underlyings.length)throw new Error(failures.join(' · ')||'No se obtuvieron datos de mercado.');
       let news={status:'not-selected',provider:'Alpaca',capturedAt:null,articles:[]};
       if(modules.news)try{news=await fetchNews(underlyings.map(x=>x.symbol));}catch(error){news={status:'unavailable',provider:'Alpaca',capturedAt:new Date().toISOString(),articles:[],error:error.message};}
@@ -349,7 +364,7 @@
       host.innerHTML=(data.data||[]).map(x=>`<div style="padding:.35rem 0;border-bottom:1px solid var(--border)"><strong>${esc(x.underlying_ticker)}</strong> · ${esc(x.expiration_date)} · ${esc(new Date(x.created_at).toLocaleString('es-MX'))} · ${esc(String(x.snapshot?.candidates?.length??0))} spreads considerados</div>`).join('')||'La bitácora aún no tiene análisis.';
     }catch(error){host.textContent=error.message;}
   }
-  // ── Selección de candidata ↔ gráfica ──
+  // ── Selección de candidata ↔ gráfica ↔ workbench ──
   function getSelectedCandidate() {
     if (selectedCandidateIndex === null || !currentSnapshot) return null;
     return currentSnapshot.candidates[selectedCandidateIndex] ?? null;
@@ -430,7 +445,42 @@
     button.textContent = opening ? 'Ocultar explicación' : 'Ver explicación';
     button.setAttribute('aria-label', button.getAttribute('aria-label').replace(opening ? /^Ver explicación/ : /^Ocultar explicación/, opening ? 'Ocultar explicación' : 'Ver explicación'));
   });
-  // Fuente de overlays: señales técnicas y señales de candidata independientes.
+  // ── Overlay del método del Quant Workbench (dibujado tras un cálculo explícito) ──
+  // prices → precio teórico BS de la pata larga; greeks → spot con |Δ|≈0.5;
+  // iv → banda de 1 desviación anualizada (spot·e^(±σ√T)) al vencimiento.
+  function workbenchMethodOverlay(state) {
+    const ctx = window.__workbenchContext;
+    if (!ctx || !ctx.data) return null;
+    if (ctx.symbol !== state.symbol) {
+      return { lines: [], band: null, note: 'El método del workbench corresponde a ' + ctx.symbol + ' y la gráfica muestra ' + state.symbol + '; no se dibuja overlay.' };
+    }
+    const overlay = { lines: [], band: null, note: '' };
+    const T = yearsToExpiration(ctx.expiration);
+    if (!Number.isFinite(T)) {
+      overlay.note = 'El vencimiento del método del workbench ya venció; no se dibuja overlay.';
+      return overlay;
+    }
+    const sigma = Number(ctx.volatility), spot = Number(ctx.spot);
+    if (ctx.method === 'prices' && Number.isFinite(ctx.data.price)) {
+      overlay.lines.push({ value: ctx.data.price, label: 'BS pata larga' });
+      overlay.note = `Método Workbench (precio BS): línea violeta en $${ctx.data.price.toFixed(2)}, precio teórico de la pata larga K=$${ctx.strike}.`;
+    } else if (ctx.method === 'greeks' && Number.isFinite(sigma) && sigma > 0 && Number.isFinite(ctx.strike)) {
+      const r = Number(ctx.rate) || 0, q = Number(ctx.dividendYield) || 0;
+      const halfSpot = ctx.strike * Math.exp(-(r - q + sigma * sigma / 2) * T);
+      overlay.lines.push({ value: halfSpot, label: 'Spot con Δ≈0.5' });
+      const delta = ctx.data.greeks?.delta;
+      overlay.note = `Método Workbench (griegas): línea violeta en $${halfSpot.toFixed(2)}, nivel de spot donde |Δ|≈0.5 con el horizonte restante al vencimiento; Δ calculado en spot $${spot.toFixed(2)}: ${Number.isFinite(delta) ? delta.toFixed(3) : '—'}.`;
+    } else if (ctx.method === 'iv' && Number.isFinite(ctx.data.impliedVolatility) && ctx.data.converged !== false && Number.isFinite(spot)) {
+      const iv = ctx.data.impliedVolatility;
+      if (iv > 0) {
+        const drift = iv * Math.sqrt(T);
+        overlay.band = { lower: spot * Math.exp(-drift), upper: spot * Math.exp(drift), label: 'Banda IV ±1σ' };
+        overlay.note = `Método Workbench (IV): banda violeta de ±1 desviación anualizada al vencimiento con IV ${(iv * 100).toFixed(1)}% ($${(spot * Math.exp(-drift)).toFixed(2)}–$${(spot * Math.exp(drift)).toFixed(2)}).`;
+      }
+    }
+    return overlay;
+  }
+  // Señales independientes, niveles de candidata y método del workbench.
   window.__candleOverlaySource = function () {
     if (!window.StrategyTriggers) return null;
     const state = window.__candlesChartState;
@@ -438,9 +488,12 @@
     const candidate = getSelectedCandidate();
     updateCandidateStatus(state);
     const showSignals = $('chShowTriggers') && $('chShowTriggers').checked;
+    const method = workbenchMethodOverlay(state);
+    const methodDraws = !!(method && (method.lines.length || method.band));
     const matches = candidate && candidate.symbol === state.symbol;
-    const overlays = { levels: matches ? window.StrategyTriggers.strategyLevels(candidate) : null, entries: [], exits: [], technicalSignals: [], note: '' };
+    const overlays = { levels: matches ? window.StrategyTriggers.strategyLevels(candidate) : null, entries: [], exits: [], technicalSignals: [], method: methodDraws ? method : null, note: '' };
     const notes = [];
+    if (method && method.note) notes.push(method.note);
     if (candidate && !matches) notes.push('La candidata corresponde a ' + candidate.symbol + ' y la gráfica muestra ' + state.symbol + '.');
     if (showSignals && !candidate) notes.push('Selecciona una candidata evaluada para ver sus entradas y salidas orientativas.');
     if (state.timeframe !== '1Day') {
@@ -476,6 +529,81 @@
     overlays.note = notes.join(' ');
     renderSignalTable(all, state, overlays.note);
     return overlays;
+  };
+  // Fuente de prefill explícito para el Quant Workbench (candidata primero,
+  // gráfica cargada como alternativa; nunca llamadas automáticas).
+  window.__chartPrefillSource = function () {
+    const candidate = getSelectedCandidate();
+    if (candidate) {
+      const cache = window.__researchMarketCache[candidate.symbol];
+      const bsSigma = candidate.blackScholes?.assumptions?.volatility;
+      const volatilityPercent = Number.isFinite(bsSigma) ? bsSigma * 100 : (Number.isFinite(cache?.realizedVolatility) ? cache.realizedVolatility : null);
+      return {
+        symbol: candidate.symbol,
+        spot: Number.isFinite(cache?.spot) ? cache.spot : candidate.blackScholes?.assumptions?.spot ?? null,
+        strike: candidate.longStrike,
+        expiration: candidate.expiration,
+        volatility: volatilityPercent,
+        source: 'candidata ' + candidate.symbol + ' ' + candidate.strategy.replace('_SPREAD', '').replaceAll('_', ' ') + ' (' + candidate.longStrike + '/' + candidate.shortStrike + ')',
+      };
+    }
+    const state = window.__candlesChartState;
+    if (state && Array.isArray(state.candles) && state.candles.length) {
+      const cache = window.__researchMarketCache[state.symbol];
+      return {
+        symbol: state.symbol,
+        spot: state.candles.at(-1).close,
+        strike: null,
+        expiration: null,
+        volatility: Number.isFinite(cache?.realizedVolatility) ? cache.realizedVolatility : null,
+        source: 'última vela de la gráfica (' + state.symbol + ')',
+      };
+    }
+    return null;
+  };
+  // ── Aplicar el método del workbench a la tabla comparativa (explícito) ──
+  const WB_METHOD_PATH = { prices: 'prices', greeks: 'greeks', iv: 'implied-volatility' };
+  const WB_METHOD_LABEL = { prices: 'Precio BS (pata larga)', greeks: 'Delta (pata larga)', iv: 'IV (pata larga)' };
+  let workbenchApplicationVersion = 0;
+  window.__renderResearchTable = function () { if (currentSnapshot) render(currentSnapshot); };
+  window.__applyWorkbenchToTable = async function () {
+    const ctx = window.__workbenchContext;
+    if (!ctx || !ctx.data || !WB_METHOD_PATH[ctx.method]) return setStatus('Primero calcula un método en Análisis cuantitativo para poder aplicarlo a la tabla.', 'error');
+    if (!currentSnapshot) return setStatus('Primero ejecuta un análisis de investigación para tener candidatas en la tabla.', 'error');
+    const snapshot=currentSnapshot,version=researchVersion,application=++workbenchApplicationVersion;
+    const { rows,filters } = filteredRows(snapshot),filterKey=JSON.stringify(filters);
+    if (!rows.length) return setStatus('No hay candidatas visibles tras los filtros; ajusta los filtros y vuelve a intentar.', 'error');
+    const stillCurrent=()=>currentSnapshot===snapshot&&researchVersion===version&&workbenchApplicationVersion===application&&window.__workbenchContext===ctx&&JSON.stringify(filteredRows(snapshot).filters)===filterKey;
+    const target = rows.slice(0, 20), omitted = rows.length - target.length;
+    const values = {}, pending = target.slice();
+    let completed = 0;
+    setStatus(`Aplicando ${WB_METHOD_LABEL[ctx.method]} a ${target.length} candidata(s) visible(s)…`, 'loading');
+    const computeOne = async () => {
+      while (pending.length && stillCurrent()) {
+        const { candidate: c, index } = pending.shift();
+        try {
+          const cached = window.__researchMarketCache[c.symbol] || {};
+          const spot = Number.isFinite(cached.spot) ? cached.spot : (Number.isFinite(c.blackScholes?.assumptions?.spot) ? c.blackScholes.assumptions.spot : ctx.spot);
+          const volatility = Number.isFinite(c.blackScholes?.assumptions?.volatility) ? c.blackScholes.assumptions.volatility : (Number.isFinite(cached.realizedVolatility) ? cached.realizedVolatility / 100 : ctx.volatility);
+          const body = { symbol: c.symbol, spot, strike: c.longStrike, expiration: c.expiration || snapshot.expirationDate, rate: ctx.rate, dividendYield: ctx.dividendYield, volatility, optionType: c.optionType, tolerance: 1e-8, maxIterations: 200 };
+          if (ctx.method === 'iv') {
+            const mid = (Number(c.longBid) + Number(c.longAsk)) / 2;
+            if (!Number.isFinite(mid) || mid <= 0) { values[index] = null; completed++; continue; }
+            body.marketPrice = mid; body.initialGuess = 0.2;
+          }
+          const response = await fetch('/api/v1/quant/' + WB_METHOD_PATH[ctx.method], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const data = await response.json().catch(() => ({}));
+          const raw = response.ok ? (ctx.method === 'prices' ? data.price : ctx.method === 'greeks' ? data.greeks?.delta : data.impliedVolatility) : null;
+          values[index] = Number.isFinite(raw) ? raw : null;
+        } catch { values[index] = null; }
+        completed++;
+      }
+    };
+    await Promise.all([computeOne(), computeOne(), computeOne()]);
+    if(!stillCurrent())return;
+    window.__workbenchTableMetrics = { token: ctx.token, method: ctx.method, label: WB_METHOD_LABEL[ctx.method], values };
+    render(snapshot);
+    setStatus(`${WB_METHOD_LABEL[ctx.method]} aplicado a ${completed} candidata(s)${omitted ? ` (se omitieron ${omitted} por el límite de 20)` : ''}. Métrica informativa del método elegido; no es pronóstico ni recomendación.`, 'info');
   };
   document.addEventListener('DOMContentLoaded',()=>{
     $('btnResearchAnalyze').addEventListener('click',runAnalysis);$('btnResearchSave').addEventListener('click',saveJournal);$('btnResearchHistory').addEventListener('click',loadJournal);

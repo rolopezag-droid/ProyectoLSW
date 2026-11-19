@@ -236,7 +236,7 @@
     .research-heading p { max-width:680px; margin:0; color:var(--muted); font-size:11px; line-height:1.55; }
     .research-eyebrow { color:var(--accent); font-size:9px; font-weight:750; letter-spacing:1.3px; text-transform:uppercase; }
     .research-controls { padding:15px; border:1px solid #2b3949; border-radius:9px; background:rgba(10,16,23,.42); }
-    .research-filter-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:10px 0 12px; }
+    .research-filter-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:10px 0 12px; align-items:end; }
     .research-filter-grid label { display:block; }
     .research-filter-grid input,.research-filter-grid select { width:100%; }
     .research-module-options { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; padding:0; border:0; }
@@ -345,6 +345,13 @@
 
     :root { --bg:#0d1218; --panel:#161e28; --panel-hover:#202b38; --text:#e5ecf3; --muted:#93a4b8; --border:#293545; --accent:#50c79a; --accent-hover:#76d6b1; --success:#50c79a; --danger:#f07b85; --direction-wash:#19372f; }
     body[data-direction="bear"] { --accent:#ef8b91; --accent-hover:#f7a9ae; --direction-wash:#3d252f; }
+    /* Scrollbars del tema oscuro: sin barras blancas nativas (WebKit + Firefox) */
+    * { scrollbar-width:thin; scrollbar-color:#263345 #0d131a; }
+    ::-webkit-scrollbar { width:10px; height:10px; }
+    ::-webkit-scrollbar-track { background:#0d131a; }
+    ::-webkit-scrollbar-thumb { background:#263345; border-radius:6px; }
+    ::-webkit-scrollbar-thumb:hover { background:#33425c; }
+    ::-webkit-scrollbar-corner { background:#0d131a; }
     body { background:var(--bg); font-family:'Segoe UI',Arial,sans-serif; font-size:13px; }
     header { height:78px; position:relative; padding:16px 26px; background:#111923; border-bottom:1px solid var(--border); gap:20px; }
     header h1 { font-size:18px; font-weight:600; letter-spacing:-.4px; }
@@ -354,6 +361,12 @@
     .dot { width:6px; height:6px; box-shadow:none!important; }
     .container { display:grid; grid-template-columns:180px minmax(0,1fr); max-width:none; padding:0; gap:0; }
     aside { padding:22px 14px; background:#111923; border-right:1px solid var(--border); min-width:0; }
+    /* Menú lateral plegable: tira delgada que cede el ancho al área central */
+    .sidebar-toggle { width:100%; margin-bottom:14px; }
+    .container.sidebar-collapsed { grid-template-columns:46px minmax(0,1fr); }
+    aside.is-collapsed { padding:10px 5px; }
+    aside.is-collapsed .tabs, aside.is-collapsed .service-drawer { display:none; }
+    aside.is-collapsed .sidebar-toggle { width:auto; }
     main { min-width:0; padding:26px; }
     .tabs { display:flex; flex-direction:column; margin:0 0 30px; padding:0; border:0; gap:6px; overflow:visible; }
     .tab-btn { text-align:left; white-space:normal; border:0; border-radius:6px; font-size:12px; padding:12px; }
@@ -364,10 +377,20 @@
     .workspace-tag { align-self:center; border:1px solid var(--border); padding:5px 10px; border-radius:4px; font-size:10px; color:var(--muted); }
     .card { padding:20px; border-radius:8px; gap:16px; box-shadow:none; }
     .card h2 { color:var(--text); font-size:13px; font-weight:600; margin:0; }
-    .analysis-layout { display:grid; grid-template-columns:minmax(0,1fr) 350px; gap:20px; align-items:start; }
+    .analysis-layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:20px; align-items:start; }
     .analysis-column { min-width:0; display:flex; flex-direction:column; gap:20px; }
-    .order-panel { grid-column:2; grid-row:1; border-top:2px solid var(--accent); }
+    .order-panel { grid-column:2; grid-row:1; border-top:2px solid var(--accent); position:sticky; top:16px; max-height:calc(100vh - 32px); overflow-y:auto; }
     .analysis-column { grid-column:1; grid-row:1; }
+    /* Panel de orden plegable: pestaña vertical única (solo el botón, título oculto), sin scrollbar blanca */
+    .btn-order-toggle, .card h2 .btn-order-toggle, .sidebar-toggle { appearance:none; background:#161f2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; color:var(--muted); cursor:pointer; font-size:11px; font-weight:600; padding:5px 12px; white-space:nowrap; flex:none; }
+    .btn-order-toggle:hover, .card h2 .btn-order-toggle:hover, .sidebar-toggle:hover { background:#202b38; color:var(--text); border-color:rgba(255,255,255,0.2); }
+    .order-panel { transition:min-width .15s ease; }
+    .order-panel.is-collapsed { width:46px; min-width:46px; padding:10px 4px; cursor:pointer; overflow:hidden; }
+    .order-panel.is-collapsed h2 { display:flex; justify-content:center; align-items:center; margin:0; }
+    .order-panel.is-collapsed h2 .card-title-text { display:none; }
+    .order-panel.is-collapsed .btn-order-toggle { writing-mode:vertical-rl; transform:rotate(180deg); padding:12px 8px; margin:auto; }
+    .analysis-layout.order-panel-collapsed { grid-template-columns:minmax(0,1fr) auto; }
+    @media(max-width:1000px) { .order-panel.is-collapsed { width:100%; min-width:0; } .order-panel.is-collapsed .btn-order-toggle { writing-mode:horizontal-tb; transform:none; margin:0 auto; } }
     #tab-strategy.active { display:block; }
     .strategy-grid { grid-template-columns:1fr 1fr; gap:8px; }
     .strategy-chip { border-radius:5px; background:#101720; border-color:#314052; padding:10px; font-weight:600; }
@@ -410,6 +433,8 @@
     aside .btn { min-height:28px; padding:5px 8px; font-size:10px; }
     aside .service-chip { font-size:10px; }
     #tab-candles .card { min-height:440px; }
+    /* Ficha compacta al plegarse y controles de rango sin desbordamiento. */
+    main .card.is-collapsed:not(.order-panel) { min-height:0 !important; height:auto; padding:12px 16px; }
     #tab-candles .row { grid-template-columns:repeat(2,minmax(0,1fr)); }
     #candlesForm > div, #candlesForm input, #candlesForm select { min-width:0; }
     #candlesChart { border-radius:4px!important; }
@@ -417,12 +442,25 @@
     .chart-empty strong { font-size:16px; color:#dce7f2; font-weight:500; background:#161e28; padding:4px 12px; }
     .chart-empty span { font-size:11px; background:#161e28; padding:4px 12px; }
     #tab-candles:has(#candlesChartContainer:not([style*="none"])) .chart-empty { display:none; }
-    @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 310px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
+    @media(max-width:1250px) { .analysis-layout { grid-template-columns:minmax(0,1fr) 340px; } .container { grid-template-columns:155px minmax(0,1fr); } main { padding:20px; } header .services-status { display:none; } }
+    .workspace-view { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; min-width:0; align-items:start; }
+    .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); }
+    .workspace-view[data-view="side"] > .research-workspace { border:1px solid var(--border); border-radius:8px; padding:14px; background:var(--panel); height:auto; overflow:visible; }
+    @media(max-width:1100px) { .workspace-view[data-view="side"] { grid-template-columns:minmax(0,1fr); } }
     .research-workspace { min-width:0; }
     .research-table thead th { position:sticky; top:-1px; background:#0d1520; z-index:2; }
     #researchCandidates tr[data-candidate] { cursor:pointer; }
     #researchCandidates tr[data-candidate]:hover td { background:rgba(56,189,248,.06); }
     #researchCandidates tr.is-selected td { background:rgba(56,189,248,.14); }
+    /* Selector de método cuantitativo (Quant Workbench). */
+    .method-chip { padding:0.6rem; border:1px solid var(--border); border-radius:8px; text-align:center; font-size:0.85rem; cursor:pointer; user-select:none; background:#101720; font-weight:600; }
+    .method-chip:hover { background: var(--panel-hover); }
+    .method-chip.active { background:var(--accent); color:#000; border-color:var(--accent); font-weight:700; }
+    .method-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .quant-iv-extras[hidden] { display:none !important; }
+    .quant-result-section { margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border); }
+    #quantForm { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    #quantForm .full { grid-column:auto; }
     .chart-trigger-controls { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; }
     .chart-trigger-controls label { display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap; min-width:0; font-size:0.9rem; white-space:normal; }
     .chart-trigger-controls select { max-width:340px; }
@@ -473,8 +511,21 @@
     .strategy-comparison .research-table { min-width:900px; }
     .strategy-comparison .research-table td { white-space:normal; vertical-align:top; overflow-wrap:anywhere; }
     .strategy-explain-button { min-width:105px; padding:6px 9px; font-size:11px; }
-    @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; } }
-    @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } }
+    /* Acordeones estilo VS Code: encabezado clicable, chevron rotatorio, cuerpo oculto al colapsar */
+    .collapsible-header { cursor:pointer; user-select:none; justify-content:flex-start !important; gap:10px; }
+    .collapsible-header > .research-source-status, .collapsible-header > button:not(.panel-chevron) { margin-left:auto; }
+    .collapsible-header:hover { color:var(--text); }
+    .panel-chevron { appearance:none; background:none; border:0; color:var(--muted); cursor:pointer; font-size:10px; line-height:1; padding:2px 7px 2px 2px; transition:transform .12s ease; flex:none; }
+    .panel-chevron.expanded { transform:rotate(90deg); }
+    .card.is-collapsed > :not(h2) { display:none !important; }
+    .research-panel.is-collapsed > :not(.research-panel-heading) { display:none !important; }
+    .research-panel.is-collapsed > .research-panel-heading { margin-bottom:0; padding-bottom:0; border-bottom-color:transparent; }
+    /* Al plegar se libera espacio: los plegados pasan a barras de ancho completo y los abiertos reacomodan */
+    .research-panel.is-collapsed { grid-column: 1 / -1; }
+    .research-dashboard.has-collapsed .research-panel:not(.is-collapsed) { grid-column: 1 / -1; }
+    @media(max-width:650px) { .method-grid { grid-template-columns:1fr; } }
+    @media(max-width:1000px) { .analysis-layout { display:flex; flex-direction:column; } .analysis-column,.order-panel { width:100%; } .order-panel { order:-1; position:static; } }
+    @media(max-width:650px) { .container { display:block; } aside { min-height:0; border:0; padding:10px; } .tabs { flex-direction:row; overflow:auto; margin:0; } .tab-btn { white-space:nowrap; } .service-drawer { margin-top:10px; } main { padding:14px; } .workspace-tag { display:none; } #tab-candles .row { grid-template-columns:1fr; } aside.is-collapsed .tabs { display:flex; } aside.is-collapsed .sidebar-toggle { width:100%; } }
     #alertContainer { position:fixed; right:20px; bottom:20px; z-index:1000; width:min(380px,calc(100vw - 32px)); display:flex; flex-direction:column; gap:8px; pointer-events:none; }
     #alertContainer .alert { position:relative; margin:0; padding:12px 38px 12px 14px; background:#172737; color:#deebf6; border:1px solid #416176; border-left:3px solid #72b4d5; border-radius:5px; box-shadow:0 4px 18px #0005; pointer-events:auto; overflow-wrap:anywhere; }
     #alertContainer .alert-error { background:#302025; border-color:#71434c; border-left-color:#ef8b91; color:#ffdce0; }
@@ -514,9 +565,7 @@
     <!-- ── Pestañas ── -->
     <div class="tabs">
       <button class="tab-btn active" id="tab-btn-strategy" onclick="showTab('strategy')"> Estrategia</button>
-      <button class="tab-btn" id="tab-btn-prices" onclick="showTab('prices')"> Precios Black-Scholes</button>
-      <button class="tab-btn" id="tab-btn-greeks" onclick="showTab('greeks')"> Griegas</button>
-      <button class="tab-btn" id="tab-btn-iv" onclick="showTab('iv')"> Volatilidad Implícita</button>
+      <button class="tab-btn" id="tab-btn-quant" onclick="showTab('quant')"> Análisis cuantitativo</button>
       <button class="tab-btn" id="tab-btn-candles" onclick="showTab('candles')"> Gráfica</button>
       <a class="password-recovery" href="/auth/recuperar.html" target="_blank" rel="noopener noreferrer">Recuperar acceso</a>
     </div>
@@ -524,7 +573,7 @@
     <!-- ── Estrategia ── -->
     <div id="tab-strategy" class="tab-content active">
       <div class="card">
-        <h2>Nueva operación</h2>
+        <h2><span class="card-title-text">Nueva operación</span> <button type="button" class="btn-order-toggle" id="btnToggleOrderPanel" aria-expanded="true" aria-controls="strategyForm" title="Oculta el panel para dar todo el ancho a la gráfica y la tabla comparativa">⟩ Ocultar</button></h2>
 
         <div class="strategy-grid" id="strategyGrid">
           <div class="strategy-chip active" data-strategy="BULL_CALL_SPREAD">Bull Call</div>
@@ -647,186 +696,84 @@
       </div>
     </div>
 
-    <!-- ── Precios Black-Scholes ── -->
-    <div id="tab-prices" class="tab-content">
+    <!-- ── Análisis cuantitativo (Quant Workbench) ── -->
+    <div id="tab-quant" class="tab-content">
       <div class="card">
-        <h2>Precio de Opción — Black-Scholes</h2>
+        <h2>Análisis cuantitativo</h2>
+        <p class="small-note">Elige el método a aplicar al contrato. Todos usan el modelo Black-Scholes del Quant Service; la volatilidad implícita se resuelve con Newton-Raphson y respaldo por bisección en el servidor.</p>
 
-        <form id="pricesForm" class="row">
+        <div class="method-grid" id="quantMethodGrid" role="radiogroup" aria-label="Método cuantitativo">
+          <div class="method-chip active" data-method="prices" role="radio" aria-checked="true" tabindex="0">Precio Black-Scholes</div>
+          <div class="method-chip" data-method="greeks" role="radio" aria-checked="false" tabindex="0">Griegas</div>
+          <div class="method-chip" data-method="iv" role="radio" aria-checked="false" tabindex="0">IV Newton-Raphson</div>
+        </div>
+
+        <form id="quantForm" class="row" style="margin-top:1rem;">
           <div>
             <label>Símbolo</label>
-            <input type="text" id="bsSymbol" value="AAPL" required />
+            <input type="text" id="qwSymbol" value="AAPL" required />
           </div>
           <div>
             <label>Tipo</label>
-            <select id="bsOptionType">
+            <select id="qwOptionType">
               <option value="call">Call</option>
               <option value="put">Put</option>
             </select>
           </div>
-          <div class="full">
+          <div>
             <label>Precio Spot del subyacente (S)</label>
-            <input type="number" id="bsSpot" step="0.01" value="343.87" required />
+            <input type="number" id="qwSpot" step="0.01" value="343.87" required />
           </div>
-          <div class="full">
+          <div>
             <label>Strike (K)</label>
-            <input type="number" id="bsStrike" step="0.01" value="340" required />
+            <input type="number" id="qwStrike" step="0.01" value="340" required />
           </div>
           <div>
             <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="bsExpiration" value="2026-12-18" required />
+            <input type="text" id="qwExpiration" value="2026-12-18" required />
           </div>
           <div>
             <label>Tasa libre de riesgo (r, anual)</label>
-            <input type="number" id="bsRate" step="0.0001" value="0.05" required />
+            <input type="number" id="qwRate" step="0.0001" value="0.05" required />
           </div>
           <div>
             <label>Rendimiento de dividendos (q, anual)</label>
-            <input type="number" id="bsDividend" step="0.0001" value="0" required />
+            <input type="number" id="qwDividend" step="0.0001" value="0" required />
           </div>
-          <div class="full">
+          <div>
             <label>Volatilidad implícita (σ, anual)</label>
-            <input type="number" id="bsVolatility" step="0.0001" value="0.25" required />
+            <input type="number" id="qwVolatility" step="0.0001" value="0.25" required />
           </div>
         </form>
 
-        <button type="button" class="btn btn-primary btn-block" id="btnCalcPrices"> Calcular precio</button>
-
-        <div id="pricesResult" style="margin-top:1.5rem; display:none;">
-          <h3 style="color:var(--accent); margin-bottom:0.5rem;">Resultado</h3>
-          <div class="results-grid" id="pricesGrid"></div>
-          <div class="small-note" id="pricesNote"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Griegas ── -->
-    <div id="tab-greeks" class="tab-content">
-      <div class="card">
-        <h2>Griegas de Opción — Black-Scholes</h2>
-
-        <form id="greeksForm" class="row">
+        <div id="qwIvExtras" class="row quant-iv-extras" hidden>
           <div>
-            <label>Símbolo</label>
-            <input type="text" id="grSymbol" value="AAPL" required />
-          </div>
-          <div>
-            <label>Tipo</label>
-            <select id="grOptionType">
-              <option value="call">Call</option>
-              <option value="put">Put</option>
-            </select>
-          </div>
-          <div class="full">
-            <label>Precio Spot del subyacente (S)</label>
-            <input type="number" id="grSpot" step="0.01" value="343.87" required />
-          </div>
-          <div class="full">
-            <label>Strike (K)</label>
-            <input type="number" id="grStrike" step="0.01" value="340" required />
-          </div>
-          <div>
-            <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="grExpiration" value="2026-12-18" required />
-          </div>
-          <div>
-            <label>Tasa libre de riesgo (r, anual)</label>
-            <input type="number" id="grRate" step="0.0001" value="0.05" required />
-          </div>
-          <div>
-            <label>Rendimiento de dividendos (q, anual)</label>
-            <input type="number" id="grDividend" step="0.0001" value="0" required />
-          </div>
-          <div class="full">
-            <label>Volatilidad implícita (σ, anual)</label>
-            <input type="number" id="grVolatility" step="0.0001" value="0.25" required />
-          </div>
-        </form>
-
-        <button type="button" class="btn btn-primary btn-block" id="btnCalcGreeks"> Calcular griegas</button>
-
-        <div id="greeksResult" style="margin-top:1.5rem; display:none;">
-          <h3 style="color:var(--accent); margin-bottom:0.5rem;">Resultado</h3>
-          <table>
-            <thead>
-              <tr><th>Griega</th><th>Valor</th><th>Interpretación</th></tr>
-            </thead>
-            <tbody id="greeksTable"></tbody>
-          </table>
-          <div class="small-note" id="greeksNote"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Volatilidad Implícita ── -->
-    <div id="tab-iv" class="tab-content">
-      <div class="card">
-        <h2>Volatilidad Implícita — Newton-Raphson</h2>
-
-        <form id="ivForm" class="row">
-          <div>
-            <label>Símbolo</label>
-            <input type="text" id="ivSymbol" value="AAPL" required />
-          </div>
-          <div>
-            <label>Tipo</label>
-            <select id="ivOptionType">
-              <option value="call">Call</option>
-              <option value="put">Put</option>
-            </select>
-          </div>
-          <div class="full">
-            <label>Precio Spot del subyacente (S)</label>
-            <input type="number" id="ivSpot" step="0.01" value="343.87" required />
-          </div>
-          <div class="full">
-            <label>Strike (K)</label>
-            <input type="number" id="ivStrike" step="0.01" value="340" required />
-          </div>
-          <div>
-            <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="ivExpiration" value="2026-12-18" required />
-          </div>
-          <div>
-            <label>Tasa libre de riesgo (r, anual)</label>
-            <input type="number" id="ivRate" step="0.0001" value="0.05" required />
-          </div>
-          <div>
-            <label>Rendimiento de dividendos (q, anual)</label>
-            <input type="number" id="ivDividend" step="0.0001" value="0" required />
-          </div>
-          <div class="full">
             <label>Precio de mercado de la opción</label>
-            <input type="number" id="ivMarketPrice" step="0.01" value="5.00" required />
+            <input type="number" id="qwMarketPrice" step="0.01" value="5.00" required />
             <div class="small-note">Precio observado en el mercado para resolver σ.</div>
           </div>
           <div>
             <label>Suposición inicial (σ inicial)</label>
-            <input type="number" id="ivInitialGuess" step="0.0001" value="0.2" required />
+            <input type="number" id="qwInitialGuess" step="0.0001" value="0.2" required />
             <div class="small-note">Valor inicial para el método de Newton-Raphson.</div>
           </div>
-        </form>
-
-        <button type="button" class="btn btn-primary btn-block" id="btnCalcIV"> Calcular volatilidad implícita</button>
-
-        <div id="ivResult" style="margin-top:1.5rem; display:none;">
-          <h3 style="color:var(--accent); margin-bottom:0.5rem;">Resultado</h3>
-          <div class="results-grid" id="ivGrid"></div>
-          <table style="margin-top:1rem;">
-            <thead>
-              <tr><th>Campo</th><th>Valor</th></tr>
-            </thead>
-            <tbody id="ivTable"></tbody>
-          </table>
-          <div class="small-note" id="ivNote"></div>
         </div>
+
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+          <button type="button" class="btn btn-primary" id="btnCalcQuant"> Calcular precio</button>
+          <button type="button" class="btn btn-secondary" id="btnPrefillQuant" title="Toma S, K, vencimiento y σ de la gráfica o de la candidata seleccionada en la tabla comparativa">Tomar datos de la gráfica/candidata</button>
+          <button type="button" class="btn btn-secondary" id="btnApplyQuantToTable" title="Calcula la métrica del método actual (precio BS, delta o IV de la pata larga) para las candidatas visibles de la tabla comparativa, máximo 20">Aplicar método a la tabla</button>
+        </div>
+
+        <div id="quantResult" style="margin-top:1.5rem; display:none;"></div>
+        <div class="small-note" id="quantNote" style="margin-top:0.5rem;"></div>
       </div>
     </div>
 
     <!-- ── Gráfica de Candles ── -->
     <div id="tab-candles" class="tab-content">
       <div class="card">
-        <h2>Mercado · Alpaca</h2>
+        <h2>Mercado · Alpaca <button type="button" class="btn-order-toggle" id="btnWorkspaceView" title="Alterna entre ver la gráfica y el panel de investigación lado a lado o apilados">Ver apilado</button></h2>
         <p class="small-note">Elige un ticker antes de mostrar la gráfica: se cargan las velas históricas de Alpaca para el símbolo que selecciontes.</p>
 
         <form id="candlesForm" class="row">
@@ -960,7 +907,7 @@
               <p class="research-panel-description">Ordenadas por score combinado orientativo. Las cifras del ranking son preliminares hasta contrastarlas con Quant en el detalle. El score fundamental puede ajustar el orden cuando hay suficientes métricas; no cambia las probabilidades mostradas.</p>
               <details class="research-method"><summary>Cómo se calcula el score y qué límites tiene</summary><p>Score base = probabilidad histórica × ganancia/riesgo × factor técnico (1.1 alineada, 1.0 mixta, 0.9 contraria; factor 1 si se desactiva técnico) ÷ (1 + diferencial relativo Bid/Ask). Cuando se selecciona fundamentales, el score base se multiplica por un factor de 0.80 a 1.20 derivado de un score fundamental de 0 a 100. El score fundamental pondera crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B; normaliza los datos disponibles y requiere al menos 50% de cobertura. Los umbrales son una heurística general sin ajuste sectorial ni calibración. No altera la probabilidad histórica ni Black‑Scholes. La probabilidad histórica usa ventanas traslapadas y su IC Wilson puede subestimar incertidumbre. Black‑Scholes usa volatilidad realizada como proxy, no volatilidad implícita. Ninguna cifra es pronóstico calibrado ni recomendación.</p></details>
               <p class="strategy-validation" id="researchBsCaveat" hidden>La probabilidad Black‑Scholes del panel presenta una discrepancia conocida en la CDF normal; no se considera una probabilidad validada. No participa en el score. Consulta la auditoría de la fase 2A.</p>
-              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th><th id="researchMethodHead" hidden>Método</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
               <section id="researchCandidateExplanation" class="strategy-explanation" aria-labelledby="researchCandidateTitle" hidden>
                 <h4 id="researchCandidateTitle">Candidata seleccionada</h4>
                 <p id="researchCandidateValidation" class="strategy-validation" role="status" aria-live="polite"></p>
@@ -998,6 +945,8 @@
 <script src="/strategy-triggers.js"></script>
 <script src="/strategy-explanation.js"></script>
 <script src="/research-ui.js"></script>
+<script src="/quant-workbench.js"></script>
+<script src="/collapsible-panels.js"></script>
 <script>
 // Composition visuelle uniquement : les contrôles conservent leurs identifiants.
 const navigation = document.querySelector('.tabs');
@@ -1018,9 +967,74 @@ const emptyTitle = document.createElement('strong'); emptyTitle.textContent = 'D
 emptyTitle.textContent = 'Datos de mercado';
 const emptyText = document.createElement('span'); emptyText.textContent = 'Selecciona un símbolo y consulta la gráfica de Alpaca.';
 emptyChart.append(emptyTitle, emptyText); chartView.querySelector('.card').append(emptyChart);
-analysisColumn.append(chartView);
+// ── Split configurable (lado a lado / apilado) + ticket de órdenes pegajoso ──
+const candlesCard = chartView.querySelector(':scope > .card');
+const researchSection = candlesCard ? candlesCard.querySelector(':scope > .research-workspace') : null;
+let workspaceView = null;
+if (candlesCard && researchSection) {
+  candlesCard.removeChild(researchSection);
+  workspaceView = document.createElement('div');
+  workspaceView.className = 'workspace-view';
+  let savedView = 'side';
+  try { if (localStorage.getItem('ui_workspace_view') === 'stacked') savedView = 'stacked'; } catch {}
+  workspaceView.dataset.view = savedView;
+  workspaceView.append(chartView, researchSection);
+  analysisColumn.append(workspaceView);
+}
 [...strategyView.children].filter(node => node !== orderPanel).forEach(node => analysisColumn.append(node));
 layout.append(analysisColumn, orderPanel); strategyView.append(layout);
+const workspaceViewBtn = document.getElementById('btnWorkspaceView');
+if (workspaceViewBtn && workspaceView) {
+  const syncViewLabel = () => { workspaceViewBtn.textContent = workspaceView.dataset.view === 'side' ? 'Ver apilado' : 'Ver lado a lado'; };
+  syncViewLabel();
+  workspaceViewBtn.addEventListener('click', () => {
+    const nextView = workspaceView.dataset.view === 'side' ? 'stacked' : 'side';
+    workspaceView.dataset.view = nextView;
+    try { localStorage.setItem('ui_workspace_view', nextView); } catch {}
+    syncViewLabel();
+  });
+}
+// ── Panel de orden plegable: pestaña lateral que libera el ancho del análisis ──
+// Los IDs del formulario y sus controles permanecen intactos; solo se ocultan.
+const orderToggleBtn = document.getElementById('btnToggleOrderPanel');
+if (orderToggleBtn) {
+  let orderCollapsed = false;
+  try { orderCollapsed = localStorage.getItem('ui_order_panel_collapsed') === '1'; } catch {}
+  const applyOrderState = () => {
+    orderPanel.classList.toggle('is-collapsed', orderCollapsed);
+    layout.classList.toggle('order-panel-collapsed', orderCollapsed);
+    orderToggleBtn.setAttribute('aria-expanded', String(!orderCollapsed));
+    orderToggleBtn.textContent = orderCollapsed ? '⟨ Nueva operación' : '⟩ Ocultar';
+    try { localStorage.setItem('ui_order_panel_collapsed', orderCollapsed ? '1' : '0'); } catch {}
+  };
+  applyOrderState();
+  orderToggleBtn.addEventListener('click', () => { orderCollapsed = !orderCollapsed; applyOrderState(); });
+  // La pestaña plegada completa también despliega (sin doble toggle con el botón).
+  orderPanel.addEventListener('click', event => {
+    if (!orderPanel.classList.contains('is-collapsed') || event.target.closest('#btnToggleOrderPanel')) return;
+    orderCollapsed = false; applyOrderState();
+  });
+}
+// ── Menú lateral plegable: tira delgada que cede el ancho al área central ──
+const sidebarToggleBtn = document.createElement('button');
+sidebarToggleBtn.type = 'button';
+sidebarToggleBtn.id = 'btnToggleSidebar';
+sidebarToggleBtn.className = 'sidebar-toggle';
+sidebarToggleBtn.setAttribute('aria-expanded', 'true');
+sidebarToggleBtn.setAttribute('aria-label', 'Ocultar o mostrar el menú lateral');
+let sidebarCollapsed = false;
+try { sidebarCollapsed = localStorage.getItem('ui_sidebar_collapsed') === '1'; } catch {}
+const containerEl = document.querySelector('.container');
+const applySidebarState = () => {
+  side.classList.toggle('is-collapsed', sidebarCollapsed);
+  if (containerEl) containerEl.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  sidebarToggleBtn.setAttribute('aria-expanded', String(!sidebarCollapsed));
+  sidebarToggleBtn.textContent = sidebarCollapsed ? '⟩' : '⟨ Ocultar menú';
+  try { localStorage.setItem('ui_sidebar_collapsed', sidebarCollapsed ? '1' : '0'); } catch {}
+};
+side.insertBefore(sidebarToggleBtn, side.firstChild);
+applySidebarState();
+sidebarToggleBtn.addEventListener('click', () => { sidebarCollapsed = !sidebarCollapsed; applySidebarState(); });
 </script>
 <script>
 const API_BASE = '';
@@ -1164,7 +1178,8 @@ async function fetchAutomaticSelection() {
   const quoteRes = await quotePromise;
   if(!stillCurrent()) throw new Error('Cambió la estrategia, empresa o vencimiento. Consulta nuevamente.');
   const q = quoteRes.data || {};
-  if(q.symbol && q.symbol.toUpperCase()!==symbol) throw new Error('La cotización no corresponde a la empresa seleccionada; no hay cotización válida del subyacente.');
+  const quotedSymbol=String(q.symbol||'').trim().toUpperCase();
+  if(quotedSymbol && quotedSymbol!==symbol) throw new Error('La cotización recibida es de '+quotedSymbol+' y no corresponde a '+symbol+'; no hay cotización válida del subyacente.');
   let spotPrice = null;
   const bid=Number(q.bid), ask=Number(q.ask), ref=Number(q.referencePrice);
   if(quoteRes.ok && Number.isFinite(ref) && ref>0) spotPrice = ref;
@@ -1469,259 +1484,18 @@ function renderHistory() {
   });
 }
 
-// ── Black-Scholes Prices ──
-document.getElementById('btnCalcPrices').addEventListener('click', async () => {
-  const body = {
-    symbol: document.getElementById('bsSymbol').value.trim().toUpperCase(),
-    spot: Number(document.getElementById('bsSpot').value),
-    strike: Number(document.getElementById('bsStrike').value),
-    expiration: document.getElementById('bsExpiration').value.trim(),
-    rate: Number(document.getElementById('bsRate').value || 0),
-    dividendYield: Number(document.getElementById('bsDividend').value || 0),
-    volatility: Number(document.getElementById('bsVolatility').value),
-    optionType: document.getElementById('bsOptionType').value,
-  };
-
-  if (!body.symbol || !body.spot || !body.strike || !body.expiration || !body.volatility) {
-    showAlert('Completa todos los campos requeridos.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btnCalcPrices');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Calculando...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/quant/prices`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
-    const data = await res.json();
-
-    const grid = document.getElementById('pricesGrid');
-    grid.innerHTML = '';
-    const metrics = [
-      { label: 'Modelo', value: data.model, neutral: true },
-      { label: 'Símbolo', value: data.symbol, neutral: true },
-      { label: 'Precio teórico', value: `$${data.price.toFixed(4)}`, neutral: true },
-      { label: 'Moneda', value: data.currency, neutral: true },
-      { label: 'Tiempo al vencimiento (años)', value: data.assumptions?.timeToMaturityYears?.toFixed(6) ?? 'N/A', neutral: true },
-      { label: 'Calculado en', value: data.calculatedAt, neutral: true },
-    ];
-    metrics.forEach(m => {
-      const el = document.createElement('div');
-      el.className = 'metric-card';
-      el.innerHTML = `<div class="label">${m.label}</div><div class="value ${m.pos ? 'pos' : m.neg ? 'neg' : 'neutral'}">${escapeHtml(m.value)}</div>`;
-      grid.appendChild(el);
-    });
-
-    document.getElementById('pricesNote').textContent = `Asumciones: spot=$${body.spot}, strike=$${body.strike}, rate=$${body.rate}, dividendYield=$${body.dividendYield}, volatility=$${body.volatility}, optionType=$${body.optionType}`;
-    document.getElementById('pricesResult').style.display = 'block';
-    showAlert('Precio calculado con Black-Scholes.', 'info');
-  } catch (e) {
-    showAlert('Error calculando precio: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = ' Calcular precio';
-  }
-});
-
-// ── Greeks ──
-document.getElementById('btnCalcGreeks').addEventListener('click', async () => {
-  const body = {
-    symbol: document.getElementById('grSymbol').value.trim().toUpperCase(),
-    spot: Number(document.getElementById('grSpot').value),
-    strike: Number(document.getElementById('grStrike').value),
-    expiration: document.getElementById('grExpiration').value.trim(),
-    rate: Number(document.getElementById('grRate').value || 0),
-    dividendYield: Number(document.getElementById('grDividend').value || 0),
-    volatility: Number(document.getElementById('grVolatility').value),
-    optionType: document.getElementById('grOptionType').value,
-  };
-
-  if (!body.symbol || !body.spot || !body.strike || !body.expiration || !body.volatility) {
-    showAlert('Completa todos los campos requeridos.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btnCalcGreeks');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Calculando...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/quant/greeks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
-    const data = await res.json();
-
-    const tbody = document.getElementById('greeksTable');
-    tbody.innerHTML = '';
-    const greeks = data.greeks || {};
-    const rows = [
-      { label: 'Delta', value: greeks.delta?.toFixed(6), desc: 'Sensibilidad del precio al cambio en el spot' },
-      { label: 'Gamma', value: greeks.gamma?.toFixed(6), desc: 'Tasa de cambio del delta respecto al spot' },
-      { label: 'Theta', value: greeks.theta?.toFixed(6), desc: 'Pérdida de valor por el paso del tiempo (día)' },
-      { label: 'Vega', value: greeks.vega?.toFixed(6), desc: 'Sensibilidad al cambio en la volatilidad' },
-      { label: 'Rho', value: greeks.rho?.toFixed(6), desc: 'Sensibilidad al cambio en la tasa de interés' },
-    ];
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.label}</td><td>${r.value}</td><td>${r.desc}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('greeksNote').textContent = `Asumciones: spot=$${body.spot}, strike=$${body.strike}, rate=$${body.rate}, dividendYield=$${body.dividendYield}, volatility=$${body.volatility}, optionType=$${body.optionType}`;
-    document.getElementById('greeksResult').style.display = 'block';
-    showAlert('Griegas calculadas con Black-Scholes.', 'info');
-  } catch (e) {
-    showAlert('Error calculando griegas: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = ' Calcular griegas';
-  }
-});
-
-// ── Implied Volatility ──
-document.getElementById('btnCalcIV').addEventListener('click', async () => {
-  const body = {
-    symbol: document.getElementById('ivSymbol').value.trim().toUpperCase(),
-    spot: Number(document.getElementById('ivSpot').value),
-    strike: Number(document.getElementById('ivStrike').value),
-    expiration: document.getElementById('ivExpiration').value.trim(),
-    rate: Number(document.getElementById('ivRate').value || 0),
-    dividendYield: Number(document.getElementById('ivDividend').value || 0),
-    optionType: document.getElementById('ivOptionType').value,
-    marketPrice: Number(document.getElementById('ivMarketPrice').value),
-    initialGuess: Number(document.getElementById('ivInitialGuess').value || 0.2),
-    tolerance: 1e-8,
-    maxIterations: 200,
-  };
-
-  if (!body.symbol || !body.spot || !body.strike || !body.expiration || !body.marketPrice) {
-    showAlert('Completa todos los campos requeridos.', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btnCalcIV');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Calculando IV...';
-  try {
-    const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/quant/implied-volatility`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-
-    // Si no converge (422), igual mostramos lo que el servidor devolvió y advertimos
-    if(res.status===422 && !Number.isFinite(data.impliedVolatility)) throw new Error(data.message||'El modelo no pudo resolver ese precio.');
-    if (res.status === 422) {
-      const grid = document.getElementById('ivGrid');
-      grid.innerHTML = '';
-      const metrics = [
-        { label: 'Volatilidad Implícita (σ)', value: (data.impliedVolatility * 100).toFixed(4) + '%', neutral: true },
-        { label: 'Método', value: data.method, neutral: true },
-        { label: 'Convergió', value: 'No', neg: true },
-        { label: 'Iteraciones', value: data.iterations, neutral: true },
-        { label: 'Precio del modelo', value: `$${data.modelPrice?.toFixed(6)}`, neutral: true },
-        { label: 'Error de precio', value: data.pricingError?.toFixed(8), neutral: true },
-      ];
-      metrics.forEach(m => {
-        const el = document.createElement('div');
-        el.className = 'metric-card';
-        el.innerHTML = `<div class="label">${m.label}</div><div class="value ${m.pos ? 'pos' : m.neg ? 'neg' : 'neutral'}">${escapeHtml(m.value)}</div>`;
-        grid.appendChild(el);
-      });
-
-      const tbody = document.getElementById('ivTable');
-      tbody.innerHTML = '';
-      const rows = [
-        { label: 'Símbolo', value: body.symbol },
-        { label: 'Tipo', value: body.optionType },
-        { label: 'Spot', value: `$${body.spot}` },
-        { label: 'Strike', value: `$${body.strike}` },
-        { label: 'Vencimiento', value: body.expiration },
-        { label: 'Tasa libre (r)', value: body.rate.toString() },
-        { label: 'Dividendos (q)', value: body.dividendYield.toString() },
-        { label: 'Precio de mercado', value: `$${body.marketPrice}` },
-        { label: 'Suposición inicial (σ)', value: body.initialGuess.toString() },
-        { label: 'Calculado en', value: data.calculatedAt },
-      ];
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${r.label}</td><td>${r.value}</td>`;
-        tbody.appendChild(tr);
-      });
-
-      document.getElementById('ivNote').textContent = 'El cálculo no convergió dentro del límite de iteraciones. Esto no demuestra que el precio sea imposible.';
-      document.getElementById('ivResult').style.display = 'block';
-      showAlert('IV no convergió (422). Revisa los detalles arriba.', 'warning');
-      btn.disabled = false;
-      btn.textContent = ' Calcular volatilidad implícita';
-      return;
-    }
-
-    if (!res.ok) throw new Error(`quant-service respondió ${res.status}`);
-
-    const grid = document.getElementById('ivGrid');
-    grid.innerHTML = '';
-    const metrics = [
-      { label: 'Volatilidad Implícita (σ)', value: (data.impliedVolatility * 100).toFixed(4) + '%', neutral: true },
-      { label: 'Método', value: data.method, neutral: true },
-      { label: 'Convergió', value: data.converged ? 'Sí' : 'No', neutral: true },
-      { label: 'Iteraciones', value: data.iterations, neutral: true },
-      { label: 'Precio del modelo', value: `$${data.modelPrice?.toFixed(6)}`, neutral: true },
-      { label: 'Error de precio', value: data.pricingError?.toFixed(8), neutral: true },
-    ];
-    metrics.forEach(m => {
-      const el = document.createElement('div');
-      el.className = 'metric-card';
-      el.innerHTML = `<div class="label">${m.label}</div><div class="value ${m.pos ? 'pos' : m.neg ? 'neg' : 'neutral'}">${escapeHtml(m.value)}</div>`;
-      grid.appendChild(el);
-    });
-
-    const tbody = document.getElementById('ivTable');
-    tbody.innerHTML = '';
-    const rows = [
-      { label: 'Símbolo', value: body.symbol },
-      { label: 'Tipo', value: body.optionType },
-      { label: 'Spot', value: `$${body.spot}` },
-      { label: 'Strike', value: `$${body.strike}` },
-      { label: 'Vencimiento', value: body.expiration },
-      { label: 'Tasa libre (r)', value: body.rate.toString() },
-      { label: 'Dividendos (q)', value: body.dividendYield.toString() },
-      { label: 'Precio de mercado', value: `$${body.marketPrice}` },
-      { label: 'Suposición inicial (σ)', value: body.initialGuess.toString() },
-      { label: 'Calculado en', value: data.calculatedAt },
-    ];
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.label}</td><td>${r.value}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('ivNote').textContent = `Método: Newton-Raphson con tolerancia 1e-8 y máximo 200 iteraciones.`;
-    document.getElementById('ivResult').style.display = 'block';
-    showAlert('Volatilidad implícita calculada.', 'info');
-  } catch (e) {
-    showAlert('Error calculando IV: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Calcular volatilidad implícita';
-  }
-});
-
 // ── Candlestick Chart ──
+// Estado de la gráfica cargada y fuente de overlays (señales/niveles) que
+// asigna research-ui.js cuando hay una candidata seleccionada.
 window.__candlesChartState = { symbol: null, timeframe: null, periodLabel: null, candles: [] };
 function candleOverlays() {
   return typeof window.__candleOverlaySource === 'function' ? window.__candleOverlaySource() : null;
 }
 function refreshChartOverlays() {
   const state = window.__candlesChartState;
-  if (!state || !state.candles.length || document.getElementById('candlesChartContainer').style.display === 'none') return;
+  if (!state || !state.candles.length) return;
+  const container = document.getElementById('candlesChartContainer');
+  if (!container || container.style.display === 'none') return;
   renderCandlesChart(state.candles, state.timeframe, candleOverlays());
 }
 function formatPrice(value) {
@@ -1850,6 +1624,30 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
     }
   }
 
+  // ── Overlay del método del Quant Workbench: línea(s) violeta(s) y banda opcional ──
+  let methodLineShapes = '', methodBandShapes = '', methodLabels = '';
+  if (overlays && overlays.method) {
+    const methodColor = '#a78bfa';
+    const band = overlays.method.band;
+    if (band && Number.isFinite(band.lower) && Number.isFinite(band.upper) && band.upper > min && band.lower < max) {
+      const bandTop = Math.max(y(band.upper), padTop), bandBottom = Math.min(y(band.lower), height - padBottom);
+      methodBandShapes += `<rect data-method-band="iv" x="${padLeft}" y="${bandTop.toFixed(2)}" width="${plotW}" height="${Math.max(bandBottom - bandTop, 1).toFixed(2)}" fill="${methodColor}" fill-opacity="0.08" pointer-events="none"/>`;
+      for (const edge of ['upper', 'lower']) {
+        const edgeValue = Number(band[edge]);
+        if (!Number.isFinite(edgeValue) || edgeValue <= min || edgeValue >= max) continue;
+        const edgeY = y(edgeValue).toFixed(2);
+        methodBandShapes += `<line data-method-band="${edge}" x1="${padLeft}" y1="${edgeY}" x2="${width - padRight}" y2="${edgeY}" stroke="${methodColor}" stroke-width="1.2" stroke-dasharray="6 5" pointer-events="none"/>`;
+        methodLabels += `<text x="${width - padRight - 4}" y="${(Number(edgeY) - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${methodColor}">${edge === 'upper' ? '+1σ' : '−1σ'} ${band.label} ${formatPrice(edgeValue)}</text>`;
+      }
+    }
+    (overlays.method.lines || []).forEach((methodLine, lineIndex) => {
+      const value = Number(methodLine.value);
+      if (!Number.isFinite(value) || value <= min || value >= max) return;
+      const lineY = y(value).toFixed(2);
+      methodLineShapes += `<line data-method-level="${lineIndex}" x1="${padLeft}" y1="${lineY}" x2="${width - padRight}" y2="${lineY}" stroke="${methodColor}" stroke-width="1.6" pointer-events="none"/>`;
+      methodLabels += `<text x="${width - padRight - 4}" y="${(Number(lineY) - 4).toFixed(2)}" text-anchor="end" font-size="10" font-weight="700" fill="${methodColor}">${methodLine.label} ${formatPrice(value)}</text>`;
+    });
+  }
   // Las señales conservan el timestamp original de su vela, incluida su precisión.
   const dateKey = value => value;
   const visibleIndex = new Map(candles.map((candle, index) => [dateKey(candle.timestamp), index]));
@@ -1919,12 +1717,14 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
     <g>
       ${gridLines}
       <g>${levelShapes}</g>
+      <g>${methodBandShapes}</g>
       <g>${triggerLevelShapes}</g>
+      <g>${methodLineShapes}</g>
       <g>${shapes}</g>
       <g>${maShapes}${lastPriceMarkup}</g>
-      <g>${markerShapes}${triggerLabels}</g>
       <g>${volumeMarkup}</g>
-      <g>${maLegend}</g>
+      <g>${maLegend}${triggerLabels}${methodLabels}</g>
+      <g>${markerShapes}</g>
       ${xLabels}
       ${yLabels}
       <line id="candleCursor" y1="${padTop}" y2="${height-38}" stroke="#a3b4c7" stroke-dasharray="3 3" pointer-events="none" visibility="hidden" />

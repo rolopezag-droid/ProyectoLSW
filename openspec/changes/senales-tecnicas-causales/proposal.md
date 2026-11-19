@@ -7,7 +7,7 @@ Las rupturas históricas usan zonas calculadas con información posterior y las 
 - Calcular señales técnicas deterministas y causales al cierre; conservar entradas, salidas y niveles de candidatas por separado.
 - Consultar velas con rango, temporalidad y límite validados, paginando con protección frente a tokens repetidos y comunicando cobertura.
 - Mostrar filtros, marcadores, explicaciones y tabla cronológica completa para señales diarias, sin generar órdenes.
-- Documentar reglas y limitaciones y verificar compatibilidad con las cuatro estrategias y la interfaz cuantitativa disponible. La propuesta original en `Iolao` también contemplaba el Workbench, que no existe en Victor.
+- Documentar reglas y limitaciones y verificar compatibilidad con las cuatro estrategias y el Workbench incorporado desde `Iolao`.
 
 ## Capabilities
 

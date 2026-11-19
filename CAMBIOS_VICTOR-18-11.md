@@ -1,6 +1,6 @@
 # Proyecto LSW: cambios de la fase 1 y pulido de interfaz
 
-> **Integración en Victor:** este informe conserva la evidencia histórica de `Iolao`. En la integración actual se adaptaron las señales y los niveles a la gráfica de Victor; el Quant Workbench y sus pruebas pertenecen a la otra rama y no están presentes aquí. Los resultados y comandos de esa rama no describen por sí solos la validación de Victor.
+> **Integración en Victor:** este informe conserva la evidencia histórica de `Iolao`. La fusión incorpora el Quant Workbench y sus pruebas junto con las señales y los niveles de Victor. Los resultados de las sesiones anteriores no describen por sí solos la validación de la fusión.
 
 **Ámbito:** análisis técnico histórico, consulta de velas y presentación de señales.  
 **Estado de la revisión:** comparación del árbol de trabajo con `HEAD` `e75101c`, rama `Iolao`, y consulta de la evidencia de las dos sesiones de trabajo.  

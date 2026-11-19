@@ -1,12 +1,12 @@
 # Fase 2A: explicabilidad y validación de estrategias Bull/Bear
 
-> **Integración en Victor:** las referencias al Workbench describen la rama `Iolao` donde se elaboró esta auditoría. Victor conserva sus pestañas independientes de precios, griegas y volatilidad implícita; la explicabilidad y las señales se integraron en esa interfaz sin el Workbench.
+> **Integración en Victor:** la auditoría se elaboró sobre `Iolao`. La fusión incorpora el Workbench junto a la explicabilidad y las señales causales de Victor; el selector del Workbench ofrece precio, griegas y volatilidad implícita.
 
 ## Estado y objetivo
 
 Se añadió una capa de explicabilidad y contraste para las candidatas existentes de Bull Call, Bull Put, Bear Call y Bear Put. El objetivo es explicar las patas, las cifras financieras y el orden del ranking utilizando sus datos y reglas reales, sin sustituir el selector, los evaluadores o el score.
 
-**Pendientes financieros:** la probabilidad risk-neutral del panel de investigación presenta una discrepancia preexistente en su CDF normal y la descripción previa de Theta en el Workbench indica una unidad incorrecta. Ambos problemas se describen en la sección 7. La probabilidad cuestionada se advierte como no validada y existe una prueba `TODO` que reproduce la discrepancia. No se considera resuelto ese defecto ni se cambiaron las fórmulas para ocultarlo.
+**Hallazgos financieros:** la probabilidad risk-neutral del panel de investigación presenta una discrepancia preexistente en su CDF normal. La probabilidad cuestionada se advierte como no validada y existe una prueba `TODO` que reproduce la discrepancia. La descripción de Theta del Workbench se corrigió para indicar que es anualizada, sin cambiar la fórmula. La sección 7 conserva los hallazgos de la auditoría original.
 
 Una candidata es una observación orientativa. Su score no garantiza rentabilidad, seguridad ni ejecución; consultar sus explicaciones no envía órdenes.
 
@@ -108,7 +108,7 @@ La prueba `research-probability-discrepancy.test.js` reproduce el caso con una a
 
 ### Etiqueta de Theta
 
-`blackScholesGreeks` devuelve Theta anualizada cuando el tiempo está expresado en años, mientras el texto preexistente del Workbench dice «por día». No se cambió la fórmula ni la pantalla preexistente. La nueva explicación indica que las griegas de las patas y del spread no se calcularon en el ranking. La etiqueta debe revisarse por separado.
+`blackScholesGreeks` devuelve Theta anualizada cuando el tiempo está expresado en años; el texto anterior del Workbench decía «por día». Durante la fusión se corrigió la etiqueta, sin cambiar la fórmula. La explicación sigue indicando que las griegas de las patas y del spread no se calcularon en el ranking.
 
 ## 8. Pruebas y evidencia
 

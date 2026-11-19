@@ -1,6 +1,6 @@
 # Fase 1: señales técnicas y velas
 
-> **Integración en Victor:** las referencias y resultados relativos al Quant Workbench corresponden a la implementación anterior en `Iolao`. Victor conserva sus pestañas cuantitativas independientes; la gráfica integrada sí incluye los niveles y las señales de candidata.
+> **Integración en Victor:** la fusión incorpora el Quant Workbench de `Iolao` junto a las señales, explicaciones y niveles de Victor. Los resultados históricos de este documento corresponden a las sesiones indicadas, no a la validación de la fusión.
 
 ## Uso desde la interfaz
 

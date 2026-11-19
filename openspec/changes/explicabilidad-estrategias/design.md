@@ -23,9 +23,9 @@ La auditoría encontró dos rutas diferentes: `compareStrategies` enumera pares 
 - [Evaluador no disponible o discrepante] → mantener las cifras del ranking etiquetadas como no verificadas y explicar el fallo.
 
 ## Hallazgos financieros previos
-- Contexto de integración: la referencia al Workbench siguiente documenta la auditoría de `Iolao`; Victor conserva sus pestañas cuantitativas independientes y no incluye ese componente.
+- Contexto de integración: la referencia al Workbench siguiente documenta la auditoría de `Iolao`. La fusión lo incorpora en Victor y corrige la descripción de Theta sin cambiar la fórmula.
 - `research-analysis.blackScholesProbability` usa una aproximación de erf sin dividir el argumento por √2, a diferencia de `option-pricing.normalCdf`. Caso determinista: spot 100, objetivo 100, tasa 0.05, volatilidad 20%, asOf `2026-01-01T16:00:00Z`, vencimiento `2027-01-01`: resultado actual 0.5839696290; CDF normal estándar esperada 0.5595974556. No se modifica la fórmula en esta fase; se mostrará la discrepancia y se agregará un caso de prueba pendiente reproducible.
-- `blackScholesGreeks` devuelve Theta anualizada, mientras el texto preexistente de `quant-workbench.js` la describe como diaria. No se cambia la fórmula; se documenta la discrepancia y el panel nuevo no atribuirá unidades diarias.
+- `blackScholesGreeks` devuelve Theta anualizada; el texto anterior de `quant-workbench.js` la describía como diaria. La fusión corrige esa descripción sin cambiar la fórmula; el panel de explicabilidad no atribuye unidades diarias.
 
 ## Migration Plan
 Los metadatos son aditivos en el snapshot existente; no se cambia el esquema ni CRUD. Desplegar la GUI con Quant compatible y revertir los archivos de interfaz si fuese necesario.

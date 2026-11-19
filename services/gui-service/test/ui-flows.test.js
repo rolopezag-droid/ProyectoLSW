@@ -67,9 +67,26 @@ test('UI registro valida antes de enviar y muestra carga sin duplicar solicitude
   resolve({ok:true,status:202,json:async()=>({status:'confirmation_required',message:'Confirma tu correo.'})});await until(()=>!btn.disabled);
  }finally{dom.window.close();}
 });
+test('UI análisis de investigación lee tasas del workbench y completa sin errores de IDs removidos',async()=>{
+ const {dom,w}=page();try{
+  assert.ok(w.document.getElementById('qwRate'),'el workbench debe existir en el DOM');
+  const btn=w.document.getElementById('btnResearchAnalyze');btn.click();
+  await until(()=>!btn.disabled);
+  const status=w.document.getElementById('researchStatus').textContent;
+  assert.doesNotMatch(status,/Cannot read properties|null/);
+  assert.match(status,/Análisis listo/);
+  await new Promise(r=>setImmediate(r));
+ }finally{dom.window.close();}
+});
 test('UI IV recupera botón tras 422 y gráfica inspecciona una vela sin mover avisos',async()=>{
  const {dom,w}=page();try{
-  w.document.getElementById('btnCalcIV').click();await until(()=>!w.document.getElementById('btnCalcIV').disabled);assert.ok(!w.document.getElementById('ivGrid').textContent.includes('NaN'));
+  w.document.querySelector('#quantMethodGrid [data-method="iv"]').click();
+  assert.equal(w.document.getElementById('qwIvExtras').hidden,false);
+  const btn=w.document.getElementById('btnCalcQuant');btn.click();
+  await until(()=>!btn.disabled);
+  assert.ok(!w.document.getElementById('quantResult').textContent.includes('NaN'));
+  assert.match(w.document.getElementById('quantResult').textContent,/no convergió/i);
+  assert.match(btn.textContent,/volatilidad implícita/i);
   w.document.getElementById('btnLoadCandles').click();await until(()=>w.document.querySelector('[data-candle]'));
   w.document.querySelector('[data-candle]').dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true,clientX:100,clientY:100}));
   assert.ok(w.document.getElementById('candleTooltip').textContent.includes('Apertura'));assert.equal(w.getComputedStyle(w.document.getElementById('alertContainer')).position,'fixed');
@@ -123,10 +140,15 @@ test('UI exige precio del subyacente antes de iniciar sesión',async()=>{
  }finally{dom.window.close();}
 });
 
-for(const quote of [{symbol:'AAPL',bid:null,ask:190},{symbol:'AAPL',bid:200,ask:190},{symbol:'MSFT',bid:190,ask:191},{symbol:'MSFT',referencePrice:191,referenceSource:'latest_trade',referenceTimestamp:'2026-11-06T20:59:00Z'}])test('UI no reutiliza precio anterior ante cotización inválida '+JSON.stringify(quote),async()=>{
+for(const [quote,alertPattern] of [
+ [{symbol:'AAPL',bid:null,ask:190},/Cotizaciones para/],
+ [{symbol:'AAPL',bid:200,ask:190},/Cotizaciones para/],
+ [{symbol:'MSFT',bid:190,ask:191},/no corresponde/],
+ [{symbol:'MSFT',referencePrice:191,referenceSource:'latest_trade',referenceTimestamp:'2026-11-06T20:59:00Z'},/no corresponde/],
+])test('UI no reutiliza precio anterior ante cotización inválida '+JSON.stringify(quote),async()=>{
  const {dom,w}=page(null,u=>u.pathname.endsWith('/broker/quotes')?{ok:true,status:200,json:async()=>quote}:null);try{
   w.document.getElementById('saveSpot').value='999';const btn=w.document.getElementById('btnFetchQuotes');btn.click();await until(()=>!btn.disabled);
-  assert.equal(w.document.getElementById('saveSpot').value,'');assert.match(w.document.getElementById('saveSpotSource').textContent,/referencia manual/);assert.match(w.document.getElementById('alertContainer').textContent,/cotización válida/);
+  assert.equal(w.document.getElementById('saveSpot').value,'');assert.match(w.document.getElementById('saveSpotSource').textContent,/referencia manual/);assert.match(w.document.getElementById('alertContainer').textContent,alertPattern);
  }finally{dom.window.close();}
 });
 
@@ -203,6 +225,74 @@ test('UI sincroniza la candidata con niveles y señales orientativas sin enviar 
   const exitDetail=w.document.getElementById(exitButton.getAttribute('aria-controls'));
   assert.equal(exitDetail.hidden,false);assert.match(exitDetail.textContent,/SMA20 anterior.*SMA20/i);
   assert.equal(calls.some(c=>/\/broker\/(orders|spreads)$/.test(new URL(c.url,'http://localhost').pathname)),false);
+  await new Promise(r=>setImmediate(r));
+ }finally{dom.window.close();}
+});
+
+test('UI aplica el método del workbench a la tabla y lo combina con señales y niveles',async()=>{
+ const fresh=new Date().toISOString();
+ let deferPrices=false;const pendingPrices=[];
+ const {dom,w,calls}=page(null,(u,opts)=>{
+  if(u.pathname.endsWith('/broker/quotes'))return {ok:true,status:200,json:async()=>({symbol:u.searchParams.get('symbol'),referencePrice:190.2,referenceSource:'midpoint',referenceTimestamp:fresh})};
+  if(u.pathname.endsWith('/options-chain')){
+   const type=u.searchParams.get('type'),letter=type==='call'?'C':'P';
+   return {ok:true,status:200,json:async()=>({contracts:[
+    {type,underlyingSymbol:'AAPL',expiration:'2026-12-18',contractSymbol:'AAPL261218'+letter+'00190000',strike:190,bid:type==='call'?4:2,ask:type==='call'?4.2:2.2,timestamp:fresh,multiplier:100},
+    {type,underlyingSymbol:'AAPL',expiration:'2026-12-18',contractSymbol:'AAPL261218'+letter+'00195000',strike:195,bid:type==='call'?2:4,ask:type==='call'?2.2:4.2,timestamp:fresh,multiplier:100}
+   ],nextPageToken:null})};
+  }
+  if(u.pathname.endsWith('/quant/prices')){
+   const response={ok:true,status:200,json:async()=>({model:'black-scholes',symbol:JSON.parse(opts.body||'{}').symbol,price:12.3456,currency:'USD',assumptions:{timeToMaturityYears:0.25},calculatedAt:'2026-11-15T00:00:00Z'})};
+   return deferPrices?new Promise(resolve=>pendingPrices.push(()=>resolve(response))):response;
+  }
+  return null;
+ });try{
+  const analyze=w.document.getElementById('btnResearchAnalyze');analyze.click();
+  await until(()=>!analyze.disabled&&!w.document.getElementById('researchEvidence').hidden);
+  const rowCount=w.document.querySelectorAll('#researchCandidates tr[data-candidate]').length;
+  assert.ok(rowCount>=1&&rowCount<=20);
+  w.document.getElementById('btnCalcQuant').click();
+  await until(()=>w.document.getElementById('quantResult').textContent.includes('Precio teórico'));
+  assert.ok(w.__workbenchContext);
+  const before=calls.filter(c=>c.url.endsWith('/quant/prices')).length;
+  w.document.getElementById('btnApplyQuantToTable').click();
+  await until(()=>!w.document.getElementById('researchMethodHead').hidden);
+  const applied=calls.filter(c=>c.url.endsWith('/quant/prices')).length-before;
+  assert.ok(applied>=1&&applied<=20);
+  assert.match(w.document.getElementById('researchMethodHead').textContent,/Precio BS \(pata larga\)/);
+  assert.match(w.document.querySelector('#researchCandidates tr[data-candidate] td:last-child').textContent,/12\.35/);
+  assert.match(w.document.getElementById('researchStatus').textContent,/aplicado a \d+ candidata/);
+  const select=w.document.getElementById('chTriggerStrategy');
+  select.value=[...select.options].find(option=>option.textContent.includes('BULL CALL')).value;
+  select.dispatchEvent(new w.Event('change'));
+  await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='verified');
+  assert.match(w.document.getElementById('researchCandidateCalculations').textContent,/POST \/api\/v1\/strategies\/evaluate/);
+  w.document.getElementById('chShowTriggers').checked=true;
+  const bars=Array.from({length:120},(_,i)=>{const close=100+15*Math.sin(i/8);return {timestamp:new Date(Date.UTC(2020,0,i+1,5)).toISOString(),open:close,high:200,low:5,close,volume:100};});
+  w.renderCandles({symbol:'AAPL',timeframe:'1Day',bars});
+  const overlays=w.__candleOverlaySource();
+  assert.ok(overlays.levels&&overlays.method?.lines.length===1);
+  assert.match(overlays.method.lines[0].label,/BS pata larga/);
+  assert.match(overlays.note,/Método Workbench/);
+  assert.ok(w.document.querySelector('[data-method-level]'),'se dibuja el método en la gráfica');
+  assert.ok(w.document.querySelector('[data-trigger-mark="technical"]'),'las señales técnicas siguen visibles');
+  assert.ok(w.document.querySelector('[data-trigger-level]'),'se dibujan los niveles de la candidata');
+  assert.equal(calls.some(c=>/\/broker\/(orders|spreads)$/.test(new URL(c.url,'http://localhost').pathname)),false);
+  const token=w.__workbenchContext.token;
+  w.document.getElementById('btnCalcQuant').click();
+  await until(()=>w.__workbenchContext&&w.__workbenchContext.token!==token);
+  assert.equal(w.document.getElementById('researchMethodHead').hidden,true,'un nuevo cálculo retira la columna obsoleta');
+  w.document.querySelector('#quantMethodGrid [data-method="greeks"]').click();
+  w.document.getElementById('btnApplyQuantToTable').click();
+  assert.match(w.document.getElementById('alertContainer').textContent,/Calcula el método seleccionado/);
+  w.document.querySelector('#quantMethodGrid [data-method="prices"]').click();
+  deferPrices=true;w.document.getElementById('btnApplyQuantToTable').click();
+  await until(()=>pendingPrices.length>0);
+  const symbols=w.document.getElementById('researchSymbols');symbols.value='MSFT';symbols.dispatchEvent(new w.Event('input'));
+  pendingPrices.forEach(resolve=>resolve());
+  await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));
+  assert.equal(w.document.getElementById('researchEvidence').hidden,true);
+  assert.equal(w.__workbenchTableMetrics,null,'un resultado tardío no se aplica al análisis invalidado');
   await new Promise(r=>setImmediate(r));
  }finally{dom.window.close();}
 });
