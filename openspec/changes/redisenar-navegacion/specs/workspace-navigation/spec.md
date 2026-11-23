@@ -1,7 +1,7 @@
 # Workspace navigation
 ## ADDED Requirements
 ### Requirement: Independent task views
-The interface SHALL expose separate market, research, operation, calculator and history views with one active view at a time.
+The interface SHALL expose Inicio, Mercado, Comparar estrategias, Nueva operación and Historial with one active view at a time. Calculator and connection administration SHALL NOT be exposed as user views.
 #### Scenario: Switch context
 - WHEN a user opens Mercado and then Nueva operación
 - THEN the market view SHALL be hidden, the operation view SHALL be visible and entered values SHALL remain unchanged.

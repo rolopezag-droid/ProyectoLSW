@@ -67,7 +67,9 @@ test('las cuatro candidatas muestran patas y cálculos del evaluador sin enviar 
       await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='verified');
       const panel=w.document.getElementById('researchCandidateExplanation');
       assert.match(w.document.getElementById('researchCandidateTitle').textContent,new RegExp(strategy));
-      assert.ok([...panel.querySelectorAll('details')].every(detail=>!detail.open),'secciones cerradas al seleccionar otra candidata');
+      assert.equal(panel.querySelector('details').open,true,'el botón abre la explicación principal');
+      assert.ok([...panel.querySelectorAll('details')].slice(1).every(detail=>!detail.open),'el resto de los detalles conserva su apertura explícita');
+      assert.equal(w.document.activeElement,panel,'el foco llega a la explicación visible');
       assert.match(w.document.getElementById('researchCandidateLegs').textContent,/Pata comprada.*Pata vendida.*Ask.*Bid/s);
       const sent=JSON.parse(calls.filter(call=>call.url.pathname.endsWith('/strategies/evaluate')).at(-1).options.body);
       const evaluated=evaluateVerticalSpread(sent),text=w.document.getElementById('researchCandidateCalculations').textContent;

@@ -7,24 +7,20 @@
     mercado: ['Mercado', 'Explora el movimiento de una empresa', 'Consulta precios históricos, velas e indicadores del periodo que elijas.'],
     comparar: ['Comparar estrategias', 'Compara antes de decidir', 'Ordena empresas o consulta las estrategias de una empresa con los cores que elijas.'],
     operacion: ['Nueva operación', 'Construye y evalúa una estrategia', 'Define dos contratos, consulta sus primas y revisa el riesgo antes de guardar.'],
-    calculadora: ['Calculadora', 'Entiende el valor de una opción', 'Calcula precio teórico, griegas o volatilidad implícita con tus supuestos.'],
     historial: ['Historial', 'Vuelve a tus evaluaciones', 'Distingue las evaluaciones de este navegador de tu bitácora guardada en Supabase.'],
     guia: ['Guía de uso', 'Un recorrido claro, de principio a fin', 'Qué hace cada sección, qué necesitas y qué resultado puedes esperar.'],
-    conexiones: ['Conexiones', 'Estado del sistema', 'Consulta la disponibilidad de los servicios y el registro de actividad.'],
   };
-  const aliases = { strategy:'operacion', candles:'mercado', quant:'calculadora', research:'comparar', history:'historial' };
+  const aliases = { strategy:'operacion', candles:'mercado', quant:'comparar', calculadora:'comparar', research:'comparar', history:'historial' };
   const pages = new Map();
   let current = null;
   const main = document.querySelector('main');
   const sidebar = document.querySelector('.container > aside');
   const originalStrategy = $('tab-strategy');
   const market = $('tab-candles');
-  const calculator = $('tab-quant');
   const ticket = originalStrategy.querySelector(':scope > .card');
   const research = document.querySelector('.research-workspace');
   const history = $('historyTable').closest('.card');
   const result = $('resultsCard');
-  const serviceCards = Array.from(sidebar.children);
   document.body.classList.add('workspace-shell');
   document.querySelector('header h1').textContent = 'Bull & Bear';
   document.querySelector('.brand-caption').textContent = 'MESA DE ANÁLISIS';
@@ -133,8 +129,6 @@
   const paperOptions=details('Ejecución Paper y automatización',paperNodes,'workspace-details paper-options');
   ticket.append(paperOptions);
 
-  const calcPage=makePage('calculadora',calculator);
-  calcPage.prepend(note('Valoración de un contrato individual', 'Para evaluar las dos patas de un Bull o Bear, usa Nueva operación. Esta calculadora trabaja con una sola opción.'));
   const historyPage=makePage('historial');
   history.querySelector('h2').textContent='Evaluaciones de este navegador';
   history.prepend(note('Historial local', 'Estos resultados se conservan en este navegador. No confirman un guardado en Supabase.'));
@@ -145,14 +139,11 @@
   else {const journalPanel=$('btnLoadResearchJournal')?.closest('.research-panel');if(journalPanel)historyPage.append(journalPanel);}
 
   const help=makePage('guia');
-  help.innerHTML='<div class="guide-intro"><span class="section-eyebrow">GUÍA RÁPIDA</span><h3>De consultar una empresa<br>a entender una operación.</h3><p>No necesitas recorrer todos los formularios. Cada sección tiene una tarea distinta.</p></div><div class="guide-grid"><section><span class="guide-index">01</span><h3>Consulta en Mercado</h3><p>Selecciona una empresa y un periodo. Carga su gráfica y observa las tarjetas de precios. Las fechas y la duración por vela se ajustan en opciones personalizadas.</p><button class="text-action" data-page="mercado">Abrir Mercado →</button></section><section><span class="guide-index">02</span><h3>Compara estrategias</h3><p>Introduce hasta tres empresas y un vencimiento. El análisis compara Bull Call, Bear Call, Bull Put y Bear Put. Abre la explicación para revisar los datos que se utilizaron.</p><button class="text-action" data-page="comparar">Abrir comparación →</button></section><section><span class="guide-index">03</span><h3>Evalúa tu operación</h3><p>Selecciona la estrategia, las dos patas y las primas. Pulsa Evaluar para calcular riesgo, ganancia y equilibrio. El resultado permite guardar con tu cuenta.</p><button class="text-action" data-page="operacion">Abrir Nueva operación →</button></section><section><span class="guide-index">04</span><h3>Consulta tus resultados</h3><p>Historial distingue lo evaluado en este navegador de la bitácora persistida. La calculadora permite estudiar un contrato de forma independiente.</p><button class="text-action" data-page="historial">Abrir Historial →</button></section></div><section class="glossary"><h3>Los términos esenciales</h3><dl><div><dt>Strike</dt><dd>Precio de ejercicio fijado en el contrato de opción.</dd></div><div><dt>Prima</dt><dd>Precio que pagas por comprar la opción o recibes por venderla.</dd></div><div><dt>Long / Short</dt><dd>Long identifica la compra; Short identifica la venta.</dd></div><div><dt>Periodo / Vela</dt><dd>El periodo es todo el historial consultado; la vela resume un intervalo dentro de él.</dd></div><div><dt>Débito / Crédito</dt><dd>El débito es un pago neto; el crédito es un ingreso neto de primas.</dd></div><div><dt>Break-even</dt><dd>Precio del subyacente que equilibra el resultado al vencimiento, sin comisiones.</dd></div></dl></section>';
-  const system=makePage('conexiones'); serviceCards.forEach(card=>system.append(card));
-  system.prepend(note('Información técnica', 'Las conexiones se comprueban sin mover las pantallas de trabajo. Los controles de procesos solo están disponibles en ejecución local.'));
-  system.append($('servicesStatus'));
+  help.innerHTML='<div class="guide-intro"><span class="section-eyebrow">GUÍA RÁPIDA</span><h3>De consultar una empresa<br>a entender una operación.</h3><p>No necesitas recorrer todos los formularios. Cada sección tiene una tarea distinta.</p></div><div class="guide-grid"><section><span class="guide-index">01</span><h3>Consulta en Mercado</h3><p>Selecciona una empresa y un periodo. Carga su gráfica y observa las tarjetas de precios. Las fechas y la duración por vela se ajustan en opciones personalizadas.</p><button class="text-action" data-page="mercado">Abrir Mercado →</button></section><section><span class="guide-index">02</span><h3>Compara estrategias</h3><p>Elige una empresa o una lista y un vencimiento. El análisis compara Bull Call, Bear Call, Bull Put y Bear Put. Abre la explicación para revisar los datos que se utilizaron.</p><button class="text-action" data-page="comparar">Abrir comparación →</button></section><section><span class="guide-index">03</span><h3>Evalúa tu operación</h3><p>Selecciona la estrategia, las dos patas y las primas. Pulsa Evaluar para calcular riesgo, ganancia y equilibrio. El resultado permite guardar con tu cuenta.</p><button class="text-action" data-page="operacion">Abrir Nueva operación →</button></section><section><span class="guide-index">04</span><h3>Consulta tus resultados</h3><p>Historial distingue lo evaluado en este navegador de la bitácora persistida.</p><button class="text-action" data-page="historial">Abrir Historial →</button></section></div><section class="glossary"><h3>Los términos esenciales</h3><dl><div><dt>Strike</dt><dd>Precio de ejercicio fijado en el contrato de opción.</dd></div><div><dt>Prima</dt><dd>Precio que pagas por comprar la opción o recibes por venderla.</dd></div><div><dt>Long / Short</dt><dd>Long identifica la compra; Short identifica la venta.</dd></div><div><dt>Periodo / Vela</dt><dd>El periodo es todo el historial consultado; la vela resume un intervalo dentro de él.</dd></div><div><dt>Débito / Crédito</dt><dd>El débito es un pago neto; el crédito es un ingreso neto de primas.</dd></div><div><dt>Break-even</dt><dd>Precio del subyacente que equilibra el resultado al vencimiento, sin comisiones.</dd></div></dl></section>';
 
   const nav=document.querySelector('.tabs'); nav.replaceChildren();nav.setAttribute('aria-label','Navegación principal');
-  const primary=['inicio','mercado','comparar','operacion','calculadora','historial'];
-  const ids={operacion:'strategy',mercado:'candles',calculadora:'quant'};
+  const primary=['inicio','mercado','comparar','operacion','historial'];
+  const ids={operacion:'strategy',mercado:'candles'};
   primary.forEach((key,index)=>{
     const button=action(key,definitions[key][0],'tab-btn');button.id='tab-btn-'+(ids[key]||key);
     const number=document.createElement('span'); number.className='nav-number'; number.setAttribute('aria-hidden','true');number.textContent=String(index+1).padStart(2,'0');
@@ -161,9 +152,9 @@
   sidebar.replaceChildren();
   const label=document.createElement('p');label.className='sidebar-label';label.textContent='ESPACIO DE TRABAJO';sidebar.append(label,nav);
   const footer=document.createElement('div');footer.className='sidebar-footer';
-  footer.append(action('guia','Guía de uso','sidebar-link'),action('conexiones','Conexiones','sidebar-link'));
+  footer.append(action('guia','Guía de uso','sidebar-link'));
   const recovery=document.createElement('a');recovery.href='/auth/recuperar.html';recovery.className='sidebar-link';recovery.textContent='Recuperar acceso';footer.append(recovery);
-  const connection=document.createElement('span');connection.id='workspaceConnection';connection.className='connection-label';connection.textContent='Comprobando conexión…';footer.append(connection);sidebar.append(footer);
+  sidebar.append(footer);
   const menu=action('','Menú','mobile-menu');menu.removeAttribute('data-page');menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-controls','workspaceSidebar');sidebar.id='workspaceSidebar';header.prepend(menu);
   menu.addEventListener('click',()=>{const open=document.body.classList.toggle('menu-open');menu.setAttribute('aria-expanded',String(open));});
 
@@ -190,6 +181,6 @@
   root.addEventListener('popstate',()=>navigate(location.hash.slice(1)||'inicio',{write:false}));
   root.addEventListener('hashchange',()=>navigate(location.hash.slice(1)||'inicio',{write:false}));
   document.addEventListener('change',updateContext);
-  root.WorkspaceNavigation={navigate,get current(){return current;},setConnectionStatus(status){const values=Object.values(status);$('workspaceConnection').textContent=!values.length?'Estado no disponible':values.every(s=>s.running)?'Servicios disponibles':'Conexión parcial · ver detalles';}};
+  root.WorkspaceNavigation={navigate,get current(){return current;}};
   if(!navigate(location.hash.slice(1)||'inicio',{write:false}))navigate('inicio',{write:false});
 })(window);

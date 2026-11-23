@@ -60,6 +60,17 @@ function candidateButton(w,strategy) {
   return [...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')].find(row=>row.cells[2].textContent.trim()===strategy)?.querySelector('button[data-explain-candidate]');
 }
 
+test('navegación simplificada sin calculadora, conexiones ni sondeo técnico en el cliente',async()=>{
+ const {dom,w,calls}=page();try{
+  const doc=w.document;
+  assert.deepEqual([...doc.querySelectorAll('.tabs [data-page]')].map(button=>button.dataset.page),['inicio','mercado','comparar','operacion','historial']);
+  for(const id of ['tab-quant','tab-btn-quant','workspaceConnection','servicesList','servicesStatus'])assert.equal(doc.getElementById(id),null);
+  assert.equal(doc.querySelector('[data-page="conexiones"]'),null);
+  assert.equal(w.WorkspaceNavigation.navigate('calculadora'),true);assert.equal(w.WorkspaceNavigation.current,'comparar');
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(calls.some(call=>call.url.pathname==='/api/services/status'),false);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
 test('top: catálogo completo, una mejor estrategia por empresa y filtros antes del top',async()=>{
  const {dom,w,calls}=page();try{
   const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='all';
@@ -120,6 +131,24 @@ test('operación y presupuesto filtran inmediatamente las candidatas de la empre
   const rows=[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')];assert.equal(rows.length,1);assert.equal(rows[0].cells[2].textContent,'BULL PUT');
   $('researchMaxLoss').value='1';$('researchMaxLoss').dispatchEvent(new w.Event('input'));
   assert.equal(w.document.querySelectorAll('#researchCandidates tr[data-candidate]').length,0);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('la gráfica dibuja solo las curvas y líneas seleccionadas y las retira sin consultar de nuevo',async()=>{
+ const {dom,w,calls}=page();try{
+  const $=id=>w.document.getElementById(id);
+  const bars=Array.from({length:240},(_,i)=>{const close=100+Math.sin(i/6)*4;return {timestamp:new Date(Date.now()-(250-i)*86400000).toISOString(),open:close-.2,high:close+1,low:close-1,close,volume:10000};});
+  w.renderCandles({symbol:'AAPL',timeframe:'1Day',periodLabel:'1 Año',bars,complete:true});
+  const count=selector=>$('candlesChart').querySelectorAll(selector).length;
+  assert.equal(count('[data-sma-period]'),0);assert.equal(count('[data-sma-legend]'),0);assert.equal(count('[data-level-kind]'),0);assert.equal(count('[data-chart-layer="last-price"]'),0);
+  const requests=calls.length;
+  for(const period of [20,50,200]){const input=$('chShowSma'+period);input.checked=true;input.dispatchEvent(new w.Event('change'));assert.equal(count('[data-sma-period="'+period+'"]'),1);assert.equal(count('[data-sma-legend="'+period+'"]'),1);}
+  $('chShowSupportLines').checked=true;$('chShowSupportLines').dispatchEvent(new w.Event('change'));assert.ok(count('[data-level-kind="support"]')>0);
+  $('chShowLastPrice').checked=true;$('chShowLastPrice').dispatchEvent(new w.Event('change'));assert.equal(count('[data-chart-layer="last-price"]'),1);
+  for(const id of ['chShowSma20','chShowSma50','chShowSma200','chShowSupportLines','chShowLastPrice']){$(id).checked=false;$(id).dispatchEvent(new w.Event('change'));}
+  assert.equal(count('[data-sma-period],[data-sma-legend],[data-level-kind],[data-chart-layer="last-price"]'),0);assert.equal($('candlesLevelsNote').textContent,'');assert.equal(calls.length,requests);
+  $('chShowSma20').checked=true;$('chShowSupportLines').checked=true;$('researchModuleTechnical').checked=false;$('researchModuleTechnical').dispatchEvent(new w.Event('change'));
+  assert.equal(count('[data-sma-period],[data-level-kind]'),0);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
 

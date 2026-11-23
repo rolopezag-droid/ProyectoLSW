@@ -627,12 +627,20 @@
       if(prepare){const snapshot=currentSnapshot,candidate=snapshot?.candidates[Number(prepare.dataset.prepareCandidate)];if(!candidate)return;prepare.disabled=true;
         try{const verified=await evaluateCandidate(candidate);if(snapshot!==currentSnapshot)throw new Error('Cambió el análisis. Vuelve a seleccionar una sugerencia.');if(verified.status!=='verified')throw new Error(verified.issues.join(' '));await window.prepareResearchOperation(candidate,snapshot.underlyings.find(item=>item.symbol===candidate.symbol)?.spot);}catch(error){setStatus('No se pudo preparar: '+error.message,'error');}finally{prepare.disabled=false;}return;}
       const tr=event.target.closest('tr[data-candidate]');if(tr)selectCandidate(Number(tr.dataset.candidate));
+      if(event.target.closest('[data-explain-candidate]')){
+        const panel=$('researchCandidateExplanation');
+        if(!panel.hidden){
+          panel.querySelector('details').open=true;
+          panel.tabIndex=-1;panel.focus({preventScroll:true});
+          panel.scrollIntoView?.({block:'start',behavior:'auto'});
+        }
+      }
     });
     $('chTriggerStrategy').addEventListener('change',()=>{const value=$('chTriggerStrategy').value;selectCandidate(value===''?null:Number(value));});
     $('researchComparison').addEventListener('toggle',()=>{if(!$('researchComparison').open){comparisonVersion++;return;}if(currentSnapshot)renderStrategyComparison(currentSnapshot,filteredRows(currentSnapshot).rows);});
     $('researchCompareSymbol').addEventListener('change',()=>{if(!currentSnapshot)return;const candidate=getSelectedCandidate();if(candidate&&candidate.symbol!==$('researchCompareSymbol').value)selectCandidate(null);if($('researchComparison').open)renderStrategyComparison(currentSnapshot,filteredRows(currentSnapshot).rows);});
     $('chShowTriggers').addEventListener('change',()=>updateCandidateStatus());
-    document.querySelectorAll('.technical-indicator').forEach(input=>input.addEventListener('change',()=>refreshChartOverlays()));
+    document.querySelectorAll('.technical-indicator, .chart-layer-toggle').forEach(input=>input.addEventListener('change',()=>refreshChartOverlays()));
     $('chMarkerLimit').addEventListener('change',()=>refreshChartOverlays());
     $('chSignalDate').addEventListener('change',()=>refreshChartOverlays());
     $('btnClearSignalDate').addEventListener('click',()=>{$('chSignalDate').value='';refreshChartOverlays();});
