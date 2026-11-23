@@ -1,6 +1,8 @@
 const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const cache = new Map();
+const SP500_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let sp500Cache = null;
 
 function finite(...values) {
   for (const value of values) {
@@ -78,4 +80,27 @@ async function loadFundamentals(symbols, apiKey, { fetchImpl = global.fetch, now
   return { status: rows.some(row => row.status === 'available') ? 'available' : 'unavailable', provider: 'Financial Modeling Prep', capturedAt, rows };
 }
 
-module.exports = { loadFundamentals };
+async function loadSp500(apiKey, { fetchImpl = global.fetch, now = Date.now } = {}) {
+  if (!apiKey) return { status: 'unavailable', provider: 'Financial Modeling Prep', capturedAt: new Date(now()).toISOString(), error: 'FMP_API_KEY no está configurada en el servidor.', constituents: [] };
+  if (sp500Cache && sp500Cache.key === apiKey.slice(-4) && now() - sp500Cache.at < SP500_CACHE_TTL_MS) return sp500Cache.result;
+  const capturedAt = new Date(now()).toISOString();
+  const url = new URL(`${FMP_BASE_URL}/sp500-constituent`);
+  url.searchParams.set('apikey', apiKey);
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(15000) });
+  if (!response.ok) {
+    const error = new Error(response.status === 429 ? 'FMP alcanzó el límite de consultas.' : `FMP respondió con HTTP ${response.status}.`);
+    error.status = response.status === 429 ? 429 : 502;
+    throw error;
+  }
+  const data = await response.json();
+  if (!Array.isArray(data)) throw Object.assign(new Error('FMP devolvió una lista del S&P 500 no válida.'), { status: 502 });
+  const seen = new Set();
+  const constituents = data.map(item => ({ symbol: String(item.symbol || '').trim().toUpperCase(), name: String(item.name || item.companyName || '').trim() }))
+    .filter(item => /^[A-Z0-9.-]{1,12}$/.test(item.symbol) && !seen.has(item.symbol) && seen.add(item.symbol));
+  if (constituents.length < 400) throw Object.assign(new Error('FMP devolvió una lista incompleta del S&P 500.'), { status: 502 });
+  const result = { status: 'available', provider: 'Financial Modeling Prep', capturedAt, constituents };
+  sp500Cache = { key: apiKey.slice(-4), at: now(), result };
+  return result;
+}
+
+module.exports = { loadFundamentals, loadSp500 };

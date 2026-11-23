@@ -87,6 +87,24 @@ class AlpacaAdapter extends BrokerAdapter {
     return result;
   }
 
+  async getSnapshots({ symbols } = {}) {
+    const normalized = [...new Set((Array.isArray(symbols) ? symbols : []).map(value => String(value).trim().toUpperCase()))];
+    if (!normalized.length || normalized.length > 600 || normalized.some(value => !/^[A-Z0-9.-]{1,12}$/.test(value))) {
+      const error = new Error('symbols debe incluir entre 1 y 600 tickers válidos.'); error.status = 400; throw error;
+    }
+    const snapshots = {};
+    for (let offset = 0; offset < normalized.length; offset += 100) {
+      const batch = normalized.slice(offset, offset + 100);
+      const params = new URLSearchParams({ symbols: batch.join(','), feed: this.stockFeed });
+      const response = await this.request(this.dataBaseUrl, `/v2/stocks/snapshots?${params}`);
+      if (!response || typeof response !== 'object' || Array.isArray(response)) throw new Error('Alpaca devolvió snapshots no válidos.');
+      for (const [symbol, snapshot] of Object.entries(response)) {
+        if (batch.includes(symbol) && snapshot && typeof snapshot === 'object') snapshots[symbol] = snapshot;
+      }
+    }
+    return { provider: 'alpaca', feed: this.stockFeed, snapshots, capturedAt: new Date().toISOString() };
+  }
+
   async getCandles({ symbol, timeframe = '1Day', limit = 100, start, end, sort, pageToken } = {}) {
     if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
       const error = new Error('symbol debe ser un ticker válido.');

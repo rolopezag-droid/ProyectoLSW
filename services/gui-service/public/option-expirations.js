@@ -29,6 +29,6 @@
   }
   document.addEventListener('DOMContentLoaded',()=>{
     install('expiration',()=>$('symbol').value);
-    install('researchExpiration',()=>$('researchMode').value==='company'?$('researchCompany').value:$('researchUniverse').value==='all'?$('chSymbol').options[0].value:$('researchSymbols').value.split(',')[0].trim().toUpperCase());
+    install('researchExpiration',()=>$('researchMode').value==='company'?$('researchCompany').value:$('researchUniverse').value==='custom'?$('researchSymbols').value.split(',')[0].trim().toUpperCase():$('chSymbol').value.trim().toUpperCase());
   },{once:true});
 })();

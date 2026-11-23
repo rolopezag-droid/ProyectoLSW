@@ -51,6 +51,18 @@ const getQuote = async (request, response) => {
   }
 };
 
+const getMarketSnapshots = async (request, response) => {
+  try {
+    const symbols = String(request.query.symbols || '').split(',').map(value => value.trim().toUpperCase()).filter(Boolean);
+    if (!symbols.length || symbols.length > 600 || symbols.some(value => !/^[A-Z0-9.-]{1,12}$/.test(value))) {
+      return response.status(400).json({ message: 'symbols debe incluir entre 1 y 600 tickers válidos.' });
+    }
+    return response.json(await broker.getSnapshots({ symbols }));
+  } catch (error) {
+    return response.status(error.status || 502).json({ message: 'No se pudieron consultar los cambios diarios de mercado.', detail: error.message });
+  }
+};
+
 const getOptionExpirations = async (request,response) => {
   try { return response.json(await broker.getOptionExpirations({symbol:request.query.symbol})); }
   catch(error){return response.status(error.status||502).json({message:'No se pudieron consultar los vencimientos disponibles.',detail:error.message});}
@@ -254,4 +266,4 @@ const getOptionQuote = async (request, response) => {
   }
 };
 
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionExpirations, getOptionChain, getOptionStrikes, getOptionQuote, getCandles, getNews, createOrder, createSpread };
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getMarketSnapshots, getOptionExpirations, getOptionChain, getOptionStrikes, getOptionQuote, getCandles, getNews, createOrder, createSpread };

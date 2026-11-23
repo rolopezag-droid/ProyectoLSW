@@ -237,6 +237,10 @@
     .research-eyebrow { color:var(--accent); font-size:9px; font-weight:750; letter-spacing:1.3px; text-transform:uppercase; }
     .research-controls { padding:15px; border:1px solid #2b3949; border-radius:9px; background:rgba(10,16,23,.42); }
     .research-filter-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:10px 0 12px; align-items:end; }
+    .research-primary-filters { grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start; margin-top:0; }
+    .research-primary-filters > div { min-width:0; }
+    .research-primary-filters small { display:block; margin-top:5px; color:var(--muted); font-size:10px; line-height:1.4; }
+    .research-expiration input { width:100%; }
     .research-filter-grid label { display:block; }
     .research-filter-grid input,.research-filter-grid select { width:100%; }
     .research-module-options { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; padding:0; border:0; }
@@ -286,8 +290,9 @@
     .research-journal-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     #researchDecision { width:100%; min-height:88px; resize:vertical; }
     #researchHistory { margin-top:12px; padding-top:8px; border-top:1px solid rgba(137,157,178,.13); }
-    @media(max-width:1100px) { .research-panel-technical,.research-panel-news { grid-column:1 / -1; } .research-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-    @media(max-width:580px) { .research-panel { padding:14px; } .research-filter-grid { grid-template-columns:1fr; } .research-heading h2 { font-size:15px; } .research-source-status { font-size:8px; padding:4px 7px; } }
+    @media(max-width:1100px) { .research-panel-technical,.research-panel-news { grid-column:1 / -1; } .research-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .research-primary-filters { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media(max-width:760px) { .research-primary-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:580px) { .research-panel { padding:14px; } .research-filter-grid,.research-primary-filters { grid-template-columns:1fr; } .research-heading h2 { font-size:15px; } .research-source-status { font-size:8px; padding:4px 7px; } }
 
     table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
     th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
@@ -420,6 +425,12 @@
     .metric-card .value.neutral { color:#e5ecf3; }
     #resultsCard > .row { order:3; border-top:1px solid var(--border); padding-top:16px; }
     table { display:block; overflow-x:auto; border-radius:5px; }
+    .legs-table-wrap { width:100%; overflow-x:auto; border:1px solid var(--border); border-radius:5px; }
+    table.legs-table { display:table; width:100%; min-width:420px; table-layout:fixed; border:0; border-radius:0; font-size:11px; }
+    .legs-table th { padding:10px 12px; font-size:9px; letter-spacing:.35px; }
+    .legs-table td { padding:11px 12px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .legs-table th:nth-child(4),.legs-table th:nth-child(5),.legs-table td:nth-child(4),.legs-table td:nth-child(5) { text-align:right; }
+    .legs-table tbody tr:nth-child(even) td { background:rgba(255,255,255,.025); }
     th { font-size:9px; background:#202b38; white-space:nowrap; }
     td { font-size:11px; padding:12px; }
     tr:hover td { background:#1b2836; }
@@ -578,16 +589,7 @@
           </div>
           <div>
             <label>Símbolo (Ticker)</label>
-            <select id="symbol" required aria-label="Empresa a analizar"><option value="AAPL">Apple (AAPL)</option>
-<option value="MSFT">Microsoft (MSFT)</option>
-<option value="TSLA">Tesla (TSLA)</option>
-<option value="AMZN">Amazon (AMZN)</option>
-<option value="GOOGL">Alphabet (Google) (GOOGL)</option>
-<option value="NVDA">NVIDIA (NVDA)</option>
-<option value="META">Meta (META)</option>
-<option value="NFLX">Netflix (NFLX)</option>
-<option value="AMD">AMD (AMD)</option>
-<option value="INTC">Intel (INTC)</option></select>
+            <input id="symbol" type="text" list="tickerCatalog" value="AAPL" maxlength="12" pattern="[A-Za-z0-9.-]{1,12}" required aria-label="Empresa a analizar" placeholder="Escribe un ticker, por ejemplo MSFT" />
           </div>
           <div>
             <label>Vencimiento (YYYY-MM-DD)</label>
@@ -657,12 +659,13 @@
         </div>
         <div class="results-grid" id="resultsGrid"></div>
         <div style="margin-top:1rem;">
-          <table>
+          <div class="legs-table-wrap"><table class="legs-table">
+            <colgroup><col style="width:10%" /><col style="width:20%" /><col style="width:18%" /><col style="width:25%" /><col style="width:27%" /></colgroup>
             <thead>
               <tr><th>Pata</th><th>Acción</th><th>Tipo</th><th>Strike</th><th>Precio</th></tr>
             </thead>
             <tbody id="legsTable"></tbody>
-          </table>
+          </table></div>
         </div>
       </div>
 
@@ -682,21 +685,12 @@
     <div id="tab-candles" class="tab-content">
       <div class="card">
         <h2>Mercado · Alpaca <button type="button" class="btn-order-toggle" id="btnWorkspaceView" title="Alterna entre ver la gráfica y el panel de investigación lado a lado o apilados">Ver apilado</button></h2>
-        <p class="small-note">Elige un ticker antes de mostrar la gráfica: se cargan las velas históricas de Alpaca para el símbolo que selecciontes.</p>
+        <p class="small-note">Escribe cualquier ticker de mercado compatible con Alpaca o elige uno de la lista sugerida para consultar sus velas históricas.</p>
 
         <form id="candlesForm" class="row">
           <div>
             <label>Símbolo (Ticker)</label>
-            <select id="chSymbol" required aria-label="Empresa a analizar"><option value="AAPL">Apple (AAPL)</option>
-<option value="MSFT">Microsoft (MSFT)</option>
-<option value="TSLA">Tesla (TSLA)</option>
-<option value="AMZN">Amazon (AMZN)</option>
-<option value="GOOGL">Alphabet (Google) (GOOGL)</option>
-<option value="NVDA">NVIDIA (NVDA)</option>
-<option value="META">Meta (META)</option>
-<option value="NFLX">Netflix (NFLX)</option>
-<option value="AMD">AMD (AMD)</option>
-<option value="INTC">Intel (INTC)</option></select>
+            <input id="chSymbol" type="text" list="tickerCatalog" value="AAPL" maxlength="12" pattern="[A-Za-z0-9.-]{1,12}" required aria-label="Empresa a analizar" placeholder="Escribe un ticker, por ejemplo MSFT" />
           </div>
           <div>
             <label>Periodo a mostrar</label>
@@ -779,14 +773,15 @@
         <section class="research-workspace" aria-labelledby="researchTitle">
           <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
           <div class="research-controls">
-            <div class="research-filter-grid"><div><label for="researchMode">¿Qué quieres comparar?</label><select id="researchMode"><option value="top">Top de empresas + mejor estrategia</option><option value="company">Una empresa + operaciones sugeridas</option></select></div><div id="researchUniverseField"><label for="researchUniverse">Empresas que analizar</label><select id="researchUniverse"><option value="all">Todas las empresas del proyecto</option><option value="custom">Mi lista de tickers</option></select></div><div id="researchCompanyField" hidden><label for="researchCompany">Empresa</label><select id="researchCompany"></select></div></div>
+            <div class="research-filter-grid research-primary-filters"><div><label for="researchMode">¿Qué quieres comparar?</label><select id="researchMode"><option value="top">Top de empresas + mejor estrategia</option><option value="company">Una empresa + operaciones sugeridas</option></select></div><div id="researchUniverseField"><label for="researchUniverse">Empresas que analizar</label><select id="researchUniverse"><option value="sp500">Explorar S&amp;P 500 (5 alzas + 5 caídas)</option><option value="custom">Mi lista de tickers</option></select><small>Requiere FMP_API_KEY; precios de Alpaca.</small></div><div id="researchCompanyField" hidden><label for="researchCompany">Empresa</label><input id="researchCompany" type="text" list="tickerCatalog" value="AAPL" maxlength="12" pattern="[A-Za-z0-9.-]{1,12}" aria-label="Empresa a comparar" /></div></div>
             <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 10</span></label>
-            <input id="researchSymbols" value="AAPL" maxlength="40" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
+            <input id="researchSymbols" value="AAPL" maxlength="130" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
+            <datalist id="tickerCatalog"><option value="AAPL" label="Apple"></option><option value="MSFT" label="Microsoft"></option><option value="TSLA" label="Tesla"></option><option value="AMZN" label="Amazon"></option><option value="GOOGL" label="Alphabet"></option><option value="NVDA" label="NVIDIA"></option><option value="META" label="Meta"></option><option value="NFLX" label="Netflix"></option><option value="AMD" label="AMD"></option><option value="INTC" label="Intel"></option></datalist>
             <fieldset class="research-module-options" aria-label="Módulos que incluir en el análisis">
               <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Core técnico (tendencia e indicadores)</label>
               <label class="research-module-option"><input id="researchModuleBlackScholes" type="checkbox" checked /> Core Black‑Scholes</label>
               <label class="research-module-option"><input id="researchModuleFinancial" type="checkbox" /> Análisis fundamental FMP</label>
-              <label class="research-module-option"><input id="researchModuleMovers" type="checkbox" /> Ganadores/perdedores entre tickers elegidos</label>
+              <label class="research-module-option"><input id="researchModuleMovers" type="checkbox" /> Ganadores/perdedores del universo analizado</label>
               <label class="research-module-option"><input id="researchModuleNews" type="checkbox" checked /> Noticias Alpaca</label>
             </fieldset>
             <div class="research-filter-grid">
@@ -811,11 +806,11 @@
             </section>
             <section id="researchFinancialPanel" class="research-panel research-panel-wide" aria-labelledby="researchFinancialTitle" hidden>
               <div class="research-panel-heading"><div><span class="research-panel-kicker">02 · Valoración y negocio</span><h3 id="researchFinancialTitle">Análisis fundamental</h3></div><span id="researchFinancialSource" class="research-source-status">FMP API</span></div>
-              <p class="research-panel-description">El core fundamental (0 a 100) pondera los datos disponibles de crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B. Un valor mayor es más favorable según los rangos de esta heurística, sin comparación sectorial. La cobertura indica el porcentaje de pesos con datos (mínimo 50%); el score participa en el promedio únicamente al seleccionar este core, sin modificar las probabilidades.</p>
+              <p class="research-panel-description">En cada empresa puedes abrir “¿Qué significa este score?” para entender la calificación y “Ver métricas e interpretación” para leer cada indicador en lenguaje simple. El score es una heurística general de 0 a 100, sin comparación sectorial; la cobertura indica cuántos datos hubo. No predice el precio.</p>
               <p id="researchFinancialStatus" class="research-panel-description"></p><div id="researchFinancialRows" class="research-financial-list"></div>
             </section>
             <section id="researchMoversPanel" class="research-panel research-panel-wide" aria-labelledby="researchMoversTitle" hidden>
-              <div class="research-panel-heading"><div><span class="research-panel-kicker">03 · Movimiento de mercado</span><h3 id="researchMoversTitle">Ganadores y perdedores</h3></div><span class="research-source-status">Alpaca · tickers elegidos</span></div>
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">03 · Movimiento de mercado</span><h3 id="researchMoversTitle">Ganadores y perdedores</h3></div><span class="research-source-status">Alpaca · universo analizado</span></div>
               <p id="researchMoversStatus" class="research-panel-description"></p><div id="researchMovers" class="research-movers-list"></div>
             </section>
             <section id="researchNewsPanel" class="research-panel research-panel-news" aria-labelledby="researchNewsTitle">
@@ -2020,8 +2015,7 @@ window.prepareResearchOperation=async function(candidate,spot){
   document.querySelectorAll('.strategy-chip').forEach(chip=>chip.classList.toggle('active',chip.dataset.strategy===selectedStrategy));
   document.body.dataset.direction=selectedStrategy.startsWith('BEAR')?'bear':'bull';
   const symbol=document.getElementById('symbol');
-  if(![...symbol.options].some(option=>option.value===candidate.symbol))symbol.add(new Option(candidate.symbol,candidate.symbol));
-  symbol.value=candidate.symbol;document.getElementById('expiration').value=candidate.expiration;
+  symbol.value=candidate.symbol;document.getElementById('chSymbol').value=candidate.symbol;document.getElementById('expiration').value=candidate.expiration;
   document.getElementById('researchExpiration').value=candidate.expiration;
   document.getElementById('label').value=candidate.symbol+' · '+selectedStrategy.replace('_SPREAD','').replaceAll('_',' ');
   document.getElementById('quantity').value='1';document.getElementById('multiplier').value=String(checked.evaluationRequest.multiplier);

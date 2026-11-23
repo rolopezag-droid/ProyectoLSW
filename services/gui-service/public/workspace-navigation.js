@@ -91,7 +91,7 @@
   const researchPage = makePage('comparar'); researchPage.append(research);
   const expirationField = document.createElement('div'); expirationField.className = 'research-expiration';
   expirationField.innerHTML = '<label for="researchExpiration">Vencimiento de los contratos</label><input id="researchExpiration" type="date"><small>Se comparte con Nueva operación. Puedes cambiarlo antes de analizar.</small>';
-  $('researchSymbols').after(expirationField);
+  research.querySelector('.research-primary-filters').append(expirationField);
   $('researchExpiration').value = $('expiration').value;
   $('researchExpiration').addEventListener('change',()=>{ $('expiration').value=$('researchExpiration').value; $('expiration').dispatchEvent(new Event('change',{bubbles:true})); });
   $('expiration').addEventListener('change',()=>{ $('researchExpiration').value=$('expiration').value; });
