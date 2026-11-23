@@ -3,3 +3,8 @@ node_modules/
 *.log
 
 .local-data/
+.vercel/
+.env.local
+.env.*.local
+.vercel
+.env*

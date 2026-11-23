@@ -537,6 +537,7 @@
     .password-control button { flex:0 0 auto; border-radius:0 4px 4px 0; margin:0; }
     .password-recovery { display:inline-block; margin-top:7px; color:var(--accent); font-size:12px; text-decoration:underline; text-underline-offset:3px; }
   </style>
+  <link rel="stylesheet" href="/workspace.css?v=20261122-contrast" />
 </head>
 <body>
 
@@ -602,7 +603,7 @@
           </div>
           <div>
             <label>Vencimiento (YYYY-MM-DD)</label>
-            <input type="text" id="expiration" value="2026-12-18" required />
+            <input type="date" id="expiration" value="2026-12-18" required />
           </div>
           <div class="full">
             <label>Strike Compra (Long)</label>
@@ -812,7 +813,6 @@
               <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="sma_up" checked /> SMA50 alcista + SMA20</label>
               <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="sma_down" checked /> SMA50 bajista + SMA20</label>
               <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="rsi" checked /> RSI14 (30/70)</label>
-              <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="resistance" checked /> Ruptura de resistencia</label>
               <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="support" checked /> Ruptura de soporte</label>
             </div>
           </fieldset>
@@ -853,18 +853,21 @@
         <section class="research-workspace" aria-labelledby="researchTitle">
           <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
           <div class="research-controls">
-            <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 3</span></label>
+            <div class="research-filter-grid"><div><label for="researchMode">¿Qué quieres comparar?</label><select id="researchMode"><option value="top">Top de empresas + mejor estrategia</option><option value="company">Una empresa + operaciones sugeridas</option></select></div><div id="researchUniverseField"><label for="researchUniverse">Empresas que analizar</label><select id="researchUniverse"><option value="all">Todas las empresas del proyecto</option><option value="custom">Mi lista de tickers</option></select></div><div id="researchCompanyField" hidden><label for="researchCompany">Empresa</label><select id="researchCompany"></select></div></div>
+            <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 10</span></label>
             <input id="researchSymbols" value="AAPL" maxlength="40" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
             <fieldset class="research-module-options" aria-label="Módulos que incluir en el análisis">
-              <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Técnico y soportes/resistencias</label>
-              <label class="research-module-option"><input id="researchModuleBlackScholes" type="checkbox" checked /> Probabilidad Black‑Scholes</label>
+              <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Core técnico (tendencia e indicadores)</label>
+              <label class="research-module-option"><input id="researchModuleBlackScholes" type="checkbox" checked /> Core Black‑Scholes</label>
               <label class="research-module-option"><input id="researchModuleFinancial" type="checkbox" /> Análisis fundamental FMP</label>
               <label class="research-module-option"><input id="researchModuleMovers" type="checkbox" /> Ganadores/perdedores entre tickers elegidos</label>
               <label class="research-module-option"><input id="researchModuleNews" type="checkbox" checked /> Noticias Alpaca</label>
             </fieldset>
             <div class="research-filter-grid">
+              <div><label for="researchStrategyFilter">Operación sugerida</label><select id="researchStrategyFilter"><option value="all">Todas las estrategias</option><option value="BULL_CALL_SPREAD">Bull Call</option><option value="BEAR_CALL_SPREAD">Bear Call</option><option value="BULL_PUT_SPREAD">Bull Put</option><option value="BEAR_PUT_SPREAD">Bear Put</option></select></div>
+              <div><label for="researchMaxLoss">Pérdida máxima por contrato (USD)</label><input id="researchMaxLoss" type="number" min="0" step="1" placeholder="Sin límite" /></div>
               <div><label for="researchMinProb">Probabilidad mínima (%)</label><input id="researchMinProb" type="number" min="0" max="100" value="0" aria-label="Probabilidad histórica mínima en porcentaje" /></div>
-              <div><label for="researchMinRR">Ganancia/riesgo mínimo</label><input id="researchMinRR" type="number" min="0" step="0.1" value="0" /></div>
+              <div><label for="researchMinRR">Ganancia/riesgo mínimo</label><input id="researchMinRR" type="number" min="0" step="0.1" value="1" /></div>
               <div><label for="researchMaxSpread">Diferencial Bid/Ask máx. (suma relativa)</label><input id="researchMaxSpread" type="number" min="0" step="0.05" value="1" /></div>
               <div><label for="researchTrendFilter">Filtro de tendencia</label><select id="researchTrendFilter"><option value="all">Todas las tendencias</option><option value="aligned">Alineada con SMA20/50</option></select></div>
             </div>
@@ -877,12 +880,12 @@
             </section>
             <section id="researchTechnicalPanel" class="research-panel research-panel-technical" aria-labelledby="researchTechnicalTitle">
               <div class="research-panel-heading"><div><span class="research-panel-kicker">01 · Precio y tendencia</span><h3 id="researchTechnicalTitle">Análisis técnico</h3></div><span class="research-source-status">Velas Alpaca</span></div>
-              <p class="research-panel-description">Indicadores calculados con velas diarias del último año. Los pivotes necesitan tres velas posteriores para confirmarse; las zonas usan ATR.</p>
+              <p class="research-panel-description">Indicadores calculados con velas diarias del último año, solo cuando seleccionas el core técnico.</p>
               <div id="researchMetrics" class="research-metrics"></div>
             </section>
             <section id="researchFinancialPanel" class="research-panel research-panel-wide" aria-labelledby="researchFinancialTitle" hidden>
               <div class="research-panel-heading"><div><span class="research-panel-kicker">02 · Valoración y negocio</span><h3 id="researchFinancialTitle">Análisis fundamental</h3></div><span id="researchFinancialSource" class="research-source-status">FMP API</span></div>
-              <p class="research-panel-description">El score fundamental (0 a 100) pondera los datos disponibles de crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B. Un valor mayor es más favorable según los rangos de esta heurística, sin comparación sectorial. La cobertura indica el porcentaje de pesos con datos (mínimo 50%); el score ajusta el ranking, no las probabilidades.</p>
+              <p class="research-panel-description">El core fundamental (0 a 100) pondera los datos disponibles de crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B. Un valor mayor es más favorable según los rangos de esta heurística, sin comparación sectorial. La cobertura indica el porcentaje de pesos con datos (mínimo 50%); el score participa en el promedio únicamente al seleccionar este core, sin modificar las probabilidades.</p>
               <p id="researchFinancialStatus" class="research-panel-description"></p><div id="researchFinancialRows" class="research-financial-list"></div>
             </section>
             <section id="researchMoversPanel" class="research-panel research-panel-wide" aria-labelledby="researchMoversTitle" hidden>
@@ -896,10 +899,11 @@
             </section>
             <section class="research-panel research-panel-wide" aria-labelledby="researchStrategiesTitle">
               <div class="research-panel-heading"><div><span class="research-panel-kicker">05 · Riesgo y strikes</span><h3 id="researchStrategiesTitle">Comparación de estrategias</h3></div><span class="research-source-status">Opciones Alpaca</span></div>
-              <p class="research-panel-description">Ordenadas por score combinado orientativo. Las cifras del ranking son preliminares hasta contrastarlas con Quant en el detalle. El score fundamental puede ajustar el orden cuando hay suficientes métricas; no cambia las probabilidades mostradas.</p>
-              <details class="research-method"><summary>Cómo se calcula el score y qué límites tiene</summary><p>Score base = probabilidad histórica × ganancia/riesgo × factor técnico (1.1 alineada, 1.0 mixta, 0.9 contraria; factor 1 si se desactiva técnico) ÷ (1 + diferencial relativo Bid/Ask). Cuando se selecciona fundamentales, el score base se multiplica por un factor de 0.80 a 1.20 derivado de un score fundamental de 0 a 100. El score fundamental pondera crecimiento de ingresos y utilidad, ROE, margen neto, deuda/capital, razón corriente, P/E y P/B; normaliza los datos disponibles y requiere al menos 50% de cobertura. Los umbrales son una heurística general sin ajuste sectorial ni calibración. No altera la probabilidad histórica ni Black‑Scholes. La probabilidad histórica usa ventanas traslapadas y su IC Wilson puede subestimar incertidumbre. Black‑Scholes usa volatilidad realizada como proxy, no volatilidad implícita. Ninguna cifra es pronóstico calibrado ni recomendación.</p></details>
-              <p class="strategy-validation" id="researchBsCaveat" hidden>La probabilidad Black‑Scholes del panel presenta una discrepancia conocida en la CDF normal; no se considera una probabilidad validada. No participa en el score. Consulta la auditoría de la fase 2A.</p>
-              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th>Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th>Prob. histórica</th><th>Prob. BS</th><th>IC 95%</th><th>Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th><th id="researchMethodHead" hidden>Método</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <p class="research-panel-description">Ordenadas por score combinado orientativo. Las cifras del ranking son preliminares hasta contrastarlas con Quant en el detalle. Solo los cores seleccionados aportan al orden. El ranking no constituye una recomendación de inversión.</p>
+              <details class="research-method"><summary>Cómo se ordenan las sugerencias</summary><p>Puntuación de 0 a 100: promedio simple de los cores seleccionados. Técnico usa alineación de tendencia; Black-Scholes usa su estimación risk-neutral; fundamental usa métricas FMP y movimiento diario usa variación alineada. Noticias es contexto y no puntúa. Si falta información de un core elegido, no se asigna posición. Primero se filtran todos los pares y después se elige la mejor estrategia de cada empresa. Desempates: ganancia/riesgo y diferencial Bid/Ask. Es una regla heurística, no una predicción de rentabilidad.</p></details>
+              <p class="strategy-validation" id="researchBsCaveat" hidden>Black-Scholes utiliza volatilidad histórica realizada como aproximación, no volatilidad implícita. Su estimación risk-neutral no es una probabilidad real de ganancia ni garantiza rentabilidad.</p>
+              <div class="research-table-wrap"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th data-core-column="technical">Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th data-core-column="technical">Prob. histórica</th><th data-core-column="blackScholes">Prob. BS</th><th data-core-column="technical">IC 95%</th><th data-core-column="technical">Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th><th id="researchMethodHead" hidden>Método</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <p id="researchRankingStatus" class="small-note" role="status"></p>
               <section id="researchCandidateExplanation" class="strategy-explanation" aria-labelledby="researchCandidateTitle" hidden>
                 <h4 id="researchCandidateTitle">Candidata seleccionada</h4>
                 <p id="researchCandidateValidation" class="strategy-validation" role="status" aria-live="polite"></p>
@@ -911,7 +915,7 @@
               <details id="researchComparison" class="research-method strategy-comparison">
                 <summary>Comparar las cuatro estrategias</summary>
                 <label for="researchCompareSymbol">Empresa analizada</label><select id="researchCompareSymbol"></select>
-                <p>Comparación entre candidatas visibles tras los filtros y el límite de 20 por ticker; una estrategia ausente puede haber quedado fuera de esa muestra.</p>
+                <p>Comparación entre candidatas visibles tras los filtros ; una estrategia ausente no tuvo un par válido con los filtros elegidos.</p>
                 <p id="researchCompareStatus" class="strategy-validation" role="status" aria-live="polite"></p>
                 <div id="researchCompareResults"></div>
               </details>
@@ -936,98 +940,12 @@
 <script src="/research-analysis.js"></script>
 <script src="/strategy-triggers.js"></script>
 <script src="/strategy-explanation.js"></script>
+<script src="/research-ranking.js"></script>
 <script src="/research-ui.js"></script>
 <script src="/quant-workbench.js"></script>
 <script src="/collapsible-panels.js"></script>
-<script>
-// Composition visuelle uniquement : les contrôles conservent leurs identifiants.
-const navigation = document.querySelector('.tabs');
-const side = document.querySelector('aside');
-const drawer = document.createElement('div');
-drawer.hidden = true;
-drawer.className = 'service-drawer';
-
-while (side.firstChild) drawer.append(side.firstChild);
-side.append(navigation, drawer);
-const strategyView = document.getElementById('tab-strategy');
-const layout = document.createElement('div'); layout.className = 'analysis-layout';
-const analysisColumn = document.createElement('div'); analysisColumn.className = 'analysis-column';
-const orderPanel = strategyView.querySelector(':scope > .card'); orderPanel.classList.add('order-panel');
-const chartView = document.getElementById('tab-candles'); chartView.classList.remove('tab-content');
-const emptyChart = document.createElement('div'); emptyChart.className = 'chart-empty';
-const emptyTitle = document.createElement('strong'); emptyTitle.textContent = 'Données de marché';
-emptyTitle.textContent = 'Datos de mercado';
-const emptyText = document.createElement('span'); emptyText.textContent = 'Selecciona un símbolo y consulta la gráfica de Alpaca.';
-emptyChart.append(emptyTitle, emptyText); chartView.querySelector('.card').append(emptyChart);
-// ── Split configurable (lado a lado / apilado) + ticket de órdenes pegajoso ──
-const candlesCard = chartView.querySelector(':scope > .card');
-const researchSection = candlesCard ? candlesCard.querySelector(':scope > .research-workspace') : null;
-let workspaceView = null;
-if (candlesCard && researchSection) {
-  candlesCard.removeChild(researchSection);
-  workspaceView = document.createElement('div');
-  workspaceView.className = 'workspace-view';
-  let savedView = 'side';
-  try { if (localStorage.getItem('ui_workspace_view') === 'stacked') savedView = 'stacked'; } catch {}
-  workspaceView.dataset.view = savedView;
-  workspaceView.append(chartView, researchSection);
-  analysisColumn.append(workspaceView);
-}
-[...strategyView.children].filter(node => node !== orderPanel).forEach(node => analysisColumn.append(node));
-layout.append(analysisColumn, orderPanel); strategyView.append(layout);
-const workspaceViewBtn = document.getElementById('btnWorkspaceView');
-if (workspaceViewBtn && workspaceView) {
-  const syncViewLabel = () => { workspaceViewBtn.textContent = workspaceView.dataset.view === 'side' ? 'Ver apilado' : 'Ver lado a lado'; };
-  syncViewLabel();
-  workspaceViewBtn.addEventListener('click', () => {
-    const nextView = workspaceView.dataset.view === 'side' ? 'stacked' : 'side';
-    workspaceView.dataset.view = nextView;
-    try { localStorage.setItem('ui_workspace_view', nextView); } catch {}
-    syncViewLabel();
-  });
-}
-// ── Panel de orden plegable: pestaña lateral que libera el ancho del análisis ──
-// Los IDs del formulario y sus controles permanecen intactos; solo se ocultan.
-const orderToggleBtn = document.getElementById('btnToggleOrderPanel');
-if (orderToggleBtn) {
-  let orderCollapsed = false;
-  try { orderCollapsed = localStorage.getItem('ui_order_panel_collapsed') === '1'; } catch {}
-  const applyOrderState = () => {
-    orderPanel.classList.toggle('is-collapsed', orderCollapsed);
-    layout.classList.toggle('order-panel-collapsed', orderCollapsed);
-    orderToggleBtn.setAttribute('aria-expanded', String(!orderCollapsed));
-    orderToggleBtn.textContent = orderCollapsed ? '⟨ Nueva operación' : '⟩ Ocultar';
-    try { localStorage.setItem('ui_order_panel_collapsed', orderCollapsed ? '1' : '0'); } catch {}
-  };
-  applyOrderState();
-  orderToggleBtn.addEventListener('click', () => { orderCollapsed = !orderCollapsed; applyOrderState(); });
-  // La pestaña plegada completa también despliega (sin doble toggle con el botón).
-  orderPanel.addEventListener('click', event => {
-    if (!orderPanel.classList.contains('is-collapsed') || event.target.closest('#btnToggleOrderPanel')) return;
-    orderCollapsed = false; applyOrderState();
-  });
-}
-// ── Menú lateral plegable: tira delgada que cede el ancho al área central ──
-const sidebarToggleBtn = document.createElement('button');
-sidebarToggleBtn.type = 'button';
-sidebarToggleBtn.id = 'btnToggleSidebar';
-sidebarToggleBtn.className = 'sidebar-toggle';
-sidebarToggleBtn.setAttribute('aria-expanded', 'true');
-sidebarToggleBtn.setAttribute('aria-label', 'Ocultar o mostrar el menú lateral');
-let sidebarCollapsed = false;
-try { sidebarCollapsed = localStorage.getItem('ui_sidebar_collapsed') === '1'; } catch {}
-const containerEl = document.querySelector('.container');
-const applySidebarState = () => {
-  side.classList.toggle('is-collapsed', sidebarCollapsed);
-  if (containerEl) containerEl.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-  sidebarToggleBtn.setAttribute('aria-expanded', String(!sidebarCollapsed));
-  sidebarToggleBtn.textContent = sidebarCollapsed ? '⟩' : '⟨ Ocultar menú';
-  try { localStorage.setItem('ui_sidebar_collapsed', sidebarCollapsed ? '1' : '0'); } catch {}
-};
-side.insertBefore(sidebarToggleBtn, side.firstChild);
-applySidebarState();
-sidebarToggleBtn.addEventListener('click', () => { sidebarCollapsed = !sidebarCollapsed; applySidebarState(); });
-</script>
+<script src="/workspace-navigation.js"></script>
+<script src="/option-expirations.js"></script>
 <script>
 const API_BASE = '';
 const QUANT_SERVICE_URL = ''; // Proxy del mismo origen; respeta QUANT_SERVICE_URL del servidor.
@@ -1046,11 +964,7 @@ try { history = JSON.parse(localStorage.getItem('td_history') || '[]'); if(!Arra
 
 // ── Tabs ──
 function showTab(tabName) {
-  if (tabName === 'candles') { showTab('strategy'); document.getElementById('tab-candles').scrollIntoView({behavior:'smooth',block:'start'}); return; }
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-btn-' + tabName).classList.add('active');
-  document.getElementById('tab-' + tabName).classList.add('active');
+  return window.WorkspaceNavigation.navigate(tabName);
 }
 
 // ── Servicios ──
@@ -1065,6 +979,7 @@ async function refreshServices() {
 }
 
 function renderServices(status) {
+  if (window.WorkspaceNavigation) window.WorkspaceNavigation.setConnectionStatus(status);
   const container = document.getElementById('servicesList');
   const headerStatus = document.getElementById('servicesStatus');
   container.innerHTML = '';
@@ -1079,6 +994,8 @@ function renderServices(status) {
 
     const hChip = chip.cloneNode(true);
     headerStatus.appendChild(hChip);
+
+    if (svc.managedExternally) continue;
 
     const btnStart = document.createElement('button');
     btnStart.className = 'btn btn-success btn-block';
@@ -1547,10 +1464,9 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
     yLabels += `<text x="${padLeft - 8}" y="${yPosition}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="${gridColors.text}">${formatPrice(value)}</text>`;
   });
 
-  const levels = window.ResearchAnalysis?.supportResistance(candles);
+  const levels = document.getElementById('researchModuleTechnical').checked ? window.ResearchAnalysis?.supportResistance(candles) : null;
   const levelGroups = [
     { kind: 'support', label: 'Soportes', color: '#38bdf8', zones: levels?.supports || [] },
-    { kind: 'resistance', label: 'Resistencias', color: '#fb7185', zones: levels?.resistances || [] },
   ];
   let levelShapes = '';
   const levelNote = document.getElementById('candlesLevelsNote');
@@ -1566,7 +1482,7 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
     });
     levelNote.innerHTML = `Niveles activos con las velas mostradas (centro de zona; último cierre ${formatPrice(levels.latestClose)}): ${descriptions.join(' · ')}. Una zona está activa si el último cierre no rebasa su límite por ${levels.breakoutAtrBuffer} ATR. Pueden diferir del panel técnico, que usa velas diarias del último año.`;
   } else {
-    levelNote.textContent = 'Niveles no disponibles: se requieren al menos 15 velas válidas y ATR positivo.';
+    levelNote.textContent = document.getElementById('researchModuleTechnical').checked ? 'Soportes no disponibles: se requieren al menos 15 velas válidas y ATR positivo.' : '';
   }
 
   let shapes = '';
@@ -1583,7 +1499,7 @@ function renderCandlesChart(candles, timeframe, overlays = null) {
 
   const movingAverages=[{period:20,color:'#c05cc8',label:'SMA 20'},{period:50,color:'#f59e0b',label:'SMA 50'},{period:200,color:'#a87916',label:'SMA 200'}];
   let maShapes='',maLegend='',legendY=padTop+14;
-  movingAverages.forEach(({period,color,label})=>{
+  (document.getElementById('researchModuleTechnical').checked?movingAverages:[]).forEach(({period,color,label})=>{
     let path='';
     const series=window.ResearchAnalysis?.simpleMovingAverageSeries(candles,period)||[];
     series.forEach((point,index)=>{
@@ -2107,9 +2023,11 @@ for (const [source, target] of [['symbol', 'chSymbol'], ['chSymbol', 'symbol']])
 }
 // ── Strikes disponibles desde Alpaca (combobox) ──
 let availableStrikes = [];
+let strikeLoadVersion = 0;
 let selectedSpotForStrikes = null;
 
 async function loadStrikes() {
+  const loadVersion=++strikeLoadVersion;
   const symbol = document.getElementById('symbol').value.trim().toUpperCase();
   const expiration = document.getElementById('expiration').value.trim();
   const type = selectedStrategy.includes('CALL') ? 'call' : 'put';
@@ -2138,6 +2056,7 @@ async function loadStrikes() {
     const params = new URLSearchParams({ symbol, expiration, type });
     const res = await fetch(`${QUANT_SERVICE_URL}/api/v1/broker/options-chain/strikes?${params}`);
     const data = await res.json().catch(() => ({}));
+    if(loadVersion!==strikeLoadVersion)return;
     if (!res.ok) throw new Error(data.message || `quant-service respondió ${res.status}`);
     availableStrikes = data.strikes || [];
     fillStrikeSelects(availableStrikes);
@@ -2147,6 +2066,7 @@ async function loadStrikes() {
     selectLong.disabled = false;
     selectShort.disabled = false;
   } catch (error) {
+    if(loadVersion!==strikeLoadVersion)return;
     noteLong.textContent = 'Error cargando strikes: ' + error.message;
     noteShort.textContent = noteLong.textContent;
     selectLong.innerHTML = '<option value="">Error</option>';
@@ -2213,7 +2133,34 @@ setInterval(refreshServices, 10000);
 renderHistory();
 loadStrikes();
 log('Dashboard listo. Estado de servicios comprobado mediante health checks.');
+
+// Preparar una sugerencia no evalúa, no guarda y no envía órdenes.
+window.prepareResearchOperation=async function(candidate,spot){
+  const checked=window.StrategyExplanation.validateCandidate(candidate);
+  if(!checked.valid)throw new Error(checked.issues.join(' '));
+  stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;clearStrategyQuotes();
+  selectedStrategy=candidate.strategy;
+  document.querySelectorAll('.strategy-chip').forEach(chip=>chip.classList.toggle('active',chip.dataset.strategy===selectedStrategy));
+  document.body.dataset.direction=selectedStrategy.startsWith('BEAR')?'bear':'bull';
+  const symbol=document.getElementById('symbol');
+  if(![...symbol.options].some(option=>option.value===candidate.symbol))symbol.add(new Option(candidate.symbol,candidate.symbol));
+  symbol.value=candidate.symbol;document.getElementById('expiration').value=candidate.expiration;
+  document.getElementById('researchExpiration').value=candidate.expiration;
+  document.getElementById('label').value=candidate.symbol+' · '+selectedStrategy.replace('_SPREAD','').replaceAll('_',' ');
+  document.getElementById('quantity').value='1';document.getElementById('multiplier').value=String(checked.evaluationRequest.multiplier);
+  await loadStrikes();
+  if(selectedStrategy!==candidate.strategy||symbol.value!==candidate.symbol||document.getElementById('expiration').value!==candidate.expiration)throw new Error('Cambió la selección mientras se preparaba la operación.');
+  for(const [id,value] of [['strikeLong',candidate.longStrike],['strikeShort',candidate.shortStrike]]){
+    const select=document.getElementById(id);if(![...select.options].some(option=>Number(option.value)===value))select.add(new Option(String(value),String(value)));select.value=String(value);
+  }
+  document.getElementById('priceLong').value=String(candidate.longAsk);document.getElementById('priceShort').value=String(candidate.shortBid);
+  document.getElementById('saveSpot').value=Number.isFinite(spot)?String(spot):'';
+  document.getElementById('saveSpotSource').textContent='Referencia de la sugerencia; las primas corresponden a su captura. Vuelve a cotizar antes de enviar una orden.';
+  for(const id of ['strikeLongNote','strikeShortNote'])document.getElementById(id).textContent='Contrato trasladado desde Comparar estrategias. Primas de la captura del análisis.';
+  window.WorkspaceNavigation.navigate('operacion',{focus:true});
+  showAlert('Sugerencia cargada. Revisa los datos y pulsa Evaluar estrategia. No se envió ninguna orden.','info');
+};
 </script>
 
 </body>
-</html
+</html>

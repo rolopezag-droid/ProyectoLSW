@@ -51,6 +51,11 @@ const getQuote = async (request, response) => {
   }
 };
 
+const getOptionExpirations = async (request,response) => {
+  try { return response.json(await broker.getOptionExpirations({symbol:request.query.symbol})); }
+  catch(error){return response.status(error.status||502).json({message:'No se pudieron consultar los vencimientos disponibles.',detail:error.message});}
+};
+
 const getOptionChain = async (request, response) => {
   try {
     const { symbol, expiration, minStrike, maxStrike, limit, type, pageToken } = request.query;
@@ -249,4 +254,4 @@ const getOptionQuote = async (request, response) => {
   }
 };
 
-module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionChain, getOptionStrikes, getOptionQuote, getCandles, getNews, createOrder, createSpread };
+module.exports = { ingestOptions, readIngestion, getAccount, getQuote, getOptionExpirations, getOptionChain, getOptionStrikes, getOptionQuote, getCandles, getNews, createOrder, createSpread };

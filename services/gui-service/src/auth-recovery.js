@@ -2,7 +2,8 @@
 const { Router } = require('express');
 
 function applicationUrl() {
-  const url = new URL(process.env.APP_PUBLIC_URL || `http://localhost:${Number(process.env.GUI_PORT || 3005)}`);
+  const deployedHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  const url = new URL(process.env.APP_PUBLIC_URL || (process.env.VERCEL && deployedHost ? `https://${deployedHost}` : `http://localhost:${Number(process.env.GUI_PORT || 3005)}`));
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('APP_PUBLIC_URL inválida.');
   return url.origin;
 }

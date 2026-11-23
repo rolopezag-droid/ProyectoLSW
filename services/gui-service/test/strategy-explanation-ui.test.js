@@ -46,6 +46,8 @@ function page({ evaluate, missingQuotes = false, missingMultiplier = false, quot
   }
   w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
   w.document.getElementById('expiration').value=expiration;
+  w.document.getElementById('researchMode').value='company';
+  w.document.getElementById('researchMinRR').value='0';
   return {dom,w,calls,expiration};
 }
 
@@ -72,8 +74,8 @@ test('las cuatro candidatas muestran patas y cálculos del evaluador sin enviar 
       assert.match(text,/POST \/api\/v1\/strategies\/evaluate/);
       assert.ok(text.includes('$'+evaluated.maxProfit.toFixed(2)));assert.ok(text.includes('$'+evaluated.maxLoss.toFixed(2)));
       assert.ok(text.includes(String(evaluated.breakEven)));assert.match(text,/acciones\/contrato.*contrato\(s\)/);
-      assert.match(w.document.getElementById('researchCandidateScore').textContent,/Score base.*probabilidad histórica.*factor técnico/i);
-      assert.match(w.document.getElementById('researchCandidateWhy').textContent,/CDF con discrepancia auditada|Black-Scholes no disponible/i);
+      assert.match(w.document.getElementById('researchCandidateScore').textContent,/promedio simple.*cores de puntuación/i);
+      assert.match(w.document.getElementById('researchCandidateWhy').textContent,/CDF normal estándar verificada|Black-Scholes no disponible/i);
     }
     assert.equal(calls.some(call=>/\/broker\/(orders|spreads)$/.test(call.url.pathname)),false);
   }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
@@ -88,7 +90,7 @@ test('comparación usa cuatro candidatas verificadas y explica alcance y mejor s
     for(const strategy of ['BULL CALL','BULL PUT','BEAR CALL','BEAR PUT'])assert.ok(text.includes(strategy));
     assert.match(text,/Mejor puntuación verificada entre las candidatas visibles/);
     assert.match(text,/no a la inversión más rentable ni más segura/);
-    assert.match(w.document.getElementById('researchCompareStatus').textContent,/máximo de 20 por ticker/);
+    assert.match(w.document.getElementById('researchCompareStatus').textContent,/todos los pares válidos por ticker/);
     assert.equal(calls.some(call=>/\/broker\/(orders|spreads)$/.test(call.url.pathname)),false);
   }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
@@ -109,9 +111,9 @@ test('el score explica pesos fundamentales reales y separa Black-Scholes y notic
     w.document.getElementById('researchModuleFinancial').checked=true;await analyze(w);candidateButton(w,'BULL CALL').click();
     await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='verified');
     const score=w.document.getElementById('researchCandidateScore').textContent,why=w.document.getElementById('researchCandidateWhy').textContent;
-    assert.match(score,/Crecimiento de ingresos: peso 15%/);assert.match(score,/Razón corriente: peso 10%/);
-    assert.match(score,/Cobertura de pesos 100%/);assert.match(score,/Black-Scholes, noticias, RSI y ATR no son factores directos/i);
-    assert.match(why,/score fundamental.*ajustó el ranking/i);assert.match(why,/Noticias:.*no modifican el score/i);
+    assert.match(score,/Fundamental/);assert.match(w.document.getElementById('researchFinancialRows').textContent,/Crecimiento de ingresos/);
+    assert.match(score,/Cada uno pesa lo mismo/);assert.match(score,/Noticias es contexto, no aporta puntuación/i);
+    assert.match(why,/score fundamental.*aportó/i);assert.match(why,/Noticias:.*no modifican el score/i);
   }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
 
@@ -183,7 +185,7 @@ test('muestras insuficientes dejan el score no disponible y no inventan una gana
   const {dom,w}=page({barsCount:20});try{
     await analyze(w);candidateButton(w,'BULL CALL').click();
     await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='verified');
-    assert.match(w.document.getElementById('researchCandidateScore').textContent,/Score no disponible.*al menos 20 muestras/i);
+    assert.match(w.document.getElementById('researchCandidateScore').textContent,/No clasificable.*Faltan datos/i);
     const comparison=w.document.getElementById('researchComparison');comparison.open=true;comparison.dispatchEvent(new w.Event('toggle'));
     await until(()=>/0\/4 estrategias/.test(w.document.getElementById('researchCompareStatus').textContent));
     assert.match(w.document.getElementById('researchCompareStatus').textContent,/No es posible comparar las cuatro con criterios equivalentes/);
@@ -204,8 +206,8 @@ test('si cambia el ticker durante la consulta no se publica el snapshot anterior
 
 test('cambiar empresa en la comparación retira el detalle de otra empresa',async()=>{
   const {dom,w}=page();try{
-    w.document.getElementById('researchSymbols').value='AAPL,MSFT';await analyze(w);
-    const aapl=[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')].find(row=>row.cells[1].textContent==='AAPL');aapl.querySelector('button').click();
+    w.document.getElementById('researchMode').value='top';w.document.getElementById('researchUniverse').value='custom';w.document.getElementById('researchSymbols').value='AAPL,MSFT';await analyze(w);
+    const aapl=[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')].find(row=>row.cells[1].textContent==='AAPL');aapl.querySelector('button[data-explain-candidate]').click();
     await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='verified');
     const comparison=w.document.getElementById('researchComparison');comparison.open=true;comparison.dispatchEvent(new w.Event('toggle'));
     const symbol=w.document.getElementById('researchCompareSymbol');symbol.value='MSFT';symbol.dispatchEvent(new w.Event('change'));

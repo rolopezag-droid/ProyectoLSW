@@ -1,8 +1,12 @@
+// Guía de estudio: https://app.notion.com/p/41d3928ef00a80ecbcbbe9d0480eb50b
+
+// Notion 1.A: validación de parámetros.
 const validatePricing = ({spot,strike,rate=0,dividendYield=0,volatility,timeToMaturity,optionType}) => {
   for(const [name,value] of Object.entries({spot,strike,volatility,timeToMaturity})) if(!Number.isFinite(Number(value))||Number(value)<=0) throw new Error(name+' debe ser un número finito mayor que cero.');
   for(const [name,value] of Object.entries({rate,dividendYield})) if(!Number.isFinite(Number(value))) throw new Error(name+' debe ser un número finito.');
   if(!['call','put'].includes(optionType)) throw new Error('optionType debe ser call o put.');
 };
+// Notion 1.B: origen de las constantes y aproximación erf.
 const erf = (x) => {
   const sign = x < 0 ? -1 : 1;
   const absX = Math.abs(x);
@@ -18,23 +22,39 @@ const erf = (x) => {
   return sign * y;
 };
 
+// Notion 1.C: distribución normal acumulada y densidad.
+//Normal acumulada, no es una proababilidad de ganar.
 const normalCdf = (value) => 0.5 * (1 + erf(value / Math.sqrt(2)));
+//Densisdad normarl estandar, que se utilza en la fórmula de Black-Scholes y las griegas.
 const normalPdf = (value) => Math.exp(-(value * value) / 2) / Math.sqrt(2 * Math.PI);
 
+
+// Notion 1.D: tiempo a vencimiento y valores de respaldo.
+// Recibe expiration del formulario (qwExpiration) a través del controlador y calcula los años restantes.
 const getTimeToMaturity = (expiration) => {
   if (!expiration) {
+    // Respaldo elegido por el programa: 0.25 años, aproximadamente tres meses. Aquí NO significa volatilidad.
     return 0.25;
   }
 
+  // Valida formato YYYY-MM-DD y que exista la fecha; no busca la expiración en Alpaca.
   if(typeof expiration!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(expiration)||!Number.isFinite(Date.parse(expiration))||new Date(expiration).toISOString().slice(0,10)!==expiration) throw new Error('expiration debe usar una fecha válida YYYY-MM-DD.');
+  // Convierte el vencimiento a fecha; una fecha YYYY-MM-DD se interpreta a medianoche UTC.
   const target = new Date(expiration);
+  // Obtiene fecha y hora actuales del servidor.
   const now = new Date();
+  // Resta ambas fechas para obtener milisegundos restantes.
   const diff = target.getTime() - now.getTime();
+  // Convierte milisegundos a años; 365.25 es la convención de año elegida en el proyecto.
   const years = diff / (1000 * 60 * 60 * 24 * 365.25);
+  // Rechaza una fecha pasada o sin tiempo restante en vez de inventar días adicionales.
   if (!Number.isFinite(years) || years <= 0) throw new Error('expiration debe ser una fecha futura válida.');
+  // Entrega los años restantes al controlador para incluirlos como timeToMaturity.
   return years;
 };
 
+
+// Notion 1.E: origen y propósito de Black-Scholes; parámetros en la tabla inicial.
 const blackScholesPrice = ({
   spot,
   strike,
@@ -70,6 +90,7 @@ const blackScholesPrice = ({
   return value;
 };
 
+// Notion 1.F: significado y unidades de las griegas.
 const blackScholesGreeks = ({
   spot,
   strike,

@@ -67,6 +67,8 @@
   }
 
   function makeCollapsible(section) {
+    // Las nuevas páginas usan detalles explícitos, sin ocultar formularios por estados antiguos.
+    if (section.closest('.workspace-page')) return;
     // Exclusiones: el ticket de órdenes y el workbench siempre visibles y sin acordeón.
     if (section.classList.contains('order-panel')) return;
     if (section.closest('#tab-quant')) return;

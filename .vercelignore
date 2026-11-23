@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+.vercel
+.local-data
+node_modules
+**/*.log
+.agents
+.github
+docs
+openspec
+**/*.md
+**/test/**

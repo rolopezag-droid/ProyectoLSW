@@ -1,0 +1,155 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "gui": {
+      "root": "services/gui-service",
+      "framework": "express",
+      "entrypoint": "src/server.js",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "gateway",
+          "format": "url",
+          "env": "GATEWAY_SERVICE_URL"
+        },
+        {
+          "type": "service",
+          "service": "quant",
+          "format": "url",
+          "env": "QUANT_SERVICE_URL"
+        },
+        {
+          "type": "service",
+          "service": "strategy",
+          "format": "url",
+          "env": "STRATEGY_SERVICE_URL"
+        },
+        {
+          "type": "service",
+          "service": "catalog",
+          "format": "url",
+          "env": "CATALOG_SERVICE_URL"
+        },
+        {
+          "type": "service",
+          "service": "spread",
+          "format": "url",
+          "env": "SPREAD_SERVICE_URL"
+        }
+      ],
+      "installCommand": "cd ../.. && npm ci --omit=dev"
+    },
+    "gateway": {
+      "root": "services/api-gateway",
+      "framework": "express",
+      "entrypoint": "src/app.js",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "catalog",
+          "format": "url",
+          "env": "CATALOG_SERVICE_URL"
+        },
+        {
+          "type": "service",
+          "service": "quant",
+          "format": "url",
+          "env": "QUANT_SERVICE_URL"
+        },
+        {
+          "type": "service",
+          "service": "spread",
+          "format": "url",
+          "env": "SPREAD_SERVICE_URL"
+        }
+      ],
+      "installCommand": "cd ../.. && npm ci --omit=dev"
+    },
+    "quant": {
+      "root": "services/quant-service",
+      "framework": "express",
+      "entrypoint": "src/vercel.js",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "spread",
+          "format": "url",
+          "env": "SPREAD_SERVICE_URL"
+        }
+      ],
+      "installCommand": "cd ../.. && npm ci --omit=dev"
+    },
+    "strategy": {
+      "root": "services/strategy-service",
+      "framework": "express",
+      "entrypoint": "src/app.js",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "spread",
+          "format": "url",
+          "env": "SPREAD_SERVICE_URL"
+        }
+      ],
+      "installCommand": "cd ../.. && npm ci --omit=dev"
+    },
+    "spread": {
+      "root": "services/spread-service",
+      "framework": "express",
+      "entrypoint": "src/app.js",
+      "installCommand": "cd ../.. && npm ci --omit=dev"
+    },
+    "catalog": {
+      "root": "services/catalog-service",
+      "framework": "express",
+      "entrypoint": "src/vercel.js",
+      "installCommand": "cd ../.. && npm ci --omit=dev"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/v1/(.*)",
+      "destination": {
+        "service": "gateway"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "gui"
+      }
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/auth/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        }
+      ]
+    }
+  ]
+}

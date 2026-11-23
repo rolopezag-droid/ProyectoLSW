@@ -9,6 +9,12 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env'), quiet: true });
 const app = express();
 const PORT = Number(process.env.GUI_PORT || 3005);
 
+// Vercel owns process lifecycles; never expose local start/stop/log controls there.
+if (process.env.VERCEL) app.use('/api/services', (req, res, next) => {
+  if (req.method === 'GET' && req.path === '/status') return next();
+  res.status(409).json({ message: 'Vercel administra los servicios de este despliegue.' });
+});
+
 app.get('/health',(_req,res)=>res.json({service:'gui-service',status:'ok',pid:process.pid}));
 
 app.get('/api/research/fundamentals', async (req, res) => {
@@ -174,7 +180,9 @@ app.get('/api/services/status', async (_req,res)=>{
   const {checkService}=require('./health');
   const entries=await Promise.all(Object.entries(SERVICES).map(async([key,svc])=>{
     const proc=serviceProcesses[key];
-    return [key,{name:svc.name,port:svc.port,pid:proc?.pid||null,processRunning:!!proc&&proc.exitCode===null&&!proc.killed,...await checkService({...svc,id:key})}];
+    const variable = {'api-gateway':'GATEWAY_SERVICE_URL','catalog-service':'CATALOG_SERVICE_URL','quant-service':'QUANT_SERVICE_URL','strategy-service':'STRATEGY_SERVICE_URL','spread-service':'SPREAD_SERVICE_URL'}[key];
+    const healthUrl = process.env.VERCEL && process.env[variable] ? new URL('/health', process.env[variable]).toString() : undefined;
+    return [key,{name:svc.name,port:svc.port,pid:proc?.pid||null,managedExternally:!!process.env.VERCEL,processRunning:!!proc&&proc.exitCode===null&&!proc.killed,...await checkService({...svc,id:key,healthUrl})}];
   }));
   res.json(Object.fromEntries(entries));
 });
@@ -305,7 +313,7 @@ app.use((error,_req,res,next)=>{
   res.status(error.status||500).json({message:error.status===400?'El cuerpo JSON no es válido.':'No se pudo completar la solicitud.'});
 });
 
-if (require.main === module) {
+if (require.main === module && !process.env.VERCEL) {
   const net = require('net');
   const checkPort = port => new Promise((resolve, reject) => {
     const probe = net.createServer();

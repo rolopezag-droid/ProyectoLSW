@@ -247,6 +247,29 @@ class AlpacaAdapter extends BrokerAdapter {
     return { provider: 'alpaca', ...created, legs: created.legs || order.legs };
   }
 
+  async getOptionExpirations({ symbol }) {
+    if (typeof symbol !== 'string' || !/^[A-Z0-9.-]{1,12}$/i.test(symbol)) {
+      const error = new Error('symbol debe ser un ticker válido.'); error.status = 400; throw error;
+    }
+    const today = new Date().toISOString().slice(0,10);
+    const upper = new Date(); upper.setUTCFullYear(upper.getUTCFullYear()+10);
+    const dates = new Set(), seen = new Set(); let token;
+    // Solo metadatos: obtener vencimientos no requiere cotizar miles de contratos.
+    for (let page=0;page<50;page++) {
+      const params=new URLSearchParams({underlying_symbols:symbol.toUpperCase(),status:'active',limit:'1000',expiration_date_gte:today,expiration_date_lte:upper.toISOString().slice(0,10)});
+      if(token)params.set('page_token',token);
+      const data=await this.request(this.tradingBaseUrl,`/v2/options/contracts?${params}`);
+      const contracts=data.option_contracts||data.contracts;
+      if(!Array.isArray(contracts))throw new Error('Respuesta de vencimientos incompleta.');
+      for(const contract of contracts)if(contract.underlying_symbol===symbol.toUpperCase()&&/^\d{4}-\d{2}-\d{2}$/.test(contract.expiration_date)&&contract.expiration_date>=today)dates.add(contract.expiration_date);
+      token=data.next_page_token;
+      if(!token)return {provider:'alpaca',symbol:symbol.toUpperCase(),expirations:[...dates].sort(),complete:true,capturedAt:new Date().toISOString()};
+      if(typeof token!=='string'||seen.has(token))throw new Error('Paginación de vencimientos inválida.');
+      seen.add(token);
+    }
+    throw new Error('Demasiadas páginas de vencimientos; no se mostrará un catálogo parcial.');
+  }
+
   async getOptionChain({ symbol, expiration, strikeRange, limit = 100, type, pageToken }) {
     if (!symbol || !/^[A-Z0-9.-]+$/i.test(symbol)) {
       const error = new Error('symbol debe ser un ticker válido.');

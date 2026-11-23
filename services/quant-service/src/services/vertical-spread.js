@@ -1,3 +1,6 @@
+// Guía de estudio: https://app.notion.com/p/41d3928ef00a80ecbcbbe9d0480eb50b
+
+// Notion 2.A: reglas de las cuatro estrategias.
 const DEFINITIONS = Object.freeze({
   BULL_CALL_SPREAD: { optionType: 'call', lowerSide: 'buy', higherSide: 'sell', premiumType: 'debit' },
   BULL_PUT_SPREAD: { optionType: 'put', lowerSide: 'buy', higherSide: 'sell', premiumType: 'credit' },
@@ -5,12 +8,14 @@ const DEFINITIONS = Object.freeze({
   BEAR_PUT_SPREAD: { optionType: 'put', lowerSide: 'sell', higherSide: 'buy', premiumType: 'debit' },
 });
 
+// Notion 2.A: normalización del nombre.
 const normalizeStrategyType = (value) => String(value || '')
   .trim()
   .toUpperCase()
   .replace(/[ -]+/g, '_')
   .replace(/^(BULL|BEAR)_(CALL|PUT)$/, '$1_$2_SPREAD');
 
+// Notion 2.B: origen de datos, valores de respaldo y validaciones.
 const evaluateVerticalSpread = (input) => {
   const strategyType = normalizeStrategyType(input.strategyType);
   const definition = DEFINITIONS[strategyType];
@@ -58,6 +63,7 @@ const evaluateVerticalSpread = (input) => {
     throw new Error('Las patas no corresponden al tipo de spread seleccionado.');
   }
 
+  // Notion 2.C: ancho y prima neta.
   const width = higher.strike - lower.strike;
   const netCashPerShare = normalizedLegs.reduce(
     (total, leg) => total + (leg.side === 'sell' ? leg.price : -leg.price),
@@ -71,10 +77,12 @@ const evaluateVerticalSpread = (input) => {
     throw new Error('El crédito neto debe ser positivo y menor que el ancho del spread.');
   }
 
+  // Notion 2.D: pérdida y ganancia máximas.
   const maxRisk = (definition.premiumType === 'debit' ? netAmount : width - netAmount)
     * quantity * multiplier;
   const maxProfit = (definition.premiumType === 'debit' ? width - netAmount : netAmount)
     * quantity * multiplier;
+  // Notion 2.E: equilibrio y relación beneficio/riesgo.
   const breakEven = definition.optionType === 'call'
     ? lower.strike + netAmount
     : higher.strike - netAmount;

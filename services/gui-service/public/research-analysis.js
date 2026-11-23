@@ -96,7 +96,8 @@
   }
 
   function normalCdf(value) {
-    const sign=value<0?-1:1,x=Math.abs(value),t=1/(1+.3275911*x);
+    // Φ(z) = (1 + erf(z / √2)) / 2, igual que en option-pricing.js.
+    const sign=value<0?-1:1,x=Math.abs(value)/Math.sqrt(2),t=1/(1+.3275911*x);
     const polynomial=(((((1.061405429*t-1.453152027)*t+1.421413741)*t-.284496736)*t+.254829592)*t);
     const erf=sign*(1-polynomial*Math.exp(-x*x));
     return .5*(1+erf);
@@ -163,7 +164,8 @@
         candidates.push({strategy,symbol,expiration,optionType:definition.optionType,side:definition.side,technicalTrend:includeTechnical?technical.trend:null,technicalAlignment,longStrike:long.strike,shortStrike:short.strike,longSymbol:long.contractSymbol,shortSymbol:short.contractSymbol,longBid:long.bid,longAsk:long.ask,longQuoteTimestamp:long.timestamp,shortBid:short.bid,shortAsk:short.ask,shortQuoteTimestamp:short.timestamp,netPremium:net,premiumType:debit?'debit':'credit',maxProfit,maxLoss,breakEven,riskReward:maxProfit/maxLoss,liquidityScore:liquidity,score,probability,blackScholes});
       }
     }
-    return candidates.sort((a,b)=>(b.score??-1)-(a.score??-1)||b.probability.sampleSize-a.probability.sampleSize).slice(0,20);
+    // No recortar por el score antiguo: el ranking final depende de los cores seleccionados.
+    return candidates.sort((a,b)=>(b.score??-1)-(a.score??-1));
   }
 
   function scoreFundamentals(metrics={}) {
