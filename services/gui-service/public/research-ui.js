@@ -74,6 +74,11 @@
   }
 
   const assessNews=item=>window.NewsContext.assess(item);
+  function sentimentOf(item){
+    if(['bullish','bearish','mixed','neutral','unknown'].includes(item.sentiment?.label))return item.sentiment;
+    const fallback=assessNews(item),labels={'Posible sesgo alcista':'bullish','Posible sesgo bajista':'bearish','Señales mixtas':'mixed','Sin dirección clara':'neutral'};
+    return {label:labels[fallback.label]||'unknown',confidence:'low',signals:{bullish:fallback.matched.favorable,bearish:fallback.matched.adverse},explanation:fallback.label+'. '+fallback.explanation};
+  }
   function renderFinancialAndMovers(snapshot){
     const modules=snapshot.modules,fundamentals=snapshot.fundamentals;
     $('researchFinancialPanel').hidden=!modules.financial;
@@ -306,9 +311,12 @@
     renderSummary(view);renderTechnical(view);renderFinancialAndMovers(view);
     const news=view.news,newsPanel=$('researchNewsPanel');newsPanel.hidden=!snapshot.modules.news;
     if(snapshot.modules.news){
-      $('researchNewsStatus').textContent=news.status==='available'?`${news.articles.length} artículo(s) consultados para ${view.underlyings.map(x=>x.symbol).join(', ')} · Captura ${new Date(news.capturedAt).toLocaleString('es-MX')}.`:`No se pudieron consultar noticias de Alpaca: ${news.error||'error no especificado'}.`;
+      const sentimentCounts=news.articles.reduce((counts,item)=>{const label=sentimentOf(item).label;counts[label]=(counts[label]||0)+1;return counts;},{});
+      $('researchNewsStatus').textContent=news.status==='available'?`${news.articles.length} artículo(s) para ${view.underlyings.map(x=>x.symbol).join(', ')} · ${sentimentCounts.bullish||0} alcistas, ${sentimentCounts.bearish||0} bajistas, ${sentimentCounts.mixed||0} mixtas, ${sentimentCounts.neutral||0} sin señal clara · Captura ${new Date(news.capturedAt).toLocaleString('es-MX')}.`:`No se pudieron consultar noticias de Alpaca: ${news.error||'error no especificado'}.`;
       const articleUrl=value=>{try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)?url.href:null;}catch{return null;}};
-      $('researchNews').innerHTML=news.status==='available'&&news.articles.length?news.articles.slice(0,20).map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada',assessment=assessNews(item);return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}</strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div><p class="research-news-summary"><strong>${esc(assessment.label)}.</strong> ${esc(assessment.explanation)} Lectura automática por palabras clave, no confirma que la noticia haya causado un movimiento en el precio.</p>${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):'<p class="research-panel-description">No hay artículos disponibles para los tickers y periodo consultados.</p>';
+      const filter=$('researchNewsFilter').value,labels={bullish:'Alcista',bearish:'Bajista',mixed:'Mixta',neutral:'Sin señal clara',unknown:'Sin clasificar'},confidenceLabels={low:'baja',medium:'media',high:'alta'};
+      const articles=news.articles.filter(item=>filter==='all'||sentimentOf(item).label===filter).slice(0,20);
+      $('researchNews').innerHTML=news.status==='available'&&articles.length?articles.map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada',sentiment=sentimentOf(item),label=labels[sentiment.label]||labels.unknown,confidence=confidenceLabels[sentiment.confidence]||confidenceLabels.low,signals=[...(sentiment.signals?.bullish||[]),...(sentiment.signals?.bearish||[])];return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}<span class="research-sentiment-badge sentiment-${esc(sentiment.label)}">${esc(label)} · nivel heurístico ${esc(confidence)}</span></strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div>${sentiment.explanation?`<p class="research-news-summary">${esc(sentiment.explanation)}</p>`:''}${signals.length?`<p class="research-news-meta">Señales de texto: ${signals.map(esc).join(', ')}</p>`:''}${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):`<p class="research-panel-description">${news.status==='available'?'No hay artículos disponibles para esa clasificación.':'No hay artículos disponibles para los tickers y periodo consultados.'}</p>`;
     }
     const wbMetrics=window.__workbenchTableMetrics,wbCtx=window.__workbenchContext;
     const wbActive=!!(wbMetrics&&wbCtx&&wbMetrics.token===wbCtx.token);
@@ -385,7 +393,7 @@
       if(screening){screening.evaluatedCount=underlyings.length;screening.failedCount=failures.length;screening.emptyCount=empty;screening.coveredCount=screening.changes.length;screening.complete=failures.length===0;screening.failures=failures;}
       let news={status:'not-selected',provider:'Alpaca',capturedAt:null,articles:[]};
       if(modules.news)try{
-        const articles=new Map();for(let i=0;i<underlyings.length;i+=20){if(version!==researchVersion)return;const part=await fetchNews(underlyings.slice(i,i+20).map(x=>x.symbol));for(const article of part.articles)articles.set(article.id||article.url,article);}
+        const articles=new Map();for(let i=0;i<underlyings.length;i+=20){if(version!==researchVersion)return;const part=await fetchNews(underlyings.slice(i,i+20).map(x=>x.symbol));for(const article of part.articles)articles.set(article.id||article.url||[article.headline,article.created_at||article.updated_at,article.source||article.author].join('|'),article);}
         news={status:'available',provider:'Alpaca',capturedAt:new Date().toISOString(),articles:[...articles.values()]};
       }catch(error){news={status:'unavailable',provider:'Alpaca',capturedAt:new Date().toISOString(),articles:[],error:error.message};}
       const changes=screening?.changes||underlyings.filter(x=>Number.isFinite(x.dailyChangePct)).map(x=>({symbol:x.symbol,changePct:x.dailyChangePct,latestClose:x.dailyClose,previousClose:x.previousClose,timestamp:x.dailyTimestamp}));
@@ -701,6 +709,7 @@
     $('btnResearchShowAll').addEventListener('click',()=>{if(currentSnapshot){showAllRankedCompanies=!showAllRankedCompanies;render(currentSnapshot);}});
     $('btnResearchCancel').addEventListener('click',()=>{invalidateResearchContext(false);setStatus('Análisis cancelado. No se publica un ranking incompleto.','info');});
     $('btnResearchAnalyze').addEventListener('click',runAnalysis);$('btnResearchSave').addEventListener('click',saveJournal);$('btnResearchHistory').addEventListener('click',loadJournal);
+    $('researchNewsFilter').addEventListener('change',()=>{if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchMinProb','researchMinRR','researchMaxSpread','researchTrendFilter','researchMaxLoss','researchStrategyFilter'])for(const event of ['input','change'])$(id).addEventListener(event,()=>{if(currentSnapshot?.screening){invalidateResearchContext(false);setStatus('Cambiaste filtros del recorrido completo. Vuelve a analizar el S&P 500 con estos filtros.','info');}else if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchModuleTechnical','researchModuleBlackScholes','researchModuleFinancial','researchModuleMovers','researchModuleNews'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['researchSymbols','expiration'])for(const eventName of ['input','change'])$(id).addEventListener(eventName,()=>{if(currentSnapshot||running)invalidateResearchContext();});

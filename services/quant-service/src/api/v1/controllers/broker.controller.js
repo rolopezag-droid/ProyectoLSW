@@ -1,4 +1,5 @@
 const { createBroker } = require('../../../brokers');
+const { classifyNewsSentiment } = require('../../../services/news-sentiment');
 const {
   brokerProvider,
   alpacaKeyId,
@@ -141,7 +142,14 @@ const getCandles = async (request, response) => {
 const getNews = async (request, response) => {
   try {
     const { symbols, start, end, limit, sort } = request.query;
-    return response.json(await broker.getNews({ symbols, start, end, limit, sort }));
+    const result = await broker.getNews({ symbols, start, end, limit, sort });
+    return response.json({
+      ...result,
+      articles: result.articles.map(article => ({
+        ...article,
+        sentiment: classifyNewsSentiment(article),
+      })),
+    });
   } catch (error) {
     return response.status(error.status || 502).json({
       message: 'No se pudieron consultar noticias de Alpaca.',

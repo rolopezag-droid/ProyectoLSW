@@ -12,7 +12,7 @@ Demo de una aplicacion REST con Express organizada como microservicios.
 
 Quant consulta velas de acciones con `ALPACA_STOCKS_FEED=iex` por defecto, compatible con el nivel Basic. Para cuentas con permiso SIP se puede configurar `ALPACA_STOCKS_FEED=sip`. Valores admitidos: `iex`, `sip`, `delayed_sip`. Las cadenas de opciones conservan su configuración independiente `ALPACA_OPTIONS_FEED`.
 
-Las noticias del análisis se consultan a Alpaca Market Data por los tickers analizados. Se muestran titulares, fuente, fecha y enlace.
+Las noticias del análisis se consultan a Alpaca Market Data por los tickers analizados. Se muestran titulares, fuente, fecha y enlace. Quant agrega una clasificación heurística (alcista, bajista, mixta o sin señal clara) basada en frases reconocidas del titular y resumen, junto con las frases que motivaron la etiqueta. No es una interpretación completa del artículo ni un pronóstico, y no modifica el score de estrategias.
 
 En el panel de investigación se pueden seleccionar por separado el análisis técnico, la probabilidad Black-Scholes, los fundamentales de Financial Modeling Prep (FMP), el cambio diario entre los tickers elegidos y las noticias. El análisis técnico detecta pivotes confirmados con tres velas posteriores, agrupa niveles cercanos con tolerancia de medio ATR y marca ruptura cuando el cierre atraviesa la zona por un cuarto de ATR. Los niveles son orientativos y dependen del periodo de velas.
 

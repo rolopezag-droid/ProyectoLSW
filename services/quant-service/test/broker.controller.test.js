@@ -6,8 +6,21 @@ const vm = require('node:vm');
 
 // Carga el controlador real con dependencias aisladas: no lee .env ni llama a Alpaca.
 function createHarness() {
-  const calls = [];
-  const broker = { async getCandles(input) { calls.push(input); return { symbol: input.symbol, timeframe: input.timeframe, bars: [] }; } };
+  const calls = [], newsCalls = [];
+  const broker = {
+    async getCandles(input) { calls.push(input); return { symbol: input.symbol, timeframe: input.timeframe, bars: [] }; },
+    async getNews(input) {
+      newsCalls.push(input);
+      return {
+        provider: 'alpaca',
+        capturedAt: '2026-11-24T00:00:00.000Z',
+        articles: [
+          { headline: 'AAPL beats estimates' },
+          { headline: 'AAPL cuts guidance' },
+        ],
+      };
+    },
+  };
   const filename = path.join(__dirname, '../src/api/v1/controllers/broker.controller.js');
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
@@ -16,6 +29,7 @@ function createHarness() {
       if (name === '../../../brokers') return { createBroker: () => broker };
       if (name === '../../../config/env') return {};
       if (name === '../../../services/ingestion') return {createIngestor:()=>({})};
+      if (name === '../../../services/news-sentiment') return require('../src/services/news-sentiment');
       throw new Error('Dependencia no esperada: ' + name);
     },
   }, { filename });
@@ -23,8 +37,25 @@ function createHarness() {
     const response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
     await module.exports.getCandles({ query }, response);
     return response;
+  }, async queryNews(query) {
+    const response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    await module.exports.getNews({ query }, response);
+    return { ...response, calls: newsCalls };
   } };
 }
+
+test('noticias agrega una clasificación y conserva los datos originales', async () => {
+  const h = createHarness();
+  const response = await h.queryNews({ symbols: 'AAPL', start: '2026-11-01', end: '2026-11-24' });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.provider, 'alpaca');
+  assert.deepEqual(response.body.articles.map(article => article.sentiment.label), ['bullish', 'bearish']);
+  assert.equal(response.calls.length, 1);
+  assert.equal(response.calls[0].symbols, 'AAPL');
+  assert.equal(response.calls[0].start, '2026-11-01');
+  assert.equal(response.calls[0].end, '2026-11-24');
+});
 
 for (const timeframe of ['15Min', '1Hour', '1Day', '1Week', '1Month', '3Month', '6Month', '12Month']) {
   test('velas acepta ' + timeframe + ' sin sustituirlo', async () => {

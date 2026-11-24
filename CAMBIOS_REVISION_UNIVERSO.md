@@ -4,6 +4,16 @@ Fecha: 23 de noviembre de 2026. Base integrada: main `94e2ad3` (cambios de Pauli
 
 ## Qué cambió
 
+### Integración y revisión de la rama Carlos
+
+Origen: `Carlos`, commit `aa8ce06` de CarlosMdza (“Cambio en noticias”). Aporte real: clasificación heurística de titulares/resúmenes en Quant, frases que sustentan la etiqueta, nivel heurístico, conteos y filtro de noticias en la GUI. No modifica el score de estrategias ni predice retornos.
+
+La rama parte de una base anterior a nuestros cambios: se resolvieron conflictos conservando el recorrido completo del índice, Top 10, consulta FMP posterior a las finalistas, protección de cuota y vencimientos actuales. Se preserva la autoría de Carlos mediante una integración con su commit como padre.
+
+Revisión adicional asistida por IA: filtrar antes del límite de veinte artículos; omitir frases negadas; conservar eventos bajistas reconocidos anteriormente; compatibilidad de la interfaz con noticias sin sentimiento; evitar que artículos sin id/URL se sobrescriban entre sí; colores de etiquetas adecuados al tema claro. La heurística sigue siendo limitada y no interpreta todo el contexto del artículo.
+
+Validación: **64 pruebas aprobadas**, incluyendo clasificador/backend, filtro, artículo coincidente después del puesto veinte, explicaciones, recorrido simulado de 400 empresas, Top y protecciones FMP. OpenSpec validado. No se consultaron noticias reales para esta revisión ni se enviaron órdenes. Integración local en roberto; no implica publicación remota ni despliegue. No se declara resuelta la suite heredada completa.
+
 ### Revisión del 24 de noviembre: FMP bloqueado con un ticker
 
 **Causa comprobada:** una lectura real de `profile` para AAPL respondió HTTP 429 con `Limit Reach`. No es que el ticker haya dejado de existir ni que Alpaca esté caído. [FMP documenta que exceder la cuota puede suspender las consultas de toda la cuenta hasta su renovación](https://site.financialmodelingprep.com/faqs). No se modificó la suscripción ni se conoce el instante de renovación de esta cuenta.
