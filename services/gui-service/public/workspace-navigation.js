@@ -90,11 +90,14 @@
 
   const researchPage = makePage('comparar'); researchPage.append(research);
   const expirationField = document.createElement('div'); expirationField.className = 'research-expiration';
-  expirationField.innerHTML = '<label for="researchExpiration">Vencimiento de los contratos</label><input id="researchExpiration" type="date"><small>Se comparte con Nueva operación. Puedes cambiarlo antes de analizar.</small>';
+  expirationField.innerHTML = '<label for="researchExpiration">Vencimiento de los contratos</label><select id="researchExpiration" required aria-label="Vencimiento de los contratos"><option value="">Fechas disponibles al abrir Comparar…</option></select><small id="researchExpirationStatus" role="status" aria-live="polite">Las fechas se consultan automáticamente al abrir Comparar.</small>';
   research.querySelector('.research-primary-filters').append(expirationField);
-  $('researchExpiration').value = $('expiration').value;
   $('researchExpiration').addEventListener('change',()=>{ $('expiration').value=$('researchExpiration').value; $('expiration').dispatchEvent(new Event('change',{bubbles:true})); });
-  $('expiration').addEventListener('change',()=>{ $('researchExpiration').value=$('expiration').value; });
+  $('expiration').addEventListener('change',()=>{
+    const select=$('researchExpiration'),date=$('expiration').value;
+    if(date&&!Array.from(select.options).some(option=>option.value===date))select.add(new Option(`${date} (fecha manual)`,date));
+    select.value=date;
+  });
   const researchEmpty = note('La comparación comienza con tus empresas', 'Elige el top o una empresa, selecciona los cores y pulsa Analizar los cuatro spreads. Aquí aparecerán los resultados y sus explicaciones.', 'research-empty section-note');
   researchEmpty.id='researchEmptyState'; $('researchEvidence').before(researchEmpty);
   new MutationObserver(()=>{researchEmpty.hidden=!$('researchEvidence').hidden;}).observe($('researchEvidence'),{attributes:true,attributeFilter:['hidden']});
@@ -171,6 +174,7 @@
     document.querySelectorAll('.tabs [data-page]').forEach(button=>{const active=button.dataset.page===key;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
     const definition=definitions[key];headerTitle.textContent=definition[1];headerDescription.textContent=definition[2];$('workspaceCrumb').textContent=definition[0];
     document.title=definition[0]+' · Bull & Bear';current=key;document.body.dataset.workspacePage=key;updateContext();
+    document.dispatchEvent(new CustomEvent('workspace:navigate',{detail:{page:key}}));
     if(write&&location.hash!=='#'+key)root.history.pushState({page:key},'','#'+key);
     document.body.classList.remove('menu-open');menu.setAttribute('aria-expanded','false');
     if(focus)headerTitle.focus({preventScroll:true});
