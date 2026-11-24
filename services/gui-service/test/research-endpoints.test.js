@@ -11,3 +11,12 @@ test('backend sirve worker y dependencias; FMP sin credencial informa ausencia s
   assert.equal((await fetch(base+'/api/research/financial-statements?symbols=A,B,C,D')).status,400);
  }finally{if(previous===undefined)delete process.env.FMP_API_KEY;else process.env.FMP_API_KEY=previous;server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 });
+
+
+test('endpoint IA sin configuración devuelve unavailable sin afectar otros servicios',async()=>{
+ const key=process.env.OPENROUTER_API_KEY,model=process.env.OPENROUTER_MODEL;delete process.env.OPENROUTER_API_KEY;delete process.env.OPENROUTER_MODEL;
+ const server=await new Promise(resolve=>{const instance=app.listen(0,'127.0.0.1',()=>resolve(instance));});const base='http://127.0.0.1:'+server.address().port;
+ try{const response=await fetch(base+'/api/research/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:'AAPL',selected:['technical'],cores:{technical:{trend:'bullish'}}})});assert.equal(response.status,200);const data=await response.json();assert.equal(data.status,'unavailable');assert.match(data.message,/OPENROUTER/);assert.equal((await fetch(base+'/health')).status,200);
+ const invalid=await fetch(base+'/api/research/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(invalid.status,400);
+ }finally{if(key===undefined)delete process.env.OPENROUTER_API_KEY;else process.env.OPENROUTER_API_KEY=key;if(model===undefined)delete process.env.OPENROUTER_MODEL;else process.env.OPENROUTER_MODEL=model;server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+});

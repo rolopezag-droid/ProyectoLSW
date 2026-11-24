@@ -1,0 +1,6 @@
+- [x] Especificar integración interpretativa sin modificar ranking.
+- [x] Crear prompt básico, plantilla vacía y documentación.
+- [x] Implementar endpoint, whitelist, validación de salida, caché, timeout y límite por instancia.
+- [x] Integrar selección de IA, snapshot visible y petición manual por empresa.
+- [x] Validar 68 pruebas focalizadas y 2 HTTP locales aprobadas, OpenSpec estricto válido.
+- [ ] Configurar clave/modelo y verificar una respuesta real de OpenRouter (sin configuración recibida).

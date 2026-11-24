@@ -182,3 +182,11 @@ Diagnóstico reproducido: Monte Carlo bloqueaba el hilo de interfaz al recorrer 
 ## Publicación en main — 24/11/2026
 
 Paquete final: pantalla continua de análisis con gráfica primero, revisión independiente, indicadores como core separado, confluencia de noticias con explicación por estrategia, controles de gráfica sincronizados y cálculo Monte Carlo/indicadores en worker cancelable. Se conserva la incorporación de Paulina 3b1f2b0. Documentación: GUIA_ANALISIS_Y_CORES.md y REVISION_ANALISIS_RESULTADOS.md. Verificación previa a publicación: 87 pruebas focalizadas aprobadas; prueba HTTP backend adicional aprobada durante esta sesión. Los pendientes de suite general y revisión visual documentados siguen abiertos. Desarrollo asistido por IA (Codex), no atribuido como optimización manual.
+
+## Core IA opcional mediante OpenRouter
+
+Endpoint POST /api/research/ai, servicio openrouter-core.js, módulo visual research-ai.js y prompt básico editable en services/gui-service/prompts/core-ia.txt. Configuración OPENROUTER_API_KEY/OPENROUTER_MODEL con plantilla vacía y guía OPENROUTER.md. Generación manual por empresa, solo cores seleccionados, sin llamadas por todo el S&P ni cambios de ranking. Timeout, JSON validado, textos escapados, caché y límite por instancia. Fallos o ausencia de configuración conservan resultados existentes. 68 pruebas focalizadas aprobadas y 2 HTTP locales aprobadas; OpenSpec válido. No se llamó al proveedor real ni se consumió saldo; falta configurar clave/modelo. Asistencia IA Codex. No publicado en Git.
+
+### Publicación de Core de IA en main
+
+Etiqueta final: Core de IA, sin paréntesis. Incluye prompt editable, plantilla sin clave, endpoint backend y guía. Validación previa: 5 pruebas focalizadas de IA aprobadas y OpenSpec estricto válido; se conserva evidencia previa de 70 pruebas. No se configuró ni se publica una clave real; falta configurar OPENROUTER_API_KEY y OPENROUTER_MODEL para probar al proveedor.

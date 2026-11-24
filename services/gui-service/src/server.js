@@ -65,6 +65,13 @@ app.use(createProxyMiddleware({
   on:{error:(_error,_req,res)=>{if(!res.headersSent)res.writeHead(502,{'Content-Type':'application/json'});res.end(JSON.stringify({message:'No se pudo contactar a Quant Service.'}));}}
 }));
 app.use(express.json());
+const interpretResearch=require('./openrouter-core').createAiCore();
+app.post('/api/research/ai',express.json({limit:'24kb'}),async(req,res)=>{
+  res.set('Cache-Control','no-store');
+  if(Buffer.byteLength(JSON.stringify(req.body||{}))>24000)return res.status(413).json({message:'El resumen para IA es demasiado grande.'});
+  try{res.json(await interpretResearch(req.body));}
+  catch(error){res.status(error.status||502).json({status:'unavailable',message:error.message||'La IA no está disponible.'});}
+});
 app.use('/api/supabase', require('./auth-recovery').recoveryRouter());
 app.use('/auth', (_req, res, next) => {
   res.set({ 'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer', 'X-Content-Type-Options':'nosniff', 'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" });

@@ -782,6 +782,7 @@
               <label class="research-module-option"><input id="researchModuleStatements" type="checkbox" /> Análisis financiero (estados y flujo de efectivo)</label>
               <p class="small-note">El fundamental revisa crecimiento, rentabilidad, deuda, liquidez y múltiplos. El financiero analiza los estados de resultados, balance y flujo de efectivo, con foco en capacidad de pago y calidad del efectivo. Ambos usan datos FMP y requieren que el servidor tenga configurada <code>FMP_API_KEY</code>; cada uno muestra un panel independiente. En el S&amp;P 500 se consultan solo para las diez finalistas.</p>
               <label class="research-module-option"><input id="researchModuleMovers" type="checkbox" /> Ganadores/perdedores del universo analizado</label>
+              <label class="research-module-option"><input id="researchModuleAi" type="checkbox" /> Core de IA</label>
               <label class="research-module-option"><input id="researchModuleNews" type="checkbox" checked /> Noticias Alpaca</label>
             </fieldset>
             <div class="research-filter-grid">
@@ -805,6 +806,7 @@
               <p class="research-panel-description">Indicadores calculados con velas diarias del último año, solo cuando seleccionas el core técnico.</p>
               <div id="researchMetrics" class="research-metrics"></div>
             </section>
+            <section id="researchAiPanel" class="research-panel research-panel-wide" hidden><div class="research-panel-heading"><h3>Interpretación de IA</h3></div><p class="research-panel-description">Genera una lectura de los cores seleccionados para una empresa del análisis. Se envía un resumen a OpenRouter al pulsar el botón; puede consumir saldo. No modifica el ranking ni envía órdenes.</p><label for="researchAiCompany">Empresa a interpretar</label><select id="researchAiCompany"></select><button type="button" id="btnResearchAi" class="btn btn-secondary">Enviar resumen e interpretar con IA</button><p id="researchAiStatus" role="status" aria-live="polite"></p><div id="researchAiResult"></div></section>
             <section id="researchIndicatorsPanel" class="research-panel research-panel-wide" hidden><div class="research-panel-heading"><h3>Indicadores y señales de compra/venta</h3></div><p class="research-panel-description">Revisa si hubo señales recientes de recuperación o debilidad y cómo se relacionan con Bull y Bear. Primero se muestra la conclusión; puedes abrir el detalle para consultar la puntuación y las reglas.</p><div id="researchIndicatorsResults"></div></section>
             <section id="researchMonteCarloPanel" class="research-panel research-panel-wide" aria-labelledby="researchMonteCarloTitle" hidden>
               <div class="research-panel-heading"><div><span class="research-panel-kicker">01B · Escenarios al vencimiento</span><h3 id="researchMonteCarloTitle">Análisis Monte Carlo</h3></div><span class="research-source-status">10,000 simulaciones</span></div>
@@ -881,6 +883,7 @@
 <script src="/news-confluence.js"></script>
 <script src="/research-computation.js"></script>
 <script src="/research-ui.js"></script>
+<script src="/research-ai.js"></script>
 <script src="/collapsible-panels.js"></script>
 <script src="/workspace-navigation.js"></script>
 <script src="/analysis-workflow.js"></script>

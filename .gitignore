@@ -8,3 +8,6 @@ node_modules/
 .env.*.local
 .vercel
 .env*
+
+# Public, empty template for the optional AI core (never the real key).
+!/services/gui-service/.env.example

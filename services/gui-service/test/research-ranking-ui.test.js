@@ -577,3 +577,26 @@ test('todos los cores seleccionados completan análisis y muestran paneles aun s
   assert.ok($('researchCandidates').children.length>0);assert.match($('researchStatus').textContent,/Análisis listo/);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
+
+
+test('IA es manual, envía solo cores seleccionados y desmarcarla elimina interpretación',async()=>{
+ const {dom,w,calls}=page();try{
+  const $=id=>w.document.getElementById(id);$('researchModuleAi').checked=true;$('researchModuleNews').checked=false;await analyze(w);
+  assert.equal($('researchAiPanel').hidden,false);assert.equal(calls.some(call=>call.url.pathname==='/api/research/ai'),false);
+  const previous=w.fetch;let sent;
+  w.fetch=async(url,options)=>{if(url==='/api/research/ai'){sent=JSON.parse(options.body);return {ok:true,json:async()=>({status:'available',model:'test/model',interpretation:{summary:'<b>Texto del modelo</b>',agreements:['Tendencia'],contradictions:[],missingData:[],conclusion:'Lectura de prueba'}})};}return previous(url,options);};
+  $('btnResearchAi').click();await until(()=>!$('btnResearchAi').disabled);
+  assert.deepEqual(Array.from(sent.selected),['technical']);assert.equal(sent.cores.news,undefined);assert.equal(sent.password,undefined);
+  assert.match($('researchAiResult').textContent,/Texto del modelo/);assert.equal($('researchAiResult').querySelector('b'),null);
+  $('researchModuleAi').checked=false;$('researchModuleAi').dispatchEvent(new w.Event('change'));
+  assert.equal($('researchAiPanel').hidden,true);assert.equal($('researchAiResult').textContent,'');
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('IA no configurada no borra el ranking existente',async()=>{
+ const {dom,w}=page();try{
+  const $=id=>w.document.getElementById(id);$('researchModuleAi').checked=true;await analyze(w);const count=$('researchCandidates').children.length;
+  const previous=w.fetch;w.fetch=async(url,options)=>url==='/api/research/ai'?{ok:true,json:async()=>({status:'unavailable',message:'Configura OPENROUTER_API_KEY y OPENROUTER_MODEL'})}:previous(url,options);
+  $('btnResearchAi').click();await until(()=>!$('btnResearchAi').disabled);assert.match($('researchAiStatus').textContent,/Configura/);assert.equal($('researchCandidates').children.length,count);assert.equal($('researchEvidence').hidden,false);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
