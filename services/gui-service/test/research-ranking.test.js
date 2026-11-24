@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {rank,topCompanies}=require('../public/research-ranking');
+const {rank,topCompanies,topByStrategy}=require('../public/research-ranking');
 const sample=(symbol,overrides={})=>({symbol,strategy:'BULL_CALL_SPREAD',side:'bullish',technicalTrend:'bullish',riskReward:1,liquidityScore:.1,longStrike:95,shortStrike:105,blackScholes:{probability:.6},...overrides});
 test('un core desmarcado no altera el orden ni aparece en los componentes',()=>{
  const a=sample('AAPL',{blackScholes:{probability:.01}}),b=sample('MSFT',{technicalTrend:'bearish',blackScholes:{probability:.99}});
@@ -34,4 +34,38 @@ test('bitácora conserva el alcance filtrado sin duplicar el universo ni exceder
  const result=journalSnapshot(snapshot,candidates.slice(10).map(candidate=>({candidate})));
  assert.ok(Buffer.byteLength(JSON.stringify(result))<200000);assert.equal(result.persistence.universeCandidates,1000);assert.equal(result.persistence.filteredCandidates,990);
  assert.equal(result.underlyings[0].candidates,undefined);assert.equal(result.candidates[0].longStrike,11);assert.equal(snapshot.candidates.length,1000);
+
+test('topByStrategy devuelve hasta el límite por cada estrategia y una empresa puede repetirse',()=>{
+  const ranked=rank([
+    sample('AAPL',{strategy:'BULL_CALL_SPREAD',score:90,side:'bullish',technicalTrend:'bullish'}),
+    sample('AAPL',{strategy:'BEAR_PUT_SPREAD',score:85,side:'bearish',technicalTrend:'bearish'}),
+    sample('MSFT',{strategy:'BULL_CALL_SPREAD',score:80,side:'bullish',technicalTrend:'bullish'}),
+    sample('MSFT',{strategy:'BULL_CALL_SPREAD',score:70,side:'bullish',technicalTrend:'bullish'}),
+    sample('GOOGL',{strategy:'BEAR_CALL_SPREAD',score:60,side:'bearish',technicalTrend:'bearish'}),
+  ],{technical:true,blackScholes:true});
+  const rows=ranked.map((candidate,index)=>({candidate,index}));
+  const byStrategy=topByStrategy(rows,2);
+  assert.equal(byStrategy.BULL_CALL_SPREAD.length,2);
+  assert.equal(byStrategy.BULL_CALL_SPREAD[0].candidate.symbol,'AAPL');
+  assert.equal(byStrategy.BULL_CALL_SPREAD[1].candidate.symbol,'MSFT');
+  assert.equal(byStrategy.BEAR_PUT_SPREAD.length,1);
+  assert.equal(byStrategy.BEAR_PUT_SPREAD[0].candidate.symbol,'AAPL');
+  assert.equal(byStrategy.BEAR_CALL_SPREAD.length,1);
+  assert.equal(byStrategy.BULL_PUT_SPREAD,undefined);
+  const symbolsByCall=byStrategy.BULL_CALL_SPREAD.map(r=>r.candidate.symbol);
+  assert.ok(symbolsByCall.includes('AAPL'));
+  const symbolsByPut=byStrategy.BEAR_PUT_SPREAD.map(r=>r.candidate.symbol);
+  assert.ok(symbolsByPut.includes('AAPL'));
+});
+test('topByStrategy respeta el límite por estrategia',()=>{
+  const ranked=rank([
+    sample('AAPL',{strategy:'BULL_CALL_SPREAD',score:100,side:'bullish',technicalTrend:'bullish'}),
+    sample('MSFT',{strategy:'BULL_CALL_SPREAD',score:90,side:'bullish',technicalTrend:'bullish'}),
+    sample('GOOGL',{strategy:'BULL_CALL_SPREAD',score:80,side:'bullish',technicalTrend:'bullish'}),
+  ],{technical:true,blackScholes:true});
+  const rows=ranked.map((candidate,index)=>({candidate,index}));
+  const byStrategy=topByStrategy(rows,1);
+  assert.equal(byStrategy.BULL_CALL_SPREAD.length,1);
+  assert.equal(byStrategy.BULL_CALL_SPREAD[0].candidate.symbol,'AAPL');
+});
 });

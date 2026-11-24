@@ -275,25 +275,53 @@
     }
     $('researchCompareResults').innerHTML=`<div class="research-table-wrap"><table class="research-table"><thead><tr><th>Estrategia</th><th>Dirección</th><th>Strikes largo/corto</th><th>Beneficio máximo</th><th>Pérdida máxima</th><th>Break-even</th><th>Ganancia/riesgo</th><th>Score y riesgos</th></tr></thead><tbody>${lines}</tbody></table></div><h4>¿Cuál estrategia obtuvo la mejor puntuación y por qué?</h4><p>${esc(summary)} «Mejor» se refiere al score y datos visibles, no a la inversión más rentable ni más segura. La puntuación utiliza únicamente los cores seleccionados con datos completos.</p>`;
   }
+  const STRATEGY_ORDER=['BULL_CALL_SPREAD','BULL_PUT_SPREAD','BEAR_CALL_SPREAD','BEAR_PUT_SPREAD'];
+  const STRATEGY_LABEL={BULL_CALL_SPREAD:'Bull Call',BULL_PUT_SPREAD:'Bull Put',BEAR_CALL_SPREAD:'Bear Call',BEAR_PUT_SPREAD:'Bear Put'};
   function render(snapshot){
     const filtered=filteredRows(snapshot),filters=filtered.filters;
     const allRows=filtered.rows,mode=$('researchMode').value,perCompany=new Map();
-    const rankedCompanies=mode==='top'?window.ResearchRanking.topCompanies(allRows):[];
-    const rows=mode==='top'?(showAllRankedCompanies?rankedCompanies:rankedCompanies.slice(0,10)):mode==='list'?allRows.filter(({candidate})=>{const count=perCompany.get(candidate.symbol)||0;perCompany.set(candidate.symbol,count+1);return count<25;}):allRows.slice(0,100);
+    let rows;
+    let rankedCompanies=[];
+    let byStrategy=null;
+    if(mode==='top'){
+      const topLimit=showAllRankedCompanies?Infinity:10;
+      byStrategy=window.ResearchRanking.topByStrategy(allRows,topLimit);
+      rankedCompanies=[];
+      rows=[];
+      for(const strategy of STRATEGY_ORDER){
+        const group=byStrategy[strategy]||[];
+        rankedCompanies.push(...group);
+        rows.push(...group);
+      }
+    } else if(mode==='list'){
+      rows=allRows.filter(({candidate})=>{const count=perCompany.get(candidate.symbol)||0;perCompany.set(candidate.symbol,count+1);return count<25;});
+    } else {
+      rows=allRows.slice(0,100);
+    }
     const symbols=new Set(rows.map(row=>row.candidate.symbol));
     // Proyección solo de lectura: no recortar el snapshot ni renumerar candidatas.
     const view=mode==='top'?{...snapshot,viewScope:{total:snapshot.underlyings.length,visible:symbols.size},underlyings:rows.map(row=>snapshot.underlyings.find(item=>item.symbol===row.candidate.symbol)).filter(Boolean),fundamentals:snapshot.fundamentals?{...snapshot.fundamentals,rows:snapshot.fundamentals.rows.filter(row=>symbols.has(row.symbol))}:null,movers:snapshot.movers?{...snapshot.movers,coveredCount:symbols.size,universeCount:null,gainers:snapshot.movers.gainers.filter(row=>symbols.has(row.symbol)),losers:snapshot.movers.losers.filter(row=>symbols.has(row.symbol))}:null,news:{...snapshot.news,articles:snapshot.news.articles.filter(article=>(article.symbols||[]).some(symbol=>symbols.has(symbol)))}}:snapshot;
     $('researchResultScope').hidden=mode!=='top';
-    $('researchScopeStatus').textContent=`${showAllRankedCompanies?'Todas las empresas clasificadas':'Top 10'}: ${rows.length} de ${rankedCompanies.length} empresas elegibles entre ${snapshot.underlyings.length} evaluadas. Los paneles siguientes corresponden a estas mismas empresas. ${snapshot.screening?.failedCount?'Cobertura parcial: '+snapshot.screening.failedCount+' empresas con errores. ':''}El score compara los cores seleccionados; no garantiza rentabilidad.`;
-    $('btnResearchShowAll').hidden=rankedCompanies.length<=10;
-    $('btnResearchShowAll').textContent=showAllRankedCompanies?'Mostrar solo el Top 10':'Ver todos los resultados';
+    const totalEligible=rankedCompanies.length;
+    const visibleCount=rows.length;
+    if(mode==='top'){
+      const perStrategy=STRATEGY_ORDER.map(strategy=>{const g=byStrategy[strategy]||[];return `${STRATEGY_LABEL[strategy]}: ${g.length}`;}).join(' · ');
+      $('researchScopeStatus').textContent=`Top 10 por estrategia · ${perStrategy}. ${visibleCount} de ${totalEligible} candidatas elegibles entre ${snapshot.underlyings.length} empresas evaluadas. ${snapshot.screening?.failedCount?'Cobertura parcial: '+snapshot.screening.failedCount+' empresas con errores. ':''}El score compara los cores seleccionados; no garantiza rentabilidad.`;
+    } else {
+      $('researchScopeStatus').textContent=`${visibleCount} de ${allRows.length} operaciones que cumplen los filtros para ${$('researchMode').value==='list'?snapshot.underlyings.map(item=>item.symbol).join(', '):$('researchCompany').value}${$('researchMode').value==='list'?' (hasta 25 por empresa)':''}. Orden: cores seleccionados, ganancia/riesgo y diferencial.`;
+    }
+    $('btnResearchShowAll').hidden=mode!=='top';
+    if(mode==='top'){
+      const maxShowing=showAllRankedCompanies?Infinity:10;
+      const hasMore=STRATEGY_ORDER.some(strategy=>{
+        const allForStrategy=allRows.filter(row=>row.candidate.strategy===strategy&&Number.isFinite(row.candidate.score));
+        return allForStrategy.length>maxShowing;
+      });
+      $('btnResearchShowAll').hidden=!hasMore;
+    }
+    $('btnResearchShowAll').textContent=showAllRankedCompanies?'Mostrar solo el Top 10 por estrategia':'Ver todas las candidatas';
     $('btnResearchShowAll').setAttribute('aria-expanded',String(showAllRankedCompanies));
-    $('researchTopReasons').innerHTML=mode==='top'&&!showAllRankedCompanies?'<ol>'+rows.map(({candidate:c},position)=>{
-      const next=rows[position+1]?.candidate,leader=rows[0]?.candidate;
-      const comparison=position===0?(next?(c.score===next.score?'Empata en puntuación con el segundo lugar; el orden se decide por ganancia/riesgo y diferencial.':`Supera al segundo lugar por ${(c.score-next.score).toFixed(2)} puntos.`):'Única empresa con puntuación completa y filtros válidos.'):(leader.score===c.score?'Tiene la misma puntuación que el primer lugar; se aplica el criterio de desempate.':`Está ${(leader.score-c.score).toFixed(2)} puntos debajo del primer lugar.`);
-      const components=Object.entries(c.scoreComponents||{}).map(([key,value])=>`${window.ResearchRanking.labels[key]}: ${Number.isFinite(value)?value.toFixed(1):'sin dato'}/100`).join(' · ');
-      return `<li><strong>${esc(c.symbol)} · ${esc(strategyLabel(c.strategy))} · ${c.score.toFixed(2)}/100</strong>. ${esc(comparison)} ${esc(components)}. Ganancia/riesgo ${c.riskReward.toFixed(2)}; diferencial ${c.liquidityScore.toFixed(3)}. En empate se prioriza ganancia/riesgo y después menor diferencial.</li>`;
-    }).join('')+'</ol>':'';
+    $('researchTopReasons').innerHTML='';
     // La decisión aparece antes que los paneles descriptivos de cada core.
     const resultPanel=$('researchStrategiesTitle').closest('section');
     if(mode==='top')$('researchResultScope').after(resultPanel);
@@ -310,9 +338,30 @@
     const wbHead=$('researchMethodHead');
     wbHead.hidden=!wbActive;if(wbActive)wbHead.textContent=wbMetrics.label;
     const wbCell=index=>!wbActive?'':!Number.isFinite(wbMetrics.values[index])?'<td>—</td>':`<td title="${esc(wbMetrics.label+' calculada con el método del Quant Workbench. Métrica informativa; no es pronóstico ni recomendación.')}">${esc(fmtWorkbenchMetric(wbMetrics.method,wbMetrics.values[index]))}</td>`;
-    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF normal estándar verificada`:`${c.blackScholes?.reason||''}`,scoreTitle=c.scoreMissing?.length?'Sin puntuación: faltan '+c.scoreMissing.join(', '):'Promedio de los cores seleccionados (0–100); no es probabilidad de ganancia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${Number.isFinite(c.score)?position+1:"—"}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td data-core-column="technical">${esc(c.technicalTrend||'Sin datos')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td data-core-column="technical">${pct(c.probability.probability)}</td><td data-core-column="blackScholes" title="${esc(bsTitle)}">${esc(bsLabel)}</td><td data-core-column="technical">${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td data-core-column="technical">${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-primary" data-prepare-candidate="${index}">Preparar operación</button> <button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td>${wbCell(index)}</tr>`;}).join('')||`<tr><td colspan="${wbActive?16:15}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
+    let positionByStrategy=new Map(),lastStrategy=null,html=[];
+    const sectionCols=wbActive?16:15;
+    for(const {candidate:c,index} of rows){
+      const strategy=c.strategy;
+      if(lastStrategy!==strategy){
+        html.push(`<tr class="research-strategy-section"><td colspan="${sectionCols}" style="background:var(--panel-hover);color:var(--accent);font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;padding:8px 12px;border-top:2px solid var(--border);">${STRATEGY_LABEL[strategy]||strategy.replace('_SPREAD','').replaceAll('_',' ')}</td></tr>`);
+        lastStrategy=strategy;
+        positionByStrategy.set(strategy,1);
+      } else {
+        positionByStrategy.set(strategy,(positionByStrategy.get(strategy)||0)+1);
+      }
+      const pos=positionByStrategy.get(strategy);
+      const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF normal estándar verificada`:`${c.blackScholes?.reason||''}`,scoreTitle=c.scoreMissing?.length?'Sin puntuación: faltan '+c.scoreMissing.join(', '):'Promedio de los cores seleccionados (0–100); no es probabilidad de ganancia';
+      html.push(`<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${Number.isFinite(c.score)?pos:"—"}</td><td>${esc(c.symbol)}</td><td>${esc(strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td data-core-column="technical">${esc(c.technicalTrend||'Sin datos')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td data-core-column="technical">${pct(c.probability.probability)}</td><td data-core-column="blackScholes" title="${esc(bsTitle)}">${esc(bsLabel)}</td><td data-core-column="technical">${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td data-core-column="technical">${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-primary" data-prepare-candidate="${index}">Preparar operación</button> <button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td>${wbCell(index)}</tr>`);
+    }
+    $('researchCandidates').innerHTML=html.join('')||`<tr><td colspan="${sectionCols}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
+
     document.querySelectorAll('[data-core-column]').forEach(cell=>{cell.hidden=!snapshot.modules[cell.dataset.coreColumn];});
-    $('researchRankingStatus').textContent=$('researchMode').value==='top'?`${showAllRankedCompanies?"Todas las clasificadas":"Top 10"}: ${rows.length} de ${rankedCompanies.length} empresas, con una estrategia por empresa, después de filtrar ${allRows.length} pares. Sin datos completos en un core seleccionado no se asigna posición.`:`${rows.length} de ${allRows.length} operaciones que cumplen los filtros para ${$('researchMode').value==='list'?snapshot.underlyings.map(item=>item.symbol).join(', '):$('researchCompany').value}${$('researchMode').value==='list'?' (hasta 25 por empresa)':''}. Orden: cores seleccionados, ganancia/riesgo y diferencial.`;
+    if($('researchMode').value==='top'){
+      const perStrategy=STRATEGY_ORDER.map(strategy=>{const g=byStrategy[strategy]||[];return `${STRATEGY_LABEL[strategy]}: ${g.length}`;}).join(' · ');
+      $('researchRankingStatus').textContent=`Top 10 por estrategia · ${perStrategy}. ${rows.length} de ${rankedCompanies.length} candidatas elegibles después de filtrar ${allRows.length} pares. Sin datos completos en un core seleccionado no se asigna posición.`;
+    } else {
+      $('researchRankingStatus').textContent=`${rows.length} de ${allRows.length} operaciones que cumplen los filtros para ${$('researchMode').value==='list'?snapshot.underlyings.map(item=>item.symbol).join(', '):$('researchCompany').value}${$('researchMode').value==='list'?' (hasta 25 por empresa)':''}. Orden: cores seleccionados, ganancia/riesgo y diferencial.`;
+    }
     $('researchEvidence').hidden=false;
     snapshot.filters=filters;
     $('researchBsCaveat').hidden=!snapshot.modules.blackScholes;

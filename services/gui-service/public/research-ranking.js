@@ -21,6 +21,23 @@
   function topCompanies(rows){
     const seen=new Set();return rows.filter(({candidate})=>{if(!Number.isFinite(candidate.score)||seen.has(candidate.symbol))return false;seen.add(candidate.symbol);return true;});
   }
+  // Top N por cada estrategia vertical (Bull Call, Bull Put, Bear Call, Bear Put).
+  // Una empresa puede aparecer en más de una estrategia si está entre las mejores de cada una.
+  function topByStrategy(rows,limitPerStrategy){
+    const byStrategy=new Map();
+    for(const row of rows){
+      const {candidate}=row;
+      if(!Number.isFinite(candidate.score))continue;
+      let group=byStrategy.get(candidate.strategy);
+      if(!group){group=[];byStrategy.set(candidate.strategy,group);}
+      group.push(row);
+    }
+    const result={};
+    for(const [strategy,group]of byStrategy){
+      result[strategy]=group.slice(0,limitPerStrategy);
+    }
+    return result;
+  }
   function journalSnapshot(snapshot,rows){
     // La bitácora admite 200 KB: no duplicar todas las combinaciones en cada empresa.
     const result={...snapshot,underlyings:snapshot.underlyings.map(({candidates,...item})=>item),candidates:rows.slice(0,50).map(row=>row.candidate),persistence:{universeCandidates:snapshot.candidates.length,filteredCandidates:rows.length,savedCandidates:0,scope:'filtered-ranked-first-50'}};
@@ -32,6 +49,6 @@
     if(size()>190000)throw new Error('La evidencia excede el límite de la bitácora; reduce las empresas o módulos.');
     result.persistence.savedCandidates=result.candidates.length;return result;
   }
-  const api={rank,topCompanies,labels,journalSnapshot};
+  const api={rank,topCompanies,topByStrategy,labels,journalSnapshot};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ResearchRanking=api;
 })(globalThis);

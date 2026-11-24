@@ -79,10 +79,13 @@ test('top: catálogo completo, una mejor estrategia por empresa y filtros antes 
   const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='custom';$('researchSymbols').value=[...$('tickerCatalog').options].map(option=>option.value).join(',');
   await analyze(w);
   const rows=[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')];
-  assert.equal(rows.length,$('tickerCatalog').options.length);assert.equal(new Set(rows.map(row=>row.cells[1].textContent)).size,rows.length);
+  // Top 10 por cada una de las 4 estrategias = hasta 40 filas con 10 tickers.
+  // Un mismo ticker puede aparecer en varias estrategias.
+  assert.equal(rows.length,40);
   $('researchMinRR').value='1.5';$('researchMinRR').dispatchEvent(new w.Event('input'));
-  for(const row of w.document.querySelectorAll('#researchCandidates tr[data-candidate]'))assert.ok(Number(row.cells[5].textContent.slice(1))/Number(row.cells[6].textContent.slice(1))>=1.5);
-  assert.match($('researchRankingStatus').textContent,/después de filtrar/);
+  const afterFilter=[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')];
+  for(const row of afterFilter)assert.ok(Number(row.cells[5].textContent.slice(1))/Number(row.cells[6].textContent.slice(1))>=1.5);
+  assert.match($('researchRankingStatus').textContent,/Top 10 por estrategia/);
   assert.equal(calls.some(call=>/\/broker\/(orders|spreads)$/.test(call.url.pathname)),false);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
@@ -188,19 +191,19 @@ test('S&P completo intenta 400 empresas, identifica cobertura parcial y cambiar 
   assert.match($('researchCoreSummary').textContent,/400 empresas.*399 tuvieron datos/);
   assert.equal(calls.some(call=>call.url.pathname.endsWith('/market-snapshots')),false,'Movimiento desmarcado no debe consultar snapshots');
   const visible=()=>[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')];
-  assert.equal(visible().length,10);
-  assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,10);
+  // Top 10 por cada una de las 4 estrategias = 40 filas.
+  assert.equal(visible().length,40);
+  assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,40);
   assert.equal($('researchFinancialRows').querySelectorAll('article').length,10);
-  assert.equal($('researchCompareSymbol').options.length,10);
-  assert.match($('researchTopReasons').textContent,/Supera al segundo lugar|Empata en puntuación/);
+  assert.equal($('researchCompareSymbol').options.length,40);
   assert.match($('researchNews').textContent,/Finalista raises guidance/);
   assert.doesNotMatch($('researchNews').textContent,/Fuera del Top|Sin ticker asociado/);
-  const firstTen=visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),requests=calls.length;
-  $('btnResearchShowAll').click();assert.equal(visible().length,399);
-  assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,399);
+  const firstForty=visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),requests=calls.length;
+  $('btnResearchShowAll').click();assert.equal(visible().length,1596);
+  assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,1596);
   assert.equal($('researchFinancialRows').querySelectorAll('article').length,399);
   assert.match($('researchNews').textContent,/Fuera del Top/);
-  $('btnResearchShowAll').click();assert.deepEqual(visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),firstTen);
+  $('btnResearchShowAll').click();assert.deepEqual(visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),firstForty);
   assert.equal(calls.length,requests,'Cambiar alcance no repite consultas');
   assert.equal($('researchStrategiesTitle').closest('section').previousElementSibling.id,'researchResultScope');
   $('researchMinRR').value='1.5';$('researchMinRR').dispatchEvent(new w.Event('input'));
