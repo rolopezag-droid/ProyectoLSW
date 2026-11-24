@@ -139,8 +139,36 @@
     };
   }
   function historicalOutcomes(bars,spot,expiration,breakEven,direction){return historicalEvaluator(bars,spot,expiration)(breakEven,direction);}
+  function monteCarloSpread({strategy,spot,expiration,volatility,volatilitySampleBars=null,rate=.05,dividendYield=0,longStrike,shortStrike,netPremium,premiumType,multiplier=100,simulations=10000,seed}) {
+    const unavailable=reason=>({probability:null,reason,method:'monte-carlo-gbm-expiration'});
+    if(!['BULL_CALL_SPREAD','BEAR_CALL_SPREAD','BULL_PUT_SPREAD','BEAR_PUT_SPREAD'].includes(strategy))return unavailable('invalid_strategy');
+    if(!Number.isFinite(spot)||spot<=0||!Number.isFinite(longStrike)||!Number.isFinite(shortStrike)||longStrike<=0||shortStrike<=0||longStrike===shortStrike||!Number.isFinite(netPremium)||netPremium<=0||!['debit','credit'].includes(premiumType)||!Number.isFinite(multiplier)||multiplier<=0)return unavailable('invalid_spread_inputs');
+    if(!Number.isFinite(volatility)||volatility<=0)return unavailable('insufficient_realized_volatility');
+    if(!Number.isFinite(rate)||!Number.isFinite(dividendYield))return unavailable('invalid_rate_assumption');
+    if(!Number.isInteger(simulations)||simulations<100||simulations>100000)return unavailable('invalid_simulation_count');
+    const time=(Date.parse(`${expiration}T16:00:00Z`)-Date.now())/(365.25*86400000);
+    if(!Number.isFinite(time)||time<=0)return unavailable('expiration_not_in_future');
+    const key=String(seed??`${strategy}|${spot}|${expiration}|${longStrike}|${shortStrike}|${netPremium}`);
+    let state=2166136261;for(let i=0;i<key.length;i++)state=Math.imul(state^key.charCodeAt(i),16777619);state>>>=0;
+    const uniform=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
+    const returns=[];let spare=null;
+    const normal=()=>{if(spare!==null){const value=spare;spare=null;return value;}let u=0,v=0;while(u===0)u=uniform();while(v===0)v=uniform();const scale=Math.sqrt(-2*Math.log(u)),angle=2*Math.PI*v;spare=scale*Math.sin(angle);return scale*Math.cos(angle);};
+    const lower=Math.min(longStrike,shortStrike),higher=Math.max(longStrike,shortStrike),isCall=strategy.endsWith('CALL_SPREAD'),debit=premiumType==='debit',sigma=volatility;
+    for(let i=0;i<simulations;i++){
+      const terminal=spot*Math.exp((rate-dividendYield-.5*sigma*sigma)*time+sigma*Math.sqrt(time)*normal());
+      let intrinsic;
+      if(isCall)intrinsic=Math.max(terminal-lower,0)-Math.max(terminal-higher,0);
+      else intrinsic=Math.max(higher-terminal,0)-Math.max(lower-terminal,0);
+      const perShare=debit?intrinsic-netPremium:netPremium-intrinsic;
+      returns.push(perShare*multiplier);
+    }
+    returns.sort((a,b)=>a-b);
+    const wins=returns.filter(value=>value>0).length,mean=returns.reduce((sum,value)=>sum+value,0)/simulations;
+    const quantile=q=>returns[Math.min(simulations-1,Math.floor((simulations-1)*q))];
+    return {probability:wins/simulations,expectedPnl:mean,medianPnl:quantile(.5),p05:quantile(.05),p95:quantile(.95),simulations,method:'monte-carlo-gbm-expiration',seed:key,assumptions:{spot,expiration,timeToMaturityYears:time,volatility,volatilitySource:'annualized-realized-historical',volatilitySampleBars,rate,dividendYield,multiplier,premiumType}};
+  }
 // Comparar todos los pares válidos; el filtro y ranking final se aplican después.
-  function compareStrategies(contracts, {symbol,expiration,spot,bars,multiplier=100,includeTechnical=true,includeBlackScholes=true,riskFreeRate=.05,dividendYield=0}={}) {
+  function compareStrategies(contracts, {symbol,expiration,spot,bars,multiplier=100,includeTechnical=true,includeBlackScholes=true,includeMonteCarlo=false,monteCarloSimulations=10000,riskFreeRate=.05,dividendYield=0}={}) {
     const candidates=[],technical=technicalIndicators(bars),historical=historicalEvaluator(bars,spot,expiration);
     //filtrar contratos por tipo, simbolo subyacente, fecha de vencimiento, strike y liquidez,
     //y calcular resultados historicos y puntuacion para cada estrategia
@@ -164,7 +192,8 @@
         const technicalAlignment=includeTechnical?rawTechnicalAlignment:1;
         const score=probability.probability===null||technicalAlignment===null?null:probability.probability*(maxProfit/maxLoss)*technicalAlignment/(1+liquidity);
         const blackScholes=includeBlackScholes?blackScholesProbability(spot,breakEven,expiration,technical.annualizedVolatility,definition.side,{rate:riskFreeRate,dividendYield,volatilitySampleBars:technical.sampleBars}):null;
-        candidates.push({strategy,symbol,expiration,optionType:definition.optionType,side:definition.side,technicalTrend:includeTechnical?technical.trend:null,technicalAlignment,longStrike:long.strike,shortStrike:short.strike,longSymbol:long.contractSymbol,shortSymbol:short.contractSymbol,longBid:long.bid,longAsk:long.ask,longQuoteTimestamp:long.timestamp,shortBid:short.bid,shortAsk:short.ask,shortQuoteTimestamp:short.timestamp,netPremium:net,premiumType:debit?'debit':'credit',maxProfit,maxLoss,breakEven,riskReward:maxProfit/maxLoss,liquidityScore:liquidity,score,probability,blackScholes});
+        const monteCarlo=includeMonteCarlo?monteCarloSpread({strategy,spot,expiration,volatility:(technical.annualizedVolatility||0)/100,volatilitySampleBars:technical.sampleBars,rate:riskFreeRate,dividendYield,longStrike:long.strike,shortStrike:short.strike,netPremium:net,premiumType:debit?'debit':'credit',multiplier:contractMultiplier,simulations:monteCarloSimulations}):null;
+        candidates.push({strategy,symbol,expiration,optionType:definition.optionType,side:definition.side,technicalTrend:includeTechnical?technical.trend:null,technicalAlignment,longStrike:long.strike,shortStrike:short.strike,longSymbol:long.contractSymbol,shortSymbol:short.contractSymbol,longBid:long.bid,longAsk:long.ask,longQuoteTimestamp:long.timestamp,shortBid:short.bid,shortAsk:short.ask,shortQuoteTimestamp:short.timestamp,netPremium:net,premiumType:debit?'debit':'credit',maxProfit,maxLoss,breakEven,riskReward:maxProfit/maxLoss,liquidityScore:liquidity,score,probability,blackScholes,monteCarlo});
       }
     }
     // No recortar por el score antiguo: el ranking final depende de los cores seleccionados.
@@ -206,7 +235,7 @@
     return {status:'available',score:available.reduce((sum,item)=>sum+item.score*item.weight,0)/coverage,coverage,components,method:'statement-financial-health-v1'};
   }
 
-  const api={technicalIndicators,relativeStrengthIndexSeries,simpleMovingAverageSeries,supportResistance,blackScholesProbability,scoreFundamentals,scoreFinancialStatements,wilson,historicalOutcomes,historicalEvaluator,compareStrategies};
+  const api={technicalIndicators,relativeStrengthIndexSeries,simpleMovingAverageSeries,supportResistance,blackScholesProbability,monteCarloSpread,scoreFundamentals,scoreFinancialStatements,wilson,historicalOutcomes,historicalEvaluator,compareStrategies};
   root.ResearchAnalysis=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);

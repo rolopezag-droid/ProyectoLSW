@@ -2,13 +2,14 @@
  * Noticias se consulta como contexto: no existe un clasificador de sentimiento.
  * Riesgo y liquidez son filtros/desempates, nunca una probabilidad de éxito. */
 (function(root){
-  const labels={technical:'Técnico',blackScholes:'Black-Scholes',financial:'Fundamental',statements:'Financiero',movers:'Movimiento diario'};
+  const labels={technical:'Técnico',blackScholes:'Black-Scholes',monteCarlo:'Monte Carlo',financial:'Fundamental',statements:'Financiero',movers:'Movimiento diario'};
   function rank(candidates,modules,{fundamentals=[],financialStatements=[],changes=[]}={}){
     const selected=Object.keys(labels).filter(key=>modules[key]);
     return candidates.map(candidate=>{
       const components={};
       if(modules.technical)components.technical=candidate.technicalTrend===candidate.side?100:candidate.technicalTrend==='mixed'?50:['bullish','bearish'].includes(candidate.technicalTrend)?0:null;
       if(modules.blackScholes)components.blackScholes=Number.isFinite(candidate.blackScholes?.probability)?candidate.blackScholes.probability*100:null;
+      if(modules.monteCarlo)components.monteCarlo=Number.isFinite(candidate.monteCarlo?.probability)?candidate.monteCarlo.probability*100:null;
       const fundamental=fundamentals.find(row=>row.symbol===candidate.symbol)?.fundamentalScore;
       if(modules.financial)components.financial=fundamental?.status==='available'?fundamental.score:null;
       const statements=financialStatements.find(row=>row.symbol===candidate.symbol)?.financialScore;
