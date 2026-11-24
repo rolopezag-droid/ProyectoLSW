@@ -80,7 +80,7 @@ test('las cuatro candidatas muestran patas y cálculos del evaluador sin enviar 
       assert.match(w.document.getElementById('researchCandidateWhy').textContent,/CDF normal estándar verificada|Black-Scholes no disponible/i);
     }
     assert.equal(calls.some(call=>/\/broker\/(orders|spreads)$/.test(call.url.pathname)),false);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('comparación usa cuatro candidatas verificadas y explica alcance y mejor score visible',async()=>{
@@ -94,7 +94,7 @@ test('comparación usa cuatro candidatas verificadas y explica alcance y mejor s
     assert.match(text,/no a la inversión más rentable ni más segura/);
     assert.match(w.document.getElementById('researchCompareStatus').textContent,/todos los pares válidos por ticker/);
     assert.equal(calls.some(call=>/\/broker\/(orders|spreads)$/.test(call.url.pathname)),false);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('la explicación compara patas con alternativas visibles sin atribuirles criterios ficticios',async()=>{
@@ -105,7 +105,7 @@ test('la explicación compara patas con alternativas visibles sin atribuirles cr
     assert.match(text,/alternativa\(s\) visible\(s\).*score.*ganancia\/riesgo.*diferencial/i);
     assert.match(text,/no se eligió por Delta, Gamma, volumen o interés abierto/i);
     assert.match(text,/selector automático del formulario es distinto/i);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('el score explica pesos fundamentales reales y separa Black-Scholes y noticias',async()=>{
@@ -116,7 +116,7 @@ test('el score explica pesos fundamentales reales y separa Black-Scholes y notic
     assert.match(score,/Fundamental/);assert.match(w.document.getElementById('researchFinancialRows').textContent,/Crecimiento de ingresos/);
     assert.match(score,/Cada uno pesa lo mismo/);assert.match(score,/Noticias es contexto, no aporta puntuación/i);
     assert.match(why,/score fundamental.*aportó/i);assert.match(why,/Noticias:.*no modifican el score/i);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('discrepancia del evaluador no se presenta como cálculo verificado',async()=>{
@@ -125,7 +125,7 @@ test('discrepancia del evaluador no se presenta como cálculo verificado',async(
     await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='discrepancy');
     assert.match(w.document.getElementById('researchCandidateValidation').textContent,/Pérdida máxima.*ranking.*Quant/);
     assert.match(w.document.getElementById('researchCandidateCalculations').textContent,/No se presentan cálculos como verificados/);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('filtros, empresa y vencimiento invalidan la explicación anterior',async()=>{
@@ -144,7 +144,7 @@ test('filtros, empresa y vencimiento invalidan la explicación anterior',async()
     const expiration=w.document.getElementById('expiration');expiration.value='2028-12-15';expiration.dispatchEvent(new w.Event('change'));
     assert.equal(w.document.getElementById('researchEvidence').hidden,true);
     assert.equal(w.document.getElementById('researchCandidateExplanation').hidden,true);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('sin cotizaciones suficientes no se inventan candidatas ni se llama al evaluador',async()=>{
@@ -153,7 +153,7 @@ test('sin cotizaciones suficientes no se inventan candidatas ni se llama al eval
     assert.match(w.document.getElementById('researchCandidates').textContent,/No hay candidatas/);
     assert.equal(w.document.querySelectorAll('#researchCandidates button[data-explain-candidate]').length,0);
     assert.equal(calls.some(call=>call.url.pathname.endsWith('/strategies/evaluate')),false);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('multiplicador o ticker de referencia no verificables impiden presentar cálculos como validados',async()=>{
@@ -163,7 +163,7 @@ test('multiplicador o ticker de referencia no verificables impiden presentar cá
       await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='invalid');
       assert.match(w.document.getElementById('researchCandidateValidation').textContent,/Multiplicador|subyacente no verificable/i);
       assert.equal(calls.some(call=>call.url.pathname.endsWith('/strategies/evaluate')),false);
-    }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+    }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
   }
 });
 
@@ -180,7 +180,7 @@ test('una respuesta tardía de Quant no reemplaza la explicación de otra candid
     release();await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));
     assert.match(w.document.getElementById('researchCandidateTitle').textContent,/BEAR PUT/);
     assert.match(w.document.getElementById('researchCandidateWhy').textContent,/BAJISTA|Bajista/);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('muestras insuficientes dejan el score no disponible y no inventan una ganadora',async()=>{
@@ -192,7 +192,7 @@ test('muestras insuficientes dejan el score no disponible y no inventan una gana
     await until(()=>/0\/4 estrategias/.test(w.document.getElementById('researchCompareStatus').textContent));
     assert.match(w.document.getElementById('researchCompareStatus').textContent,/No es posible comparar las cuatro con criterios equivalentes/);
     assert.match(w.document.getElementById('researchCompareResults').textContent,/No hay una mejor puntuación verificable/);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('si cambia el ticker durante la consulta no se publica el snapshot anterior',async()=>{
@@ -203,7 +203,7 @@ test('si cambia el ticker durante la consulta no se publica el snapshot anterior
     release();await until(()=>!button.disabled);
     assert.equal(w.document.getElementById('researchEvidence').hidden,true);
     assert.match(w.document.getElementById('researchStatus').textContent,/Cambió la empresa/);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
 test('cambiar empresa en la comparación retira el detalle de otra empresa',async()=>{
@@ -216,5 +216,5 @@ test('cambiar empresa en la comparación retira el detalle de otra empresa',asyn
     assert.equal(w.document.getElementById('researchCandidateExplanation').hidden,true);
     await until(()=>/4\/4 estrategias/.test(w.document.getElementById('researchCompareStatus').textContent));
     assert.match(w.document.getElementById('researchCompareResults').textContent,/MSFT/);
-  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+  }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });

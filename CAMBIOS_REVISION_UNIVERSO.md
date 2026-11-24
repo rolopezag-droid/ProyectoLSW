@@ -4,9 +4,20 @@ Fecha: 23 de noviembre de 2026. Base integrada: main `94e2ad3` (cambios de Pauli
 
 ## Qué cambió
 
+### Corrección posterior: cuota FMP y orden de apartados
+
+- La sección **05 Comparación de estrategias** vuelve a estar después de **04 Noticias**, respetando la secuencia numerada.
+- En S&P 500 con fundamental seleccionado, primero se evalúa el universo con Técnico, Black-Scholes y/o Movimiento, según lo seleccionado. Después de aplicar filtros y elegir las diez finalistas se consultan sus fundamentales en FMP. No se consulta FMP durante el bucle de empresas para sus fundamentales.
+- En este flujo, fundamental es información complementaria de las finalistas: no participa en el ranking global ni lo modifica después. Pantalla, explicaciones y snapshot indican `fundamentalScope.phase = post-selection` y `affectsRanking = false`. Los modos manuales conservan el fundamental como core de puntuación.
+- Si solo está elegido fundamental, se solicita al menos otro core de puntuación antes de consumir consultas. Noticias por sí sola no permite clasificar empresas.
+- “Ver todos” conserva los fundamentales de esas diez finalistas, sin nuevas llamadas ni fundamentos inventados para el resto. Un fallo o límite de FMP muestra el aviso y conserva el ranking ya calculado.
+- El límite es de diez **empresas**, no diez peticiones al proveedor: cada empresa puede requerir hasta cuatro recursos (métricas, ratios, estados y perfil), con las cachés existentes. Esto reduce consumo; no restaura una cuota ya agotada ni desbloquea recursos premium.
+
+Prueba: recorrido simulado de 400 empresas, consulta fundamental solo para diez símbolos después de todas las cotizaciones, FMP sin cuota manteniendo el Top, expansión sin llamadas adicionales y orden de sección 05 después de Noticias. No se repitió un recorrido real completo ni se consumió cuota real para esta validación.
+
 ### Ajuste posterior: presentar solo las finalistas
 
-En el modo Top, el resultado inicial muestra como máximo diez empresas con score completo y una estrategia por empresa, después de comparar todo el universo elegible. La comparación aparece antes de las tarjetas de contexto y explica componentes del score, diferencia respecto al primer/segundo lugar y criterios de desempate. Los paneles técnico, fundamental, movimientos y noticias corresponden a esas mismas finalistas. Las noticias sin ticker asociado no se atribuyen a una finalista.
+En el modo Top, el resultado inicial muestra como máximo diez empresas con score completo y una estrategia por empresa, después de comparar todo el universo elegible. El resumen de finalistas precede las tarjetas de contexto; la sección numerada 05 permanece después de Noticias. Se explican componentes del score, diferencia respecto al primer/segundo lugar y criterios de desempate. Los paneles técnico, fundamental, movimientos y noticias corresponden a esas mismas finalistas. Las noticias sin ticker asociado no se atribuyen a una finalista.
 
 “Ver todos los resultados” permite consultar todas las empresas clasificadas y volver al Top 10 sin repetir consultas ni cambiar scores. El snapshot completo y los índices originales se conservan para preparar operaciones y consultar explicaciones. Las empresas con datos incompletos no se incorporan al Top por rellenar diez posiciones. Los modos Una empresa y Varias empresas conservan su comportamiento anterior.
 

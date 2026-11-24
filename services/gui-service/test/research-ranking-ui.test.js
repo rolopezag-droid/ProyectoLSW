@@ -10,7 +10,7 @@ async function until(predicate) {
   throw new Error('La interfaz no completó la operación esperada.');
 }
 
-function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false, universeSize = 0, scanFailures = false, articles = [] } = {}) {
+function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false, universeSize = 0, scanFailures = false, articles = [], fundamentalsUnavailable = false } = {}) {
   const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
   const dom=new JSDOM(html,{url:'http://localhost:3005',runScripts:'outside-only'}),w=dom.window,calls=[];
   w.structuredClone=structuredClone;Object.defineProperty(w,'crypto',{value:require('node:crypto').webcrypto});
@@ -36,7 +36,7 @@ function page({ evaluate, missingQuotes = false, missingMultiplier = false, quot
     }
     if(u.pathname.endsWith('/options-chain/expirations'))return response({expirations:[expiration],complete:true});
     if(u.pathname.endsWith('/broker/news'))return response({articles,capturedAt:timestamp});
-    if(u.pathname==='/api/research/fundamentals')return response({status:'available',provider:'simulado',capturedAt:timestamp,rows:u.searchParams.get('symbols').split(',').map(symbol=>({symbol,status:'available',metrics:{revenueGrowth:10,netIncomeGrowth:8,roe:.2,netMargin:.15,debtEquity:1,currentRatio:1.5,pe:20,pb:2}}))});
+    if(u.pathname==='/api/research/fundamentals')return response({status:'available',provider:'simulado',capturedAt:timestamp,rows:u.searchParams.get('symbols').split(',').map(symbol=>fundamentalsUnavailable?{symbol,status:'unavailable',error:'FMP alcanzó el límite de consultas.',metrics:{}}:({symbol,status:'available',metrics:{revenueGrowth:10,netIncomeGrowth:8,roe:.2,netMargin:.15,debtEquity:1,currentRatio:1.5,pe:20,pb:2}}))});
     if(u.pathname.endsWith('/strategies/evaluate')){
       const body=JSON.parse(options.body);
       if(evaluate)return evaluate(body,response);
@@ -178,7 +178,7 @@ test('lista manual admite separadores, duplica cero tickers y permite empresas f
 });
 
 test('S&P completo intenta 400 empresas, identifica cobertura parcial y cambiar filtros exige repetir',async()=>{
- const {dom,w,calls}=page({universeSize:400,scanFailures:true,articles:[{id:1,headline:'Finalista raises guidance',symbols:['T0']},{id:2,headline:'Fuera del Top',symbols:['T398']},{id:3,headline:'Sin ticker asociado',symbols:[]}]});try{
+ const {dom,w,calls}=page({universeSize:400,scanFailures:true,fundamentalsUnavailable:true,articles:[{id:1,headline:'Finalista raises guidance',symbols:['T0']},{id:2,headline:'Fuera del Top',symbols:['T398']},{id:3,headline:'Sin ticker asociado',symbols:[]}]});try{
   const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='sp500';$('researchModuleFinancial').checked=true;
   $('btnResearchAnalyze').click();
   for(let i=0;i<10000&&$('btnResearchAnalyze').disabled;i++)await new Promise(resolve=>setTimeout(resolve,2));
@@ -195,14 +195,22 @@ test('S&P completo intenta 400 empresas, identifica cobertura parcial y cambiar 
   assert.match($('researchTopReasons').textContent,/Supera al segundo lugar|Empata en puntuación/);
   assert.match($('researchNews').textContent,/Finalista raises guidance/);
   assert.doesNotMatch($('researchNews').textContent,/Fuera del Top|Sin ticker asociado/);
+  const fundamentalCalls=calls.filter(call=>call.url.pathname==='/api/research/fundamentals');
+  const requestedFundamentals=fundamentalCalls.flatMap(call=>call.url.searchParams.get('symbols').split(','));
+  assert.match($('researchFinancialRows').textContent,/límite de consultas/);
+  assert.equal(visible().length,10,'La falta de FMP no elimina ni altera el Top previamente elegido');
+  assert.equal(requestedFundamentals.length,10);assert.deepEqual(requestedFundamentals,visible().map(row=>row.cells[1].textContent));
+  const firstFmp=calls.findIndex(call=>call.url.pathname==='/api/research/fundamentals');
+  assert.ok(firstFmp>calls.findLastIndex(call=>call.url.pathname.endsWith('/quotes')),'FMP solo después de recorrer las 400 empresas');
+  assert.match($('researchCoreSummary').textContent,/fundamental es contexto complementario/);
   const firstTen=visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),requests=calls.length;
   $('btnResearchShowAll').click();assert.equal(visible().length,399);
   assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,399);
-  assert.equal($('researchFinancialRows').querySelectorAll('article').length,399);
+  assert.equal($('researchFinancialRows').querySelectorAll('article').length,10,'Ver todos no consulta fundamentales fuera de las finalistas');
   assert.match($('researchNews').textContent,/Fuera del Top/);
   $('btnResearchShowAll').click();assert.deepEqual(visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),firstTen);
   assert.equal(calls.length,requests,'Cambiar alcance no repite consultas');
-  assert.equal($('researchStrategiesTitle').closest('section').previousElementSibling.id,'researchResultScope');
+  assert.equal($('researchStrategiesTitle').closest('section').previousElementSibling.id,'researchNewsPanel');
   $('researchMinRR').value='1.5';$('researchMinRR').dispatchEvent(new w.Event('input'));
   assert.equal($('researchEvidence').hidden,true);assert.match($('researchStatus').textContent,/Vuelve a analizar/);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
@@ -220,5 +228,14 @@ test('noticias reales del flujo cargan el clasificador y muestran el motivo sin 
  const {dom,w}=page({articles:[{headline:'GF Securities Lowers Price Target on Dell Technologies',summary:'Concerns over spending slowdowns.',symbols:['DELL'],url:'https://example.com/news',created_at:new Date().toISOString()}]});try{
   await analyze(w);assert.match(w.document.getElementById('researchNews').textContent,/Posible sesgo bajista/);assert.match(w.document.getElementById('researchNews').textContent,/lowers price target/);
   assert.doesNotMatch(w.document.getElementById('researchStatus').textContent,/Cannot read/);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('S&P con solo fundamental solicita otro core antes de consumir consultas',async()=>{
+ const {dom,w,calls}=page();try{
+  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='sp500';
+  $('researchModuleTechnical').checked=false;$('researchModuleBlackScholes').checked=false;$('researchModuleNews').checked=false;$('researchModuleFinancial').checked=true;
+  const before=calls.length;$('btnResearchAnalyze').click();
+  assert.equal(calls.length,before);assert.match($('researchStatus').textContent,/selecciona Técnico, Black-Scholes o Movimiento/);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
