@@ -191,7 +191,22 @@
     return {status:'available',score,coverage,components,factor:.8+.4*(score/100),method:'weighted-fundamental-heuristic-v1'};
   }
 
-  const api={technicalIndicators,relativeStrengthIndexSeries,simpleMovingAverageSeries,supportResistance,blackScholesProbability,scoreFundamentals,wilson,historicalOutcomes,historicalEvaluator,compareStrategies};
+  function scoreFinancialStatements(metrics={}) {
+    const clamp=value=>Math.max(0,Math.min(100,value));
+    const linear=(value,low,high)=>Number.isFinite(value)?clamp((value-low)/(high-low)*100):null;
+    const inverse=(value,best,worst)=>Number.isFinite(value)?clamp((worst-value)/(worst-best)*100):null;
+    const components=[
+      {key:'currentRatio',label:'Liquidez de corto plazo',weight:25,score:linear(metrics.currentRatio,.5,2)},
+      {key:'debtToEquity',label:'Deuda respecto al capital',weight:25,score:inverse(metrics.debtToEquity,0,3)},
+      {key:'interestCoverage',label:'Cobertura de intereses',weight:25,score:linear(metrics.interestCoverage,0,5)},
+      {key:'cashConversion',label:'Conversión de utilidad a efectivo operativo',weight:25,score:linear(metrics.cashConversion,-.5,1.5)},
+    ];
+    const available=components.filter(item=>item.score!==null),coverage=available.reduce((sum,item)=>sum+item.weight,0);
+    if(coverage<50)return {status:'unavailable',score:null,coverage,components,method:'statement-financial-health-v1'};
+    return {status:'available',score:available.reduce((sum,item)=>sum+item.score*item.weight,0)/coverage,coverage,components,method:'statement-financial-health-v1'};
+  }
+
+  const api={technicalIndicators,relativeStrengthIndexSeries,simpleMovingAverageSeries,supportResistance,blackScholesProbability,scoreFundamentals,scoreFinancialStatements,wilson,historicalOutcomes,historicalEvaluator,compareStrategies};
   root.ResearchAnalysis=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);

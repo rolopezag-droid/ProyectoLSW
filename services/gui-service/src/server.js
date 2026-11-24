@@ -31,6 +31,14 @@ app.get('/api/research/fundamentals', async (req, res) => {
   }
 });
 
+app.get('/api/research/financial-statements', async (req, res) => {
+  const symbols=String(req.query.symbols||'').split(',').map(symbol=>symbol.trim().toUpperCase()).filter(Boolean);
+  if(!symbols.length||symbols.length>3||symbols.some(symbol=>!/^[A-Z0-9.-]{1,12}$/.test(symbol)))return res.status(400).json({message:'symbols debe contener de 1 a 3 tickers válidos.'});
+  res.set('Cache-Control','no-store');
+  try{return res.json(await require('./fmp-fundamentals').loadFinancialStatements(symbols,process.env.FMP_API_KEY));}
+  catch{return res.status(502).json({message:'No se pudieron consultar los estados financieros de FMP.'});}
+});
+
 app.get('/api/research/universe/sp500', async (_req, res) => {
   res.set('Cache-Control', 'no-store');
   try {

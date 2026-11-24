@@ -21,7 +21,7 @@ function createFmpClient({fetchImpl=global.fetch,now=Date.now,wait=ms=>new Promi
         state.nextAt=now()+intervalMs;
         const url=new URL(`https://financialmodelingprep.com/stable/${endpoint}`);
         url.searchParams.set('apikey',apiKey);if(symbol)url.searchParams.set('symbol',symbol);
-        if(['key-metrics','ratios','income-statement'].includes(endpoint)){url.searchParams.set('limit','2');url.searchParams.set('period','annual');}
+        if(['key-metrics','ratios','income-statement','balance-sheet-statement','cash-flow-statement'].includes(endpoint)){url.searchParams.set('limit','2');url.searchParams.set('period','annual');}
         const response=await fetchImpl(url,{signal:AbortSignal.timeout(10000)});
         let data;try{data=await response.json();}catch{data=null;}
         const message=typeof data==='string'?data:String(data?.['Error Message']||data?.message||'');

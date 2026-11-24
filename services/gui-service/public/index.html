@@ -785,8 +785,9 @@
             <fieldset class="research-module-options" aria-label="Módulos que incluir en el análisis">
               <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Core técnico (tendencia e indicadores)</label>
               <label class="research-module-option"><input id="researchModuleBlackScholes" type="checkbox" checked /> Core Black‑Scholes</label>
-              <label class="research-module-option"><input id="researchModuleFinancial" type="checkbox" /> Análisis fundamental FMP</label>
-              <p class="small-note">En el S&amp;P 500, primero se elige el Top con los otros cores seleccionados y después se consulta FMP solo para las diez finalistas. Sus fundamentales son complementarios y no cambian ese orden.</p>
+              <label class="research-module-option"><input id="researchModuleFinancial" type="checkbox" /> Análisis fundamental (negocio y valoración)</label>
+              <label class="research-module-option"><input id="researchModuleStatements" type="checkbox" /> Análisis financiero (estados y flujo de efectivo)</label>
+              <p class="small-note">El fundamental revisa crecimiento, rentabilidad, deuda, liquidez y múltiplos. El financiero analiza los estados de resultados, balance y flujo de efectivo, con foco en capacidad de pago y calidad del efectivo. Ambos usan datos FMP y requieren que el servidor tenga configurada <code>FMP_API_KEY</code>; cada uno muestra un panel independiente. En el S&amp;P 500 se consultan solo para las diez finalistas.</p>
               <label class="research-module-option"><input id="researchModuleMovers" type="checkbox" /> Ganadores/perdedores del universo analizado</label>
               <label class="research-module-option"><input id="researchModuleNews" type="checkbox" checked /> Noticias Alpaca</label>
             </fieldset>
@@ -812,9 +813,14 @@
               <div id="researchMetrics" class="research-metrics"></div>
             </section>
             <section id="researchFinancialPanel" class="research-panel research-panel-wide" aria-labelledby="researchFinancialTitle" hidden>
-              <div class="research-panel-heading"><div><span class="research-panel-kicker">02 · Valoración y negocio</span><h3 id="researchFinancialTitle">Análisis fundamental</h3></div><span id="researchFinancialSource" class="research-source-status">FMP API</span></div>
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">02 · Negocio y valoración</span><h3 id="researchFinancialTitle">Análisis fundamental</h3></div><span id="researchFinancialSource" class="research-source-status">FMP API</span></div>
               <p class="research-panel-description">En cada empresa puedes abrir “¿Qué significa este score?” para entender la calificación y “Ver métricas e interpretación” para leer cada indicador en lenguaje simple. El score es una heurística general de 0 a 100, sin comparación sectorial; la cobertura indica cuántos datos hubo. No predice el precio.</p>
               <p id="researchFinancialStatus" class="research-panel-description"></p><div id="researchFinancialRows" class="research-financial-list"></div>
+            </section>
+            <section id="researchStatementsPanel" class="research-panel research-panel-wide" aria-labelledby="researchStatementsTitle" hidden>
+              <div class="research-panel-heading"><div><span class="research-panel-kicker">02B · Estados financieros</span><h3 id="researchStatementsTitle">Análisis financiero</h3></div><span class="research-source-status">FMP API</span></div>
+              <p class="research-panel-description">Lee ventas, utilidad, activos, pasivos, deuda y flujos de operación e inversión. La calificación resume cobertura de intereses, liquidez, deuda y conversión de utilidades a efectivo; no es una predicción.</p>
+              <p id="researchStatementsStatus" class="research-panel-description"></p><div id="researchStatementsRows" class="research-financial-list"></div>
             </section>
             <section id="researchMoversPanel" class="research-panel research-panel-wide" aria-labelledby="researchMoversTitle" hidden>
               <div class="research-panel-heading"><div><span class="research-panel-kicker">03 · Movimiento de mercado</span><h3 id="researchMoversTitle">Ganadores y perdedores</h3></div><span class="research-source-status">Alpaca · universo analizado</span></div>

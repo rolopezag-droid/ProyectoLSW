@@ -14,6 +14,7 @@
   const DEFAULT_COLLAPSED = [
     'panel:researchCoreSummaryPanel',   // 00 · Resumen del análisis
     'panel:researchFinancialPanel',     // 02 · Análisis fundamental
+    'panel:researchStatementsPanel',    // 02B · Análisis financiero
     'panel:researchMoversPanel',        // 03 · Ganadores y perdedores
     'panel:researchNewsPanel',          // 04 · Noticias
     'panel:Bitácora del análisis',      // 06 · Bitácora (sin id)
