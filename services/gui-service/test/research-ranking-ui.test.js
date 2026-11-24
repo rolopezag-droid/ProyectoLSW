@@ -6,11 +6,11 @@ const { JSDOM } = require('jsdom');
 const { evaluateVerticalSpread } = require('../../quant-service/src/services/vertical-spread');
 
 async function until(predicate) {
-  for (let i=0;i<150;i++) { if (predicate()) return; await new Promise(resolve=>setImmediate(resolve)); }
+  for (let i=0;i<1000;i++) { if (predicate()) return; await new Promise(resolve=>setTimeout(resolve,2)); }
   throw new Error('La interfaz no completó la operación esperada.');
 }
 
-function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false } = {}) {
+function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false, universeSize = 0, scanFailures = false, articles = [] } = {}) {
   const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
   const dom=new JSDOM(html,{url:'http://localhost:3005',runScripts:'outside-only'}),w=dom.window,calls=[];
   w.structuredClone=structuredClone;Object.defineProperty(w,'crypto',{value:require('node:crypto').webcrypto});
@@ -19,6 +19,9 @@ function page({ evaluate, missingQuotes = false, missingMultiplier = false, quot
   const response=body=>({ok:true,status:200,json:async()=>body});
   w.fetch=async(url,options={})=>{
     const u=new URL(url,'http://localhost:3005');calls.push({url:u,options});
+    if(u.pathname==='/api/research/universe/sp500')return response({provider:'fixture público',constituents:Array.from({length:universeSize},(_,i)=>({symbol:'T'+i,name:'Empresa '+i}))});
+    if(u.pathname.endsWith('/market-snapshots'))return response({snapshots:{}});
+    if(scanFailures&&u.searchParams.get('symbol')==='T399')throw new Error('Fallo controlado de proveedor');
     if(u.pathname==='/api/services/status')return response({});
     if(u.pathname.endsWith('/broker/candles')){const result=response({symbol:u.searchParams.get('symbol'),timeframe:'1Day',bars,complete:true,feed:'iex'});return waitForCandles?waitForCandles(result):result;}
     if(u.pathname.endsWith('/broker/quotes'))return response({symbol:quoteSymbol||u.searchParams.get('symbol'),referencePrice:100,referenceSource:'quote_midpoint',referenceTimestamp:timestamp});
@@ -32,7 +35,7 @@ function page({ evaluate, missingQuotes = false, missingMultiplier = false, quot
       return response({contracts,nextPageToken:null});
     }
     if(u.pathname.endsWith('/options-chain/expirations'))return response({expirations:[expiration],complete:true});
-    if(u.pathname.endsWith('/broker/news'))return response({articles:[],capturedAt:timestamp});
+    if(u.pathname.endsWith('/broker/news'))return response({articles,capturedAt:timestamp});
     if(u.pathname==='/api/research/fundamentals')return response({status:'available',provider:'simulado',capturedAt:timestamp,rows:u.searchParams.get('symbols').split(',').map(symbol=>({symbol,status:'available',metrics:{revenueGrowth:10,netIncomeGrowth:8,roe:.2,netMargin:.15,debtEquity:1,currentRatio:1.5,pe:20,pb:2}}))});
     if(u.pathname.endsWith('/strategies/evaluate')){
       const body=JSON.parse(options.body);
@@ -73,10 +76,10 @@ test('navegación simplificada sin calculadora, conexiones ni sondeo técnico en
 
 test('top: catálogo completo, una mejor estrategia por empresa y filtros antes del top',async()=>{
  const {dom,w,calls}=page();try{
-  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='all';
+  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='custom';$('researchSymbols').value=[...$('tickerCatalog').options].map(option=>option.value).join(',');
   await analyze(w);
   const rows=[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')];
-  assert.equal(rows.length,$('chSymbol').options.length);assert.equal(new Set(rows.map(row=>row.cells[1].textContent)).size,rows.length);
+  assert.equal(rows.length,$('tickerCatalog').options.length);assert.equal(new Set(rows.map(row=>row.cells[1].textContent)).size,rows.length);
   $('researchMinRR').value='1.5';$('researchMinRR').dispatchEvent(new w.Event('input'));
   for(const row of w.document.querySelectorAll('#researchCandidates tr[data-candidate]'))assert.ok(Number(row.cells[5].textContent.slice(1))/Number(row.cells[6].textContent.slice(1))>=1.5);
   assert.match($('researchRankingStatus').textContent,/después de filtrar/);
@@ -159,5 +162,47 @@ test('solo noticias: sin top artificial ni consulta de histórico técnico',asyn
   assert.equal(w.document.querySelectorAll('#researchCandidates tr[data-candidate]').length,0);
   assert.equal(calls.some(call=>call.url.pathname.endsWith('/candles')),false);
   assert.equal($('researchNewsPanel').hidden,false);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+
+test('lista manual admite separadores, duplica cero tickers y permite empresas fuera del catálogo',async()=>{
+ const {dom,w,calls}=page();try{
+  const $=id=>w.document.getElementById(id);$('researchMode').value='list';$('researchMode').dispatchEvent(new w.Event('change'));
+  assert.equal($('researchSymbols').hidden,false);assert.equal($('researchUniverseField').hidden,true);
+  $('researchSymbols').value='dell; ibm AAPL,DELL';await analyze(w);
+  const requested=new Set(calls.filter(call=>call.url.pathname.endsWith('/quotes')).map(call=>call.url.searchParams.get('symbol')));
+  assert.deepEqual([...requested],['DELL','IBM','AAPL']);
+  assert.equal([...w.document.querySelectorAll('#researchCandidates tr')].some(row=>row.textContent.includes('DELL')),true);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('S&P completo intenta 400 empresas, identifica cobertura parcial y cambiar filtros exige repetir',async()=>{
+ const {dom,w,calls}=page({universeSize:400,scanFailures:true});try{
+  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='sp500';$('researchModuleNews').checked=false;$('researchModuleTechnical').checked=false;
+  $('btnResearchAnalyze').click();
+  for(let i=0;i<10000&&$('btnResearchAnalyze').disabled;i++)await new Promise(resolve=>setTimeout(resolve,2));
+  assert.equal($('btnResearchAnalyze').disabled,false);
+  assert.equal(new Set(calls.filter(call=>call.url.pathname.endsWith('/quotes')).map(call=>call.url.searchParams.get('symbol'))).size,400);
+  assert.match($('researchStatus').textContent,/Cobertura parcial: 1 errores/);
+  assert.match($('researchCoreSummary').textContent,/400 empresas.*399 tuvieron datos/);
+  assert.equal(calls.some(call=>call.url.pathname.endsWith('/market-snapshots')),false,'Movimiento desmarcado no debe consultar snapshots');
+  $('researchMinRR').value='1.5';$('researchMinRR').dispatchEvent(new w.Event('input'));
+  assert.equal($('researchEvidence').hidden,true);assert.match($('researchStatus').textContent,/Vuelve a analizar/);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('cancelar el recorrido descarta respuestas tardías y no muestra un top incompleto',async()=>{
+ let release;const {dom,w}=page({universeSize:400,waitForCandles:result=>new Promise(resolve=>{release=()=>resolve(result);})});try{
+  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('btnResearchAnalyze').click();await until(()=>release);
+  $('btnResearchCancel').click();release();await until(()=>!$('btnResearchAnalyze').disabled);
+  assert.equal($('researchEvidence').hidden,true);assert.match($('researchStatus').textContent,/cancelado/);assert.equal($('researchCancel')?.hidden??true,true);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('noticias reales del flujo cargan el clasificador y muestran el motivo sin romper resultados',async()=>{
+ const {dom,w}=page({articles:[{headline:'GF Securities Lowers Price Target on Dell Technologies',summary:'Concerns over spending slowdowns.',symbols:['DELL'],url:'https://example.com/news',created_at:new Date().toISOString()}]});try{
+  await analyze(w);assert.match(w.document.getElementById('researchNews').textContent,/Posible sesgo bajista/);assert.match(w.document.getElementById('researchNews').textContent,/lowers price target/);
+  assert.doesNotMatch(w.document.getElementById('researchStatus').textContent,/Cannot read/);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });

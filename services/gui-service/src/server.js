@@ -35,9 +35,9 @@ app.get('/api/research/universe/sp500', async (_req, res) => {
   res.set('Cache-Control', 'no-store');
   try {
     const result = await require('./fmp-fundamentals').loadSp500(process.env.FMP_API_KEY);
-    return res.status(result.status === 'available' ? 200 : 503).json({ ...result, message: result.error || 'La lista del S&P 500 no está disponible.' });
+    return res.status(result.status === 'available' ? 200 : 503).json({ ...result, message: result.status === 'available' ? 'Universo del S&P 500 disponible.' : result.error || 'La lista del S&P 500 no está disponible.' });
   } catch (error) {
-    return res.status(error.status || 502).json({ message: 'No se pudo consultar la lista actual del S&P 500 en FMP.', detail: error.message });
+    return res.status(error.status || 502).json({ message: 'No se pudo consultar una lista verificable del S&P 500.', detail: error.message });
   }
 });
 

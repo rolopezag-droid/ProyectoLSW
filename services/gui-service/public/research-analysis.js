@@ -123,22 +123,25 @@
     return {lower:Math.max(0,center-half),upper:Math.min(1,center+half),confidence:0.95};
   }
 //calcular resultados históricos de una estrategia de opciones
-  function historicalOutcomes(bars, spot, expiration, breakEven, direction) {
+  // Las ventanas históricas dependen de empresa, vencimiento y spot, no del par de strikes.
+  // Se preparan una vez por empresa; cada break-even usa búsqueda binaria en esa muestra.
+  function historicalEvaluator(bars, spot, expiration) {
     const sorted=(bars||[]).filter(b=>Number.isFinite(b.close)&&b.close>0).slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
     const days=Math.max(1,Math.ceil((Date.parse(expiration+'T16:00:00Z')-Date.now())/86400000));
-    const horizon=Math.max(1,Math.ceil(days*5/7)); const outcomes=[];
-    for(let i=horizon;i<sorted.length;i++) {
-      const base=sorted[i-horizon].close, end=sorted[i].close;
-      if(base<=0)continue;
-      const projected=spot*(end/base);
-      outcomes.push(direction==='bullish'?projected>=breakEven:projected<=breakEven);
-    }
-    const wins=outcomes.filter(Boolean).length;
-    return {probability:outcomes.length>=20?wins/outcomes.length:null,interval:outcomes.length>=20?wilson(wins,outcomes.length):null,sampleSize:outcomes.length,horizonTradingDays:horizon,method:'historical-overlapping-returns'};
+    const horizon=Math.max(1,Math.ceil(days*5/7)),projected=[];
+    for(let i=horizon;i<sorted.length;i++)projected.push(spot*(sorted[i].close/sorted[i-horizon].close));
+    projected.sort((a,b)=>a-b);
+    return (breakEven,direction)=>{
+      let low=0,high=projected.length;
+      if(Number.isFinite(breakEven))while(low<high){const mid=(low+high)>>>1;if(direction==='bullish'?projected[mid]<breakEven:projected[mid]<=breakEven)low=mid+1;else high=mid;}
+      const wins=!Number.isFinite(breakEven)?0:direction==='bullish'?projected.length-low:low,total=projected.length;
+      return {probability:total>=20?wins/total:null,interval:total>=20?wilson(wins,total):null,sampleSize:total,horizonTradingDays:horizon,method:'historical-overlapping-returns'};
+    };
   }
-//comparar estrategias de opciones y devolver las mejores 20
+  function historicalOutcomes(bars,spot,expiration,breakEven,direction){return historicalEvaluator(bars,spot,expiration)(breakEven,direction);}
+// Comparar todos los pares válidos; el filtro y ranking final se aplican después.
   function compareStrategies(contracts, {symbol,expiration,spot,bars,multiplier=100,includeTechnical=true,includeBlackScholes=true,riskFreeRate=.05,dividendYield=0}={}) {
-    const candidates=[],technical=technicalIndicators(bars);
+    const candidates=[],technical=technicalIndicators(bars),historical=historicalEvaluator(bars,spot,expiration);
     //filtrar contratos por tipo, simbolo subyacente, fecha de vencimiento, strike y liquidez,
     //y calcular resultados historicos y puntuacion para cada estrategia
     for(const [strategy,definition] of Object.entries(STRATEGIES)) {
@@ -155,7 +158,7 @@
         const contractMultiplier=Number(long.multiplier)||multiplier;
         if((Number(short.multiplier)||multiplier)!==contractMultiplier)continue;
         const debit=definition.legs==='debit',maxProfit=(debit?width-net:net)*contractMultiplier,maxLoss=(debit?net:width-net)*contractMultiplier;
-        const probability=historicalOutcomes(bars,spot,expiration,breakEven,definition.side);
+        const probability=historical(breakEven,definition.side);
         const liquidity=(long.ask-long.bid)/((long.ask+long.bid)/2)+(short.ask-short.bid)/((short.ask+short.bid)/2);
         const rawTechnicalAlignment=technical.trend===definition.side?1.1:technical.trend==='mixed'?1:technical.trend==='insufficient_data'?null:.9;
         const technicalAlignment=includeTechnical?rawTechnicalAlignment:1;
@@ -188,7 +191,7 @@
     return {status:'available',score,coverage,components,factor:.8+.4*(score/100),method:'weighted-fundamental-heuristic-v1'};
   }
 
-  const api={technicalIndicators,relativeStrengthIndexSeries,simpleMovingAverageSeries,supportResistance,blackScholesProbability,scoreFundamentals,wilson,historicalOutcomes,compareStrategies};
+  const api={technicalIndicators,relativeStrengthIndexSeries,simpleMovingAverageSeries,supportResistance,blackScholesProbability,scoreFundamentals,wilson,historicalOutcomes,historicalEvaluator,compareStrategies};
   root.ResearchAnalysis=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(globalThis);

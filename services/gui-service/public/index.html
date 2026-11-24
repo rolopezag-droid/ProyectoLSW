@@ -773,8 +773,8 @@
         <section class="research-workspace" aria-labelledby="researchTitle">
           <div class="research-heading"><div><span class="research-eyebrow">Panel de investigación</span><h2 id="researchTitle">Análisis y comparación</h2><p>Combina tendencia, noticias y cotizaciones para revisar Bull Call, Bear Call, Bull Put y Bear Put en el vencimiento elegido.</p></div></div>
           <div class="research-controls">
-            <div class="research-filter-grid research-primary-filters"><div><label for="researchMode">¿Qué quieres comparar?</label><select id="researchMode"><option value="top">Top de empresas + mejor estrategia</option><option value="company">Una empresa + operaciones sugeridas</option></select></div><div id="researchUniverseField"><label for="researchUniverse">Empresas que analizar</label><select id="researchUniverse"><option value="sp500">Explorar S&amp;P 500 (5 alzas + 5 caídas)</option><option value="custom">Mi lista de tickers</option></select><small>Requiere FMP_API_KEY; precios de Alpaca.</small></div><div id="researchCompanyField" hidden><label for="researchCompany">Empresa</label><input id="researchCompany" type="text" list="tickerCatalog" value="AAPL" maxlength="12" pattern="[A-Za-z0-9.-]{1,12}" aria-label="Empresa a comparar" /></div></div>
-            <label for="researchSymbols">Tickers <span class="small-note">· separados por coma, máximo 10</span></label>
+            <div class="research-filter-grid research-primary-filters"><div><label for="researchMode">¿Qué quieres comparar?</label><select id="researchMode"><option value="top">Top de empresas + mejor estrategia</option><option value="company">Una empresa + operaciones sugeridas</option><option value="list">Varias empresas + operaciones sugeridas</option></select></div><div id="researchUniverseField"><label for="researchUniverse">Empresas que analizar</label><select id="researchUniverse"><option value="sp500">S&amp;P 500 completo (recorrido prolongado)</option><option value="custom">Mi lista de tickers</option></select><small>Se intenta cada empresa. El recorrido completo puede tardar decenas de minutos según cuotas y contratos. Puedes cancelarlo; la pestaña debe permanecer abierta.</small></div><div id="researchCompanyField" hidden><label for="researchCompany">Empresa</label><input id="researchCompany" type="text" list="tickerCatalog" value="AAPL" maxlength="12" pattern="[A-Za-z0-9.-]{1,12}" aria-label="Empresa a comparar" /></div></div>
+            <label for="researchSymbols">Tickers <span class="small-note">· coma, espacio o punto y coma; máximo 10</span></label>
             <input id="researchSymbols" value="AAPL" maxlength="130" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
             <datalist id="tickerCatalog"><option value="AAPL" label="Apple"></option><option value="MSFT" label="Microsoft"></option><option value="TSLA" label="Tesla"></option><option value="AMZN" label="Amazon"></option><option value="GOOGL" label="Alphabet"></option><option value="NVDA" label="NVIDIA"></option><option value="META" label="Meta"></option><option value="NFLX" label="Netflix"></option><option value="AMD" label="AMD"></option><option value="INTC" label="Intel"></option></datalist>
             <fieldset class="research-module-options" aria-label="Módulos que incluir en el análisis">
@@ -792,7 +792,7 @@
               <div><label for="researchMaxSpread">Diferencial Bid/Ask máx. (suma relativa)</label><input id="researchMaxSpread" type="number" min="0" step="0.05" value="1" /></div>
               <div><label for="researchTrendFilter">Filtro de tendencia</label><select id="researchTrendFilter"><option value="all">Todas las tendencias</option><option value="aligned">Alineada con SMA20/50</option></select></div>
             </div>
-            <div class="research-actions"><button type="button" class="btn btn-primary" id="btnResearchAnalyze">Analizar los cuatro spreads</button><p id="researchStatus" role="status" aria-live="polite"></p></div>
+            <div class="research-actions"><button type="button" class="btn btn-primary" id="btnResearchAnalyze">Analizar los cuatro spreads</button><button type="button" class="btn" id="btnResearchCancel" hidden>Cancelar análisis</button><p id="researchStatus" role="status" aria-live="polite"></p></div>
           </div>
           <div id="researchEvidence" class="research-dashboard" hidden>
             <section id="researchCoreSummaryPanel" class="research-panel research-panel-wide" aria-labelledby="researchCoreSummaryTitle">
@@ -862,6 +862,7 @@
 <script src="/strategy-triggers.js"></script>
 <script src="/strategy-explanation.js"></script>
 <script src="/research-ranking.js"></script>
+<script src="/news-context.js"></script>
 <script src="/research-ui.js"></script>
 <script src="/collapsible-panels.js"></script>
 <script src="/workspace-navigation.js"></script>

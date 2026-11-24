@@ -159,7 +159,7 @@
   menu.addEventListener('click',()=>{const open=document.body.classList.toggle('menu-open');menu.setAttribute('aria-expanded',String(open));});
 
   function updateContext(){
-    const symbol=$('symbol');$('homeSymbol').textContent=symbol.selectedOptions[0]?.textContent||symbol.value;
+    const symbol=$('symbol');$('homeSymbol').textContent=symbol.selectedOptions?.[0]?.textContent||symbol.value;
     $('homeExpiration').textContent=$('expiration').value||'Sin seleccionar';
     let count=0;try{const rows=JSON.parse(localStorage.getItem('td_history')||'[]');if(Array.isArray(rows))count=rows.length;}catch{}
     $('homeHistory').textContent=String(count);

@@ -10,6 +10,7 @@ class AlpacaAdapter extends BrokerAdapter {
     stockFeed = 'iex',
     optionsFeed = 'indicative',
     fetchImplementation = fetch,
+    readIntervalMs = fetchImplementation === global.fetch ? 400 : 0,
   }) {
     super();
     this.keyId = keyId;
@@ -19,9 +20,19 @@ class AlpacaAdapter extends BrokerAdapter {
     this.stockFeed = stockFeed;
     this.optionsFeed = optionsFeed;
     this.fetch = fetchImplementation;
+    this.readIntervalMs = readIntervalMs;
+    this.nextReadAt = 0;
   }
 
   async request(baseUrl, path, options = {}) {
+    // Un recorrido del índice no debe agotar de golpe la cuota de lecturas.
+    // Reservar el turno ANTES de esperar mantiene el límite con llamadas paralelas.
+    // Las órdenes nunca se reintentan ni se mezclan con esta cola de lecturas.
+    if ((!options.method || options.method === 'GET') && this.readIntervalMs > 0) {
+      const turn = Math.max(Date.now(), this.nextReadAt);
+      this.nextReadAt = turn + this.readIntervalMs;
+      if (turn > Date.now()) await new Promise(resolve => setTimeout(resolve, turn - Date.now()));
+    }
     const response = await this.fetch(`${baseUrl}${path}`, {
       method: options.method || 'GET',
       signal: AbortSignal.timeout(30000),

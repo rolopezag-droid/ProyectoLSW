@@ -2,6 +2,7 @@
   let currentSnapshot=null,accessToken=null,running=false,modulesDirty=false;
   let researchVersion=0,selectionVersion=0,comparisonVersion=0;
   const evaluationCache=new WeakMap();
+  let analysisController=null;
   // Caché runtime de velas diarias por ticker para señales/prefill. Vive FUERA del
   // snapshot persistido: la bitácora de Supabase no se engorda con las velas.
   window.__researchMarketCache = window.__researchMarketCache || {};
@@ -20,7 +21,7 @@
   const setStatus=(text,state='')=>{$('researchStatus').textContent=text;$('researchStatus').dataset.state=state;};
   const readModules=()=>({technical:$('researchModuleTechnical').checked,blackScholes:$('researchModuleBlackScholes').checked,financial:$('researchModuleFinancial').checked,movers:$('researchModuleMovers').checked,news:$('researchModuleNews').checked});
   async function json(url,options={}){
-    const response=await fetch(url,options),data=await response.json().catch(()=>({}));
+    const response=await fetch(url,{...options,signal:analysisController?AbortSignal.any([analysisController.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)}),data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.detail?`${data.message||'Error del servidor.'} Detalle: ${data.detail}`:data.message||`Error del servidor (${response.status}).`);
     return data;
   }
@@ -34,7 +35,7 @@
     const end=new Date(),start=new Date(end);start.setUTCDate(start.getUTCDate()-370);
     const params=new URLSearchParams({symbol,timeframe:'1Day',start:start.toISOString(),end:end.toISOString(),limit:'1000',sort:'asc'});
     const [barsData,quote,calls,puts]=await Promise.all([
-      (modules.technical||modules.blackScholes||modules.movers?json('/api/v1/broker/candles?'+params):Promise.resolve({bars:[],complete:true})),json('/api/v1/broker/quotes?symbol='+encodeURIComponent(symbol)),allContracts(symbol,expiration,'call'),allContracts(symbol,expiration,'put')
+      (modules.technical||modules.blackScholes||modules.movers?json('/api/v1/broker/candles?'+params):Promise.resolve({bars:[],complete:true})),json('/api/v1/broker/quotes?symbol='+encodeURIComponent(symbol)).catch(()=>({})),allContracts(symbol,expiration,'call'),allContracts(symbol,expiration,'put')
     ]);
     if (!Array.isArray(barsData.bars)) throw new Error('La respuesta de velas está incompleta.');
     if (barsData.complete === false) throw new Error('La consulta de velas quedó incompleta: ' + (barsData.partialReason || 'cobertura desconocida') + '.');
@@ -49,7 +50,7 @@
     const spotSource=usesQuote?(quote.referenceSource||'referencia de cotización sin método'):'último cierre de vela',spotTimestamp=usesQuote?(quote.referenceTimestamp||null):(last?.timestamp||null),spotSymbol=usesQuote?(quote.symbol||null):symbol;
     const underlying={symbol:spotSymbol,price:spot,source:spotSource,timestamp:spotTimestamp};
     const candidates=ResearchAnalysis.compareStrategies(contracts,{symbol,expiration,spot,bars,includeTechnical:modules.technical,includeBlackScholes:modules.blackScholes,riskFreeRate,dividendYield}).map(candidate=>window.StrategyExplanation.attachEvidence(candidate,contracts,underlying));
-    return {symbol,spot,spotSource,spotTimestamp,spotSymbol,capturedAt:barsData.capturedAt,stockFeed:barsData.feed||'iex',dailyChangePct:changePct,technical,supportResistance:levels,candidates};
+    return {symbol,spot,spotSource,spotTimestamp,spotSymbol,capturedAt:barsData.capturedAt,stockFeed:barsData.feed||'iex',dailyChangePct:changePct,dailyClose:last?.close??null,previousClose:previous?.close??null,dailyTimestamp:last?.timestamp??null,technical,supportResistance:levels,candidates};
   }
   async function fetchNews(symbols){
     const end=new Date(),start=new Date(end);start.setUTCDate(start.getUTCDate()-7);
@@ -60,32 +61,18 @@
   async function scanSp500(){
     const universe=await json('/api/research/universe/sp500');
     const symbols=(universe.constituents||[]).map(item=>item.symbol);
-    if(symbols.length<400)throw new Error('FMP no entregó una lista completa del S&P 500.');
-    const snapshots=await json('/api/v1/broker/market-snapshots?symbols='+encodeURIComponent(symbols.join(',')));
+    for(const item of universe.constituents||[]){if(![...$('tickerCatalog').options].some(option=>option.value===item.symbol)){const option=document.createElement('option');option.value=item.symbol;option.label=item.name||item.symbol;$('tickerCatalog').append(option);}}
+    if(symbols.length<400)throw new Error('El proveedor no entregó una lista completa del S&P 500.');
+    const snapshots=readModules().movers?await json('/api/v1/broker/market-snapshots?symbols='+encodeURIComponent(symbols.join(','))).catch(()=>({snapshots:{}})):{snapshots:{}};
     const changes=symbols.map(symbol=>{
       const snap=snapshots.snapshots?.[symbol],close=Number(snap?.dailyBar?.c),previous=Number(snap?.prevDailyBar?.c);
-      return Number.isFinite(close)&&close>0&&Number.isFinite(previous)&&previous>0?{symbol,changePct:(close/previous-1)*100}:null;
+      return Number.isFinite(close)&&close>0&&Number.isFinite(previous)&&previous>0?{symbol,changePct:(close/previous-1)*100,latestClose:close,previousClose:previous,timestamp:snap.dailyBar.t}:null;
     }).filter(Boolean);
-    if(changes.length<Math.min(400,Math.floor(symbols.length*.8)))throw new Error(`Alpaca solo devolvió cambios para ${changes.length} de ${symbols.length} empresas; no usaré un ranking parcial del S&P 500.`);
-    const gainers=changes.filter(item=>item.changePct>0).sort((a,b)=>b.changePct-a.changePct).slice(0,5);
-    const losers=changes.filter(item=>item.changePct<0).sort((a,b)=>a.changePct-b.changePct).slice(0,5);
-    let selected=[...gainers,...losers];
-    if(selected.length<10){
-      const seen=new Set(selected.map(item=>item.symbol));
-      selected=[...selected,...changes.filter(item=>!seen.has(item.symbol)).sort((a,b)=>Math.abs(b.changePct)-Math.abs(a.changePct)).slice(0,10-selected.length)];
-    }
-    if(!selected.length)throw new Error('Alpaca no devolvió cambios diarios para el S&P 500.');
-    return {symbols:selected.map(item=>item.symbol),changes,universeCount:symbols.length,coveredCount:changes.length,capturedAt:snapshots.capturedAt||universe.capturedAt,provider:universe.provider};
+    // Los snapshots solo nutren Movimiento diario; su ausencia no elimina empresas del universo de opciones.
+    return {symbols,changes,universeCount:symbols.length,coveredCount:changes.length,capturedAt:snapshots.capturedAt||universe.capturedAt,provider:universe.provider,sourceUrl:universe.sourceUrl};
   }
-  function assessNews(item){
-    const text=`${item.headline||''} ${item.summary||''}`.toLowerCase();
-    const positive=(text.match(/\b(beat|beats|beating|upgrade|upgraded|approval|approved|growth|grows|record|surge|surges|gain|gains|profit|profits|contract win|buyback|raises guidance|sube|subida|ganancia|crecimiento|aprobaci[oó]n|mejora)\b/g)||[]).length;
-    const negative=(text.match(/\b(miss|misses|missed|downgrade|downgraded|loss|losses|decline|declines|fall|falls|drops|drop|cut|cuts|lawsuit|probe|investigation|recall|warning|bankruptcy|layoffs|debt|plunge|plunges|cae|ca[ií]da|p[eé]rdida|recorte|demanda|investigaci[oó]n|quiebra)\b/g)||[]).length;
-    if(positive>negative)return {label:'Posible sesgo alcista',explanation:'El titular o resumen contiene más términos favorables que adversos.'};
-    if(negative>positive)return {label:'Posible sesgo bajista',explanation:'El titular o resumen contiene más términos adversos que favorables.'};
-    if(positive&&negative)return {label:'Señales mixtas',explanation:'Aparecen términos favorables y adversos en el mismo texto.'};
-    return {label:'Sin dirección clara',explanation:'El texto no contiene señales suficientes para asignar una dirección.'};
-  }
+
+  const assessNews=item=>window.NewsContext.assess(item);
   function renderFinancialAndMovers(snapshot){
     const modules=snapshot.modules,fundamentals=snapshot.fundamentals;
     $('researchFinancialPanel').hidden=!modules.financial;
@@ -93,7 +80,7 @@
       const status=$('researchFinancialStatus'),host=$('researchFinancialRows');
       if(!fundamentals){status.textContent='Se consultan métricas fundamentales en FMP cuando FMP_API_KEY está configurada en el servidor.';host.innerHTML='';}
       else if(fundamentals.status!=='available'){status.textContent=fundamentals.error||'FMP no devolvió fundamentales para estos tickers.';host.innerHTML=fundamentals.rows.map(row=>`<article class="research-financial-row"><strong>${esc(row.symbol)}</strong> · ${esc(row.error||'Sin datos para mostrar.')}</article>`).join('');}
-      else {status.textContent=`Fuente: ${fundamentals.provider} · Consulta ${new Date(fundamentals.capturedAt).toLocaleString('es-MX')}. El core fundamental participa solo si está seleccionado; no modifica probabilidades.`;host.innerHTML=fundamentals.rows.map(row=>{if(row.status!=='available')return `<article class="research-financial-row"><strong>${esc(row.symbol)}</strong> · ${esc(row.error||'Sin datos para mostrar.')}</article>`;const m=row.metrics||{},fundamentalScore=row.fundamentalScore,scoreBlock=fundamentalScore?.status==='available'?`<p><strong>Score fundamental: ${fundamentalScore.score.toFixed(1)}/100</strong> · Más alto significa que los datos disponibles se acercan más a los rangos favorecidos por la heurística. Cobertura ${fundamentalScore.coverage}%.</p><details><summary>¿Qué significa este score?</summary><p>Promedio ponderado de crecimiento, rentabilidad, deuda, liquidez y valoración. Cada componente se transforma a 0–100 dentro de rangos generales. La cobertura indica qué parte de los pesos tuvo datos. No compara con el sector y no predice el precio.</p><p>${fundamentalScore.components.map(component=>`${esc(component.label)} (${component.weight}% del score): ${component.score===null?'sin dato':component.score.toFixed(0)+'/100'}`).join(' · ')}</p><p>Umbrales usados: crecimiento −20% a +20%; ROE −10% a +30%; margen neto −20% a +20%; deuda/capital 0 a 3 (menor deuda suma más); razón corriente 0.5 a 2; P/E 5 a 40 (menor múltiplo suma más dentro del rango); P/B 1 a 10 (menor múltiplo suma más dentro del rango). Fuera del rango se limita a 0 o 100. Cobertura menor al 50% no produce score.</p></details>`: `<p><strong>Score fundamental no disponible</strong> · Cobertura ${fundamentalScore?.coverage??0}% (mínimo 50%).</p>`,defs=[['Capitalización',m.marketCap===null?'—':moneyCompact(m.marketCap),'Tamaño de mercado de la empresa.'],['P/E',m.pe===null?'—':m.pe.toFixed(2),'Precio frente a ganancias; alto puede significar caro o expectativas de crecimiento.'],['P/B',m.pb===null?'—':m.pb.toFixed(2),'Precio frente al valor contable por acción.'],['ROE',m.roe===null?'—':percentPoints(m.roe*100),'Ganancia generada por cada peso de capital; normalmente más alto es mejor.'],['Margen neto',m.netMargin===null?'—':percentPoints(m.netMargin*100),'Parte de los ingresos que queda como utilidad; normalmente más alto es mejor.'],['Deuda/capital',m.debtEquity===null?'—':m.debtEquity.toFixed(2),'Deuda respecto al capital; valores altos suelen implicar más apalancamiento.'],['Razón corriente',m.currentRatio===null?'—':m.currentRatio.toFixed(2),'Activos disponibles para cubrir obligaciones de corto plazo.'],['Crec. ingresos anual',m.revenueGrowth===null?'—':percentPoints(m.revenueGrowth),'Cambio de ventas frente al año previo.'],['Crec. utilidad anual',m.netIncomeGrowth===null?'—':percentPoints(m.netIncomeGrowth),'Cambio de ganancias frente al año previo.'],['FCF por acción',m.freeCashFlowPerShare===null?'—':money(m.freeCashFlowPerShare),'Efectivo libre generado, dividido entre acciones.']];return `<article class="research-financial-row"><strong>${esc(row.symbol)}</strong>${row.period?' · '+esc(row.period):''}${row.dataDate?' · Datos al '+esc(row.dataDate):''}${scoreBlock}<details><summary>Ver métricas e interpretación</summary>${defs.filter(([,v])=>v!=='—').map(([n,v,meaning])=>`<p><strong>${esc(n)}: ${esc(v)}</strong> · ${esc(meaning)}</p>`).join('')||'FMP no devolvió métricas reconocidas para este periodo.'}</details></article>`;}).join('');}
+      else {status.textContent=`Fuente: ${fundamentals.provider} · Consulta ${new Date(fundamentals.capturedAt).toLocaleString('es-MX')}. El core fundamental participa solo si está seleccionado; no modifica probabilidades.`;host.innerHTML=fundamentals.rows.map(row=>{if(row.status!=='available')return `<article class="research-financial-row"><strong>${esc(row.symbol)}</strong> · ${esc(row.error||'Sin datos para mostrar.')}</article>`;const m=row.metrics||{},fundamentalScore=row.fundamentalScore,scoreBlock=fundamentalScore?.status==='available'?`<p><strong>Score fundamental: ${fundamentalScore.score.toFixed(1)}/100</strong> · Más alto significa que los datos disponibles se acercan más a los rangos favorecidos por la heurística. Cobertura ${fundamentalScore.coverage}%.</p><details><summary>¿Qué significa este score?</summary><p>Promedio ponderado de crecimiento, rentabilidad, deuda, liquidez y valoración. Cada componente se transforma a 0–100 dentro de rangos generales. La cobertura del score indica qué parte de los pesos de sus ocho indicadores tuvo datos; es distinta del número de métricas mostradas. Capitalización y FCF son contexto y no puntúan. No compara con el sector y no predice el precio.</p><p>${fundamentalScore.components.map(component=>`${esc(component.label)} (${component.weight}% del score): ${component.score===null?'sin dato':component.score.toFixed(0)+'/100'}`).join(' · ')}</p><p>Umbrales usados: crecimiento −20% a +20%; ROE −10% a +30%; margen neto −20% a +20%; deuda/capital 0 a 3 (menor deuda suma más); razón corriente 0.5 a 2; P/E 5 a 40 (menor múltiplo suma más dentro del rango); P/B 1 a 10 (menor múltiplo suma más dentro del rango). Fuera del rango se limita a 0 o 100. Cobertura menor al 50% no produce score.</p></details>`: `<p><strong>Score fundamental no disponible</strong> · Cobertura ${fundamentalScore?.coverage??0}% (mínimo 50%).</p>`,defs=[['Capitalización',m.marketCap===null?'—':moneyCompact(m.marketCap),'Tamaño de mercado de la empresa.'],['P/E',m.pe===null?'—':m.pe.toFixed(2),'Precio frente a ganancias; alto puede significar caro o expectativas de crecimiento.'],['P/B',m.pb===null?'—':m.pb.toFixed(2),'Precio frente al valor contable por acción.'],['ROE',m.roe===null?'—':percentPoints(m.roe*100),'Ganancia generada por cada peso de capital; normalmente más alto es mejor.'],['Margen neto',m.netMargin===null?'—':percentPoints(m.netMargin*100),'Parte de los ingresos que queda como utilidad; normalmente más alto es mejor.'],['Deuda/capital',m.debtEquity===null?'—':m.debtEquity.toFixed(2),'Deuda respecto al capital; valores altos suelen implicar más apalancamiento.'],['Razón corriente',m.currentRatio===null?'—':m.currentRatio.toFixed(2),'Activos disponibles para cubrir obligaciones de corto plazo.'],['Crec. ingresos anual',m.revenueGrowth===null?'—':percentPoints(m.revenueGrowth),'Cambio de ventas frente al año previo.'],['Crec. utilidad anual',m.netIncomeGrowth===null?'—':percentPoints(m.netIncomeGrowth),'Cambio de ganancias frente al año previo.'],['FCF por acción',m.freeCashFlowPerShare===null?'—':money(m.freeCashFlowPerShare),'Efectivo libre generado, dividido entre acciones.']];return `<article class="research-financial-row"><strong>${esc(row.companyName||row.symbol)} (${esc(row.symbol)})</strong>${row.coverage?' · Cobertura '+esc(row.coverage):''}${row.warnings?.length?'<p>'+esc(row.warnings.join(' '))+'</p>':''}${row.period?' · '+esc(row.period):''}${row.dataDate?' · Datos al '+esc(row.dataDate):''}${scoreBlock}<details><summary>Ver métricas e interpretación</summary>${defs.filter(([,v])=>v!=='—').map(([n,v,meaning])=>`<p><strong>${esc(n)}: ${esc(v)}</strong> · ${esc(meaning)}</p>`).join('')||'FMP no devolvió métricas reconocidas para este periodo.'}</details></article>`;}).join('');}
     }
     $('researchMoversPanel').hidden=!modules.movers;
     if(modules.movers){
@@ -101,8 +88,8 @@
       const movers=snapshot.movers;
       if(!movers||movers.status!=='available'){status.textContent='No hay cambio diario disponible para los tickers elegidos.';host.innerHTML='';}
       else {
-        status.textContent=`Cambio porcentual respecto al cierre anterior: el numerador es la variación y el cierre anterior es la base de comparación. Se exploraron ${movers.coveredCount??movers.gainers.length+movers.losers.length} empresas${movers.universeCount?` de ${movers.universeCount} del S&P 500`:''}. Positivo significa avance; negativo, caída. No explica por sí solo la causa ni predice la siguiente sesión. Se muestran hasta 10 por grupo.`;
-        const group=(title,rows)=>`<strong>${title}</strong>${rows.length?rows.slice(0,10).map(row=>`<div class="research-mover-row"><strong>${esc(row.symbol)}</strong> · ${percentPoints(row.changePct)} <span>${row.changePct>=0?'El precio cerró arriba respecto al cierre anterior.':'El precio cerró abajo respecto al cierre anterior.'}</span></div>`).join(''):'<div class="research-mover-row">Sin tickers en este grupo.</div>'}`;
+        status.textContent=`Cambio porcentual respecto al cierre anterior: el numerador es la variación y el cierre anterior es la base de comparación. Se exploraron ${movers.coveredCount??movers.gainers.length+movers.losers.length} empresas${movers.universeCount?` de ${movers.universeCount} del S&P 500`:''}. Positivo significa avance; negativo, caída. La última vela diaria puede estar en formación durante la sesión. No explica por sí solo la causa ni predice la siguiente sesión. Se muestran hasta 10 por grupo.`;
+        const group=(title,rows)=>`<strong>${title}</strong>${rows.length?rows.slice(0,10).map(row=>`<div class="research-mover-row"><strong>${esc(row.symbol)}</strong> · ${percentPoints(row.changePct)}${Number.isFinite(row.previousClose)&&Number.isFinite(row.latestClose)?' · De '+money(row.previousClose)+' a '+money(row.latestClose):''}${row.timestamp?' · Vela '+esc(new Date(row.timestamp).toLocaleDateString('es-MX',{timeZone:'UTC'})):''} <span>${row.changePct>=0?'El último precio diario disponible está arriba del cierre anterior.':'El último precio diario disponible está abajo del cierre anterior.'}</span></div>`).join(''):'<div class="research-mover-row">Sin tickers en este grupo.</div>'}`;
         host.innerHTML=group('Ganadores',movers.gainers)+group('Perdedores',movers.losers);
       }
     }
@@ -120,12 +107,12 @@
   }
   function renderSummary(snapshot){
     const modules=snapshot.modules,selected=[];
-    if(modules.technical)selected.push('Técnico');if(modules.blackScholes)selected.push('Black‑Scholes');if(modules.financial)selected.push('Fundamentales FMP');if(modules.movers)selected.push('Ganadores/perdedores entre tickers elegidos');if(modules.news)selected.push('Noticias Alpaca');
+    if(modules.technical)selected.push('Técnico');if(modules.blackScholes)selected.push('Black‑Scholes');if(modules.financial)selected.push('Fundamentales');if(modules.movers)selected.push('Ganadores/perdedores entre tickers elegidos');if(modules.news)selected.push('Noticias Alpaca');
     $('researchCoreModules').textContent=selected.join(' · ')||'Solo opciones e histórico';
-    const items=[`Comparé ${snapshot.underlyings.map(item=>item.symbol).join(', ')} para vencimiento ${snapshot.expirationDate} con cotizaciones de opciones Alpaca.`,snapshot.screening?`Exploré ${snapshot.screening.coveredCount} de ${snapshot.screening.universeCount} empresas del S&P 500 por cambio diario y pasé los 5 mayores avances y las 5 mayores caídas al análisis de opciones.`:'El universo comparado proviene de la lista manual ingresada.','El orden usa exclusivamente los cores de puntuación seleccionados; noticias es contexto y no puntúa.'];
+    const items=[`Comparé ${snapshot.underlyings.map(item=>item.symbol).join(', ')} para vencimiento ${snapshot.expirationDate} con cotizaciones de opciones Alpaca.`,snapshot.screening?`Se intentaron todas las ${snapshot.screening.universeCount} empresas del S&P 500; ${snapshot.screening.evaluatedCount} tuvieron datos para evaluar opciones y ${snapshot.screening.failedCount} fallaron. Se conservó la mejor combinación de cada estrategia por empresa que cumplió los filtros. Fuente del universo: ${snapshot.screening.provider}. El orden corresponde al vencimiento y filtros elegidos, no a todos los vencimientos posibles.`:'El universo comparado proviene de la lista manual ingresada.','El orden usa exclusivamente los cores de puntuación seleccionados; noticias es contexto y no puntúa.'];
     if(modules.technical)for(const item of snapshot.underlyings)items.push(`${item.symbol}: tendencia ${item.technical?.trend||'sin datos'}.`);
     if(modules.blackScholes)items.push('Black‑Scholes estima una probabilidad risk‑neutral independiente usando volatilidad realizada histórica como proxy, no IV de opciones.');
-    if(modules.financial)items.push(snapshot.fundamentals?.status==='available'?snapshot.fundamentals.rows.filter(row=>row.status==='available').map(row=>row.fundamentalScore?.status==='available'?`${row.symbol}: score fundamental ${row.fundamentalScore.score.toFixed(1)}/100; ajusta el ranking con factor ×${row.fundamentalScore.factor.toFixed(2)}.`:`${row.symbol}: score fundamental no disponible por cobertura insuficiente.`).join(' '):snapshot.fundamentals?.error||'No hay fundamentales disponibles desde FMP.');
+    if(modules.financial)items.push(snapshot.fundamentals?.status==='available'?snapshot.fundamentals.rows.filter(row=>row.status==='available').map(row=>row.fundamentalScore?.status==='available'?`${row.symbol}: score fundamental ${row.fundamentalScore.score.toFixed(1)}/100; aporta al promedio de cores seleccionados.`:`${row.symbol}: score fundamental no disponible por cobertura insuficiente.`).join(' '):snapshot.fundamentals?.error||'No hay fundamentales disponibles desde FMP.');
     if(modules.movers)items.push(snapshot.movers?.status==='available'?'Ganadores/perdedores compara el cambio entre el cierre anterior y el cierre diario más reciente. Es una descripción del movimiento, no su causa ni una predicción.':'No hay cambio diario disponible para comparar los tickers elegidos.');
     if(modules.news)items.push(snapshot.news.status==='available'?`${snapshot.news.articles.length} noticias recientes consultadas en Alpaca.`:'Noticias Alpaca no disponibles: '+(snapshot.news.error||'sin resultados.'));
     items.push('Puntuación de 0 a 100: promedio de los cores elegidos con datos disponibles. Si falta uno, no se asigna puntuación. No es una probabilidad de rentabilidad.');
@@ -134,7 +121,7 @@
   // Índices originales compartidos por tabla, explicaciones y método cuantitativo.
   function filteredRows(snapshot){
     const minP=Number($('researchMinProb').value)/100,minRR=Number($('researchMinRR').value),maxSpread=Number($('researchMaxSpread').value),trendFilter=snapshot.modules.technical?$('researchTrendFilter').value:'all';
-    const mode=$('researchMode').value,company=$('researchCompany').value,strategy=$('researchStrategyFilter').value,maxLoss=$('researchMaxLoss').value===''?Infinity:Number($('researchMaxLoss').value);
+    const mode=$('researchMode').value,company=$('researchCompany').value.trim().toUpperCase(),strategy=$('researchStrategyFilter').value,maxLoss=$('researchMaxLoss').value===''?Infinity:Number($('researchMaxLoss').value);
     const probabilityFor=c=>snapshot.modules.blackScholes?c.blackScholes?.probability:snapshot.modules.technical?c.probability?.probability:null;
     const rows=snapshot.candidates.map((candidate,index)=>({candidate,index})).filter(({candidate:c})=>(mode!=='company'||c.symbol===company)&&(strategy==='all'||c.strategy===strategy)&&c.maxLoss<=maxLoss&&(minP===0||Number.isFinite(probabilityFor(c))&&probabilityFor(c)>=minP)&&c.riskReward>=minRR&&c.liquidityScore<=maxSpread&&(trendFilter==='all'||c.technicalTrend===c.side));
     return {rows,filters:{minProbability:minP,minRiskReward:minRR,maxRelativeBidAsk:maxSpread,technicalAlignment:trendFilter,strategy,maxLoss:Number.isFinite(maxLoss)?maxLoss:null}};
@@ -197,7 +184,7 @@
     const lower=Number.isFinite(candidate.longStrike)&&Number.isFinite(candidate.shortStrike)&&candidate.longStrike!==candidate.shortStrike?(candidate.longStrike<candidate.shortStrike?'larga':'corta'):null;
     const alternatives=rows.map(row=>row.candidate).filter(other=>other!==candidate&&other.symbol===candidate.symbol&&other.expiration===candidate.expiration&&other.strategy===candidate.strategy);
     const other=alternatives[0];
-    const comparison=other?`Entre ${alternatives.length} alternativa(s) visible(s) de la misma estrategia, el par ${other.longStrike}/${other.shortStrike} tiene score ${scoreNumber(other.score)}, probabilidad histórica ${pct(other.probability?.probability)}, ganancia/riesgo ${evidenceNumber(other.riskReward)} y diferencial ${evidenceNumber(other.liquidityScore)}; el par seleccionado tiene score ${scoreNumber(candidate.score)}, probabilidad ${pct(candidate.probability?.probability)}, ganancia/riesgo ${evidenceNumber(candidate.riskReward)} y diferencial ${evidenceNumber(candidate.liquidityScore)}.`:'No hay otro par visible de la misma empresa y estrategia para comparar; los filtros y el límite de 20 pueden haber excluido alternativas.';
+    const comparison=other?`Entre ${alternatives.length} alternativa(s) visible(s) de la misma estrategia, el par ${other.longStrike}/${other.shortStrike} tiene score ${scoreNumber(other.score)}, probabilidad histórica ${pct(other.probability?.probability)}, ganancia/riesgo ${evidenceNumber(other.riskReward)} y diferencial ${evidenceNumber(other.liquidityScore)}; el par seleccionado tiene score ${scoreNumber(candidate.score)}, probabilidad ${pct(candidate.probability?.probability)}, ganancia/riesgo ${evidenceNumber(candidate.riskReward)} y diferencial ${evidenceNumber(candidate.liquidityScore)}.`:'No hay otro par visible de la misma empresa y estrategia para comparar; el alcance mostrado y los filtros pueden haber excluido alternativas.';
     const provenance=e.long&&e.short?'Identidades y cotizaciones proceden de las patas conservadas para esta candidata.':'Falta la evidencia original completa; los campos disponibles proceden del ranking y no están verificados.';
     return `<p>${esc(provenance)}</p><h4>Pata comprada (long)</h4>${leg('Compra',long,'buy')}<h4>Pata vendida (short)</h4>${leg('Venta',short,'sell')}
       <p>${lower?`La pata ${esc(lower)} tiene el strike menor; `:'No se pudo comprobar el orden de los strikes; '}se compra al Ask y se vende al Bid. La cantidad mostrada corresponde a una unidad de spread del ranking, no a una orden ejecutada. El ranking revisa pares de la misma empresa, vencimiento y tipo, strikes dentro del 30% del spot, cotizaciones positivas sin cruce y hasta 72 horas de antigüedad; exige prima positiva menor que el ancho. Enumera pares, calcula el score y conserva hasta 20 candidatas por ticker.</p>
@@ -296,15 +283,16 @@
       $('researchNews').innerHTML=news.status==='available'&&news.articles.length?news.articles.slice(0,20).map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada',assessment=assessNews(item);return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}</strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div><p class="research-news-summary"><strong>${esc(assessment.label)}.</strong> ${esc(assessment.explanation)} Lectura automática por palabras clave, no confirma que la noticia haya causado un movimiento en el precio.</p>${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):'<p class="research-panel-description">No hay artículos disponibles para los tickers y periodo consultados.</p>';
     }
     const filtered=filteredRows(snapshot),filters=filtered.filters;
-    const allRows=filtered.rows,rows=$('researchMode').value==='top'?window.ResearchRanking.topCompanies(allRows):allRows.slice(0,100);
+    const allRows=filtered.rows,mode=$('researchMode').value,perCompany=new Map();
+    const rows=mode==='top'?window.ResearchRanking.topCompanies(allRows):mode==='list'?allRows.filter(({candidate})=>{const count=perCompany.get(candidate.symbol)||0;perCompany.set(candidate.symbol,count+1);return count<25;}):allRows.slice(0,100);
     const wbMetrics=window.__workbenchTableMetrics,wbCtx=window.__workbenchContext;
     const wbActive=!!(wbMetrics&&wbCtx&&wbMetrics.token===wbCtx.token);
     const wbHead=$('researchMethodHead');
     wbHead.hidden=!wbActive;if(wbActive)wbHead.textContent=wbMetrics.label;
     const wbCell=index=>!wbActive?'':!Number.isFinite(wbMetrics.values[index])?'<td>—</td>':`<td title="${esc(wbMetrics.label+' calculada con el método del Quant Workbench. Métrica informativa; no es pronóstico ni recomendación.')}">${esc(fmtWorkbenchMetric(wbMetrics.method,wbMetrics.values[index]))}</td>`;
-    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF normal estándar verificada`:`${c.blackScholes?.reason||''}`,scoreTitle='Promedio de los cores seleccionados (0–100); no es probabilidad de ganancia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${Number.isFinite(c.score)?position+1:"—"}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td data-core-column="technical">${esc(c.technicalTrend||'Sin datos')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td data-core-column="technical">${pct(c.probability.probability)}</td><td data-core-column="blackScholes" title="${esc(bsTitle)}">${esc(bsLabel)}</td><td data-core-column="technical">${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td data-core-column="technical">${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-primary" data-prepare-candidate="${index}">Preparar operación</button> <button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td>${wbCell(index)}</tr>`;}).join('')||`<tr><td colspan="${wbActive?16:15}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
+    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF normal estándar verificada`:`${c.blackScholes?.reason||''}`,scoreTitle=c.scoreMissing?.length?'Sin puntuación: faltan '+c.scoreMissing.join(', '):'Promedio de los cores seleccionados (0–100); no es probabilidad de ganancia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${Number.isFinite(c.score)?position+1:"—"}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td data-core-column="technical">${esc(c.technicalTrend||'Sin datos')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td data-core-column="technical">${pct(c.probability.probability)}</td><td data-core-column="blackScholes" title="${esc(bsTitle)}">${esc(bsLabel)}</td><td data-core-column="technical">${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td data-core-column="technical">${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-primary" data-prepare-candidate="${index}">Preparar operación</button> <button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td>${wbCell(index)}</tr>`;}).join('')||`<tr><td colspan="${wbActive?16:15}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
     document.querySelectorAll('[data-core-column]').forEach(cell=>{cell.hidden=!snapshot.modules[cell.dataset.coreColumn];});
-    $('researchRankingStatus').textContent=$('researchMode').value==='top'?`${rows.length} empresas clasificadas, con una estrategia por empresa, después de filtrar ${allRows.length} pares. Sin datos completos en un core seleccionado no se asigna posición.`:`${rows.length} de ${allRows.length} operaciones que cumplen los filtros para ${$('researchCompany').value}. Orden: cores seleccionados, ganancia/riesgo y diferencial.`;
+    $('researchRankingStatus').textContent=$('researchMode').value==='top'?`${rows.length} empresas clasificadas, con una estrategia por empresa, después de filtrar ${allRows.length} pares. Sin datos completos en un core seleccionado no se asigna posición.`:`${rows.length} de ${allRows.length} operaciones que cumplen los filtros para ${$('researchMode').value==='list'?snapshot.underlyings.map(item=>item.symbol).join(', '):$('researchCompany').value}${$('researchMode').value==='list'?' (hasta 25 por empresa)':''}. Orden: cores seleccionados, ganancia/riesgo y diferencial.`;
     $('researchEvidence').hidden=false;
     snapshot.filters=filters;
     $('researchBsCaveat').hidden=!snapshot.modules.blackScholes;
@@ -317,7 +305,7 @@
     if($('researchComparison').open)renderStrategyComparison(snapshot,allRows);
   }
   function invalidateResearchContext(showMessage=true){
-    researchVersion++;selectionVersion++;comparisonVersion++;
+    researchVersion++;selectionVersion++;comparisonVersion++;analysisController?.abort();
     currentSnapshot=null;selectedCandidateIndex=null;modulesDirty=false;
     window.__researchMarketCache={};window.__workbenchTableMetrics=null;
     $('researchEvidence').hidden=true;$('researchCandidateExplanation').hidden=true;
@@ -333,34 +321,59 @@
     if(!Object.values(modules).some(Boolean))return setStatus('Selecciona al menos un módulo para incluir en el análisis.','error');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(expiration)||Date.parse(expiration+'T00:00:00Z')<=Date.now())return setStatus('Selecciona un vencimiento futuro válido.','error');
     const useSp500=$('researchMode').value==='top'&&$('researchUniverse').value==='sp500';
-    if(!useSp500&&(!symbols.length||symbols.length>10||symbols.some(s=>!/^[A-Z0-9.-]{1,12}$/.test(s))))return setStatus('Ingresa de 1 a 10 tickers válidos, separados por comas, o selecciona el S&P 500.','error');
+    if(!useSp500&&(!symbols.length||symbols.length>10||symbols.some(s=>!/^[A-Z0-9.-]{1,12}$/.test(s))))return setStatus('Ingresa de 1 a 10 tickers válidos, separados por coma, espacio o punto y coma, o selecciona el S&P 500.','error');
     invalidateResearchContext(false);const version=researchVersion;
-    const btn=$('btnResearchAnalyze');running=true;btn.disabled=true;btn.textContent='Consultando mercado…';$('researchEvidence').hidden=true;
+    const btn=$('btnResearchAnalyze');analysisController=new AbortController();$('btnResearchCancel').hidden=false;running=true;btn.disabled=true;btn.textContent='Consultando mercado…';$('researchEvidence').hidden=true;
     try{
       let screening=null;
-      if(useSp500){setStatus('Explorando cambios diarios del S&P 500…','loading');screening=await scanSp500();symbols=screening.symbols;}
+      if(useSp500){setStatus('Obteniendo todas las empresas del S&P 500…','loading');screening=await scanSp500();symbols=screening.symbols;}
       if(version!==researchVersion)return;
-      if(!symbols.length||symbols.length>10||symbols.some(s=>!/^[A-Z0-9.-]{1,12}$/.test(s)))throw new Error('El análisis de opciones necesita de 1 a 10 tickers válidos.');
+      if(!symbols.length||symbols.length>(useSp500?600:10)||symbols.some(s=>!/^[A-Z0-9.-]{1,12}$/.test(s)))throw new Error('El análisis de opciones necesita de 1 a 10 tickers válidos.');
       const rate=Number($('qwRate')?.value),dividend=Number($('qwDividend')?.value),riskFreeRate=Number.isFinite(rate)?rate:.05,dividendYield=Number.isFinite(dividend)?dividend:0;
-      const underlyings=[],failures=[];
-      for(const symbol of symbols){if(version!==researchVersion)return;setStatus(`Consultando velas y cadena de opciones de ${symbol}…`,'loading');try{underlyings.push(await analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield,version));}catch(error){failures.push(`${symbol}: ${error.message}`);}if(version!==researchVersion)return;}
-      if(!underlyings.length)throw new Error(failures.join(' · ')||'No se obtuvieron datos de mercado.');
+      const underlyings=[],failures=[],fundamentalRows=[];let completed=0,empty=0;
+      async function getFundamentals(list){
+        const parts=[];for(let i=0;i<list.length;i+=3){if(version!==researchVersion)return[];parts.push(await json('/api/research/fundamentals?symbols='+encodeURIComponent(list.slice(i,i+3).join(','))));}
+        return parts.flatMap(part=>part.rows||[]).map(row=>row.status==='available'?{...row,fundamentalScore:ResearchAnalysis.scoreFundamentals(row.metrics)}:row);
+      }
+      for(const symbol of symbols){
+        if(version!==researchVersion)return;
+        setStatus(`Evaluando opciones ${completed+1}/${symbols.length}: ${symbol}. ${failures.length} errores; ${empty} sin pares válidos. Puedes cancelar.`,'loading');
+        try{
+          const item=await analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield,version);
+          if(useSp500){
+            const rows=modules.financial?await getFundamentals([symbol]):[];fundamentalRows.push(...rows);
+            if(!screening.changes.some(row=>row.symbol===symbol)&&Number.isFinite(item.dailyChangePct))screening.changes.push({symbol,changePct:item.dailyChangePct,latestClose:item.dailyClose,previousClose:item.previousClose,timestamp:item.dailyTimestamp});
+            const ranked=ResearchRanking.rank(item.candidates,modules,{fundamentals:rows,changes:screening.changes});
+            const matching=filteredRows({modules,candidates:ranked}).rows;
+            const strategies=new Set();item.candidates=matching.filter(({candidate})=>!strategies.has(candidate.strategy)&&strategies.add(candidate.strategy)).map(row=>row.candidate);
+            // Las velas para 500 empresas no deben permanecer en memoria del navegador.
+            delete window.__researchMarketCache[symbol];
+          }
+          if(!item.candidates.length)empty++;underlyings.push(item);
+        }catch(error){if(version!==researchVersion)return;failures.push(`${symbol}: ${error.message}`);}
+        completed++;if(useSp500)await new Promise(resolve=>setTimeout(resolve,0));
+      }
+      if(!underlyings.length)throw new Error(failures.slice(0,10).join(' · ')||'No se obtuvieron datos de mercado.');
+      if(screening){screening.evaluatedCount=underlyings.length;screening.failedCount=failures.length;screening.emptyCount=empty;screening.coveredCount=screening.changes.length;screening.complete=failures.length===0;screening.failures=failures;}
       let news={status:'not-selected',provider:'Alpaca',capturedAt:null,articles:[]};
-      if(modules.news)try{news=await fetchNews(underlyings.map(x=>x.symbol));}catch(error){news={status:'unavailable',provider:'Alpaca',capturedAt:new Date().toISOString(),articles:[],error:error.message};}
+      if(modules.news)try{
+        const articles=new Map();for(let i=0;i<underlyings.length;i+=20){if(version!==researchVersion)return;const part=await fetchNews(underlyings.slice(i,i+20).map(x=>x.symbol));for(const article of part.articles)articles.set(article.id||article.url,article);}
+        news={status:'available',provider:'Alpaca',capturedAt:new Date().toISOString(),articles:[...articles.values()]};
+      }catch(error){news={status:'unavailable',provider:'Alpaca',capturedAt:new Date().toISOString(),articles:[],error:error.message};}
       let fundamentals=null;
-      if(modules.financial)try{const parts=[];for(let i=0;i<underlyings.length;i+=3)parts.push(await json('/api/research/fundamentals?symbols='+encodeURIComponent(underlyings.slice(i,i+3).map(x=>x.symbol).join(','))));fundamentals={status:parts.some(part=>part.status==='available')?'available':'unavailable',provider:'Financial Modeling Prep',capturedAt:new Date().toISOString(),rows:parts.flatMap(part=>part.rows||[])};}catch(error){fundamentals={status:'unavailable',provider:'Financial Modeling Prep',capturedAt:new Date().toISOString(),error:error.message,rows:[]};}
+      if(modules.financial)try{const rows=useSp500?fundamentalRows:await getFundamentals(underlyings.map(x=>x.symbol));fundamentals={status:rows.some(row=>row.status==='available')?'available':'unavailable',provider:'Financial Modeling Prep',capturedAt:new Date().toISOString(),rows};}catch(error){fundamentals={status:'unavailable',provider:'Financial Modeling Prep',capturedAt:new Date().toISOString(),error:error.message,rows:[]};}
       if(version!==researchVersion)return;
       if(fundamentals?.rows)fundamentals.rows=fundamentals.rows.map(row=>row.status==='available'?{...row,fundamentalScore:ResearchAnalysis.scoreFundamentals(row.metrics)}:row);
-      const changes=screening?.changes||underlyings.filter(x=>Number.isFinite(x.dailyChangePct)).map(x=>({symbol:x.symbol,changePct:x.dailyChangePct}));
+      const changes=screening?.changes||underlyings.filter(x=>Number.isFinite(x.dailyChangePct)).map(x=>({symbol:x.symbol,changePct:x.dailyChangePct,latestClose:x.dailyClose,previousClose:x.previousClose,timestamp:x.dailyTimestamp}));
       const candidates=window.ResearchRanking.rank(underlyings.flatMap(x=>x.candidates),modules,{fundamentals:fundamentals?.rows||[],changes});
       const movers=modules.movers?{status:changes.length?'available':'unavailable',provider:screening?'Alpaca market snapshots':'Alpaca daily bars',capturedAt:screening?.capturedAt||new Date().toISOString(),coveredCount:screening?.coveredCount,universeCount:screening?.universeCount,gainers:changes.filter(x=>x.changePct>=0).sort((a,b)=>b.changePct-a.changePct),losers:changes.filter(x=>x.changePct<0).sort((a,b)=>a.changePct-b.changePct)}:null;
       currentSnapshot={generatedAt:new Date().toISOString(),provider:'Alpaca',expirationDate:expiration,modules,screening,marketData:{capturedAt:new Date().toISOString(),stocksFeed:underlyings.map(x=>({symbol:x.symbol,feed:x.stockFeed})),spotMethod:'midpoint quote, latest trade fallback, then last daily close',candidateRules:'valid bid/ask with timestamp no older than 72h; strikes within 30% of spot; same expiration; vertical width and premium checked'},underlyings,candidates,news,fundamentals,movers,estimation:{historical:{method:'historical-overlapping-returns',confidenceLevel:.95,minSampleSize:20,disclaimer:'Historical frequency is not a calibrated forecast. Rolling windows overlap and the Wilson interval may understate uncertainty.'},blackScholes:{method:'black-scholes-risk-neutral',volatilitySource:'annualized-realized-historical-proxy-not-option-implied',rate:riskFreeRate,dividendYield,disclaimer:'Risk-neutral model estimate; not a calibrated real-world forecast.'}},filters:{},decision:''};
-      render(currentSnapshot);modulesDirty=false;setStatus(`Análisis listo: ${underlyings.length}/${symbols.length} tickers de opciones; ${screening?`exploración diaria ${screening.coveredCount}/${screening.universeCount} del S&P 500; `:''}${candidates.length} spreads válidos.${failures.length?' Sin datos: '+failures.join(' · '):''} Las probabilidades son estimaciones separadas, no calibradas.`,'info');
+      render(currentSnapshot);modulesDirty=false;setStatus(`Análisis listo: ${underlyings.length}/${symbols.length} tickers de opciones; ${screening?`exploración diaria ${screening.coveredCount}/${screening.universeCount} del S&P 500; `:''}${candidates.length} spreads válidos.${failures.length?' Cobertura parcial: '+failures.length+' errores. Primeros: '+failures.slice(0,5).join(' · '):''}${empty?' '+empty+' empresas sin pares que cumplan los filtros.':''} Las probabilidades son estimaciones separadas, no calibradas.`,'info');
       const triggerSelect=$('chTriggerStrategy');
       triggerSelect.innerHTML='<option value="">— Ninguna seleccionada —</option>'+candidates.map((c,i)=>`<option value="${i}">${esc(c.symbol+' · '+c.strategy.replace('_SPREAD','').replaceAll('_',' ')+' · '+c.longStrike+'/'+c.shortStrike)}</option>`).join('');
       selectCandidate(null);
     }catch(error){if(version===researchVersion)setStatus(error.message,'error');}
-    finally{running=false;btn.disabled=false;btn.textContent='Analizar y comparar los cuatro spreads';}
+    finally{analysisController=null;$('btnResearchCancel').hidden=true;running=false;btn.disabled=false;btn.textContent='Analizar y comparar los cuatro spreads';}
   }
   async function ensureSession(){
     if(accessToken)return accessToken;
@@ -629,12 +642,12 @@
   };
 
   function researchSymbols(){
-    if($('researchMode').value==='company')return [$('researchCompany').value];
-    return [...new Set($('researchSymbols').value.split(',').map(symbol=>symbol.trim().toUpperCase()).filter(Boolean))];
+    if($('researchMode').value==='company')return [$('researchCompany').value.trim().toUpperCase()];
+    return [...new Set($('researchSymbols').value.split(/[\s,;]+/).map(symbol=>symbol.trim().toUpperCase()).filter(Boolean))];
   }
   function syncResearchControls(){
-    const single=$('researchMode').value==='company',custom=$('researchUniverse').value==='custom';
-    $('researchCompanyField').hidden=!single;$('researchUniverseField').hidden=single;
+    const single=$('researchMode').value==='company',list=$('researchMode').value==='list',custom=list||$('researchUniverse').value==='custom';
+    $('researchCompanyField').hidden=!single;$('researchUniverseField').hidden=single||list;
     $('researchSymbols').hidden=single||!custom;document.querySelector('label[for="researchSymbols"]').hidden=single||!custom;
     $('researchTrendFilter').closest('div').hidden=!$('researchModuleTechnical').checked;
     const hasProbability=$('researchModuleTechnical').checked||$('researchModuleBlackScholes').checked;
@@ -650,8 +663,9 @@
     for(const eventName of ['input','change'])$('researchCompany').addEventListener(eventName,()=>{if(currentSnapshot||running)invalidateResearchContext();});
     document.querySelectorAll('.research-module-options input').forEach(input=>input.addEventListener('change',()=>{syncResearchControls();if(typeof refreshChartOverlays==='function')refreshChartOverlays();}));
 
+    $('btnResearchCancel').addEventListener('click',()=>{invalidateResearchContext(false);setStatus('Análisis cancelado. No se publica un ranking incompleto.','info');});
     $('btnResearchAnalyze').addEventListener('click',runAnalysis);$('btnResearchSave').addEventListener('click',saveJournal);$('btnResearchHistory').addEventListener('click',loadJournal);
-    for(const id of ['researchMinProb','researchMinRR','researchMaxSpread','researchTrendFilter','researchMaxLoss','researchStrategyFilter'])for(const event of ['input','change'])$(id).addEventListener(event,()=>{if(currentSnapshot)render(currentSnapshot);});
+    for(const id of ['researchMinProb','researchMinRR','researchMaxSpread','researchTrendFilter','researchMaxLoss','researchStrategyFilter'])for(const event of ['input','change'])$(id).addEventListener(event,()=>{if(currentSnapshot?.screening){invalidateResearchContext(false);setStatus('Cambiaste filtros del recorrido completo. Vuelve a analizar el S&P 500 con estos filtros.','info');}else if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchModuleTechnical','researchModuleBlackScholes','researchModuleFinancial','researchModuleMovers','researchModuleNews'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['researchSymbols','expiration'])for(const eventName of ['input','change'])$(id).addEventListener(eventName,()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['symbol','chSymbol'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
