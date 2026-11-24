@@ -4,6 +4,14 @@ Fecha: 23 de noviembre de 2026. Base integrada: main `94e2ad3` (cambios de Pauli
 
 ## Qué cambió
 
+### Ajuste posterior: presentar solo las finalistas
+
+En el modo Top, el resultado inicial muestra como máximo diez empresas con score completo y una estrategia por empresa, después de comparar todo el universo elegible. La comparación aparece antes de las tarjetas de contexto y explica componentes del score, diferencia respecto al primer/segundo lugar y criterios de desempate. Los paneles técnico, fundamental, movimientos y noticias corresponden a esas mismas finalistas. Las noticias sin ticker asociado no se atribuyen a una finalista.
+
+“Ver todos los resultados” permite consultar todas las empresas clasificadas y volver al Top 10 sin repetir consultas ni cambiar scores. El snapshot completo y los índices originales se conservan para preparar operaciones y consultar explicaciones. Las empresas con datos incompletos no se incorporan al Top por rellenar diez posiciones. Los modos Una empresa y Varias empresas conservan su comportamiento anterior.
+
+Validación: prueba de recorrido simulado de 400 empresas (399 evaluadas y un fallo), comprobando diez filas/tarjetas/selectores inicialmente, paneles fundamentales limitados a diez, noticias asociadas, expansión a 399, retorno al Top conservando índices/puntuaciones y cero consultas adicionales. Se mantiene la cobertura global separada del alcance visible. Estos resultados no se presentan como una garantía de inversión.
+
 - Navegación: se eliminó la dependencia de `selectedOptions` al convertir el ticker en un campo editable. Las sugerencias no limitan los tickers admitidos por Alpaca.
 - Comparación: nuevo modo **Varias empresas**, con 1–10 símbolos, separadores coma/espacios/punto y coma y deduplicación. Se muestran hasta 25 operaciones por empresa para que una emisora no oculte las demás. Una empresa mantiene hasta 100 operaciones visibles.
 - S&P 500: se obtiene un catálogo completo con procedencia. Si FMP lo restringe, se usa [datasets/s-and-p-500-companies](https://github.com/datasets/s-and-p-500-companies), basado en Wikipedia, con caché de 24 horas. No se sustituye por las diez empresas iniciales ni por cinco alzas/cinco caídas.

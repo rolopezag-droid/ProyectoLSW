@@ -178,8 +178,8 @@ test('lista manual admite separadores, duplica cero tickers y permite empresas f
 });
 
 test('S&P completo intenta 400 empresas, identifica cobertura parcial y cambiar filtros exige repetir',async()=>{
- const {dom,w,calls}=page({universeSize:400,scanFailures:true});try{
-  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='sp500';$('researchModuleNews').checked=false;$('researchModuleTechnical').checked=false;
+ const {dom,w,calls}=page({universeSize:400,scanFailures:true,articles:[{id:1,headline:'Finalista raises guidance',symbols:['T0']},{id:2,headline:'Fuera del Top',symbols:['T398']},{id:3,headline:'Sin ticker asociado',symbols:[]}]});try{
+  const $=id=>w.document.getElementById(id);$('researchMode').value='top';$('researchUniverse').value='sp500';$('researchModuleFinancial').checked=true;
   $('btnResearchAnalyze').click();
   for(let i=0;i<10000&&$('btnResearchAnalyze').disabled;i++)await new Promise(resolve=>setTimeout(resolve,2));
   assert.equal($('btnResearchAnalyze').disabled,false);
@@ -187,6 +187,22 @@ test('S&P completo intenta 400 empresas, identifica cobertura parcial y cambiar 
   assert.match($('researchStatus').textContent,/Cobertura parcial: 1 errores/);
   assert.match($('researchCoreSummary').textContent,/400 empresas.*399 tuvieron datos/);
   assert.equal(calls.some(call=>call.url.pathname.endsWith('/market-snapshots')),false,'Movimiento desmarcado no debe consultar snapshots');
+  const visible=()=>[...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')];
+  assert.equal(visible().length,10);
+  assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,10);
+  assert.equal($('researchFinancialRows').querySelectorAll('article').length,10);
+  assert.equal($('researchCompareSymbol').options.length,10);
+  assert.match($('researchTopReasons').textContent,/Supera al segundo lugar|Empata en puntuación/);
+  assert.match($('researchNews').textContent,/Finalista raises guidance/);
+  assert.doesNotMatch($('researchNews').textContent,/Fuera del Top|Sin ticker asociado/);
+  const firstTen=visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),requests=calls.length;
+  $('btnResearchShowAll').click();assert.equal(visible().length,399);
+  assert.equal($('researchMetrics').querySelectorAll('.research-ticker-card').length,399);
+  assert.equal($('researchFinancialRows').querySelectorAll('article').length,399);
+  assert.match($('researchNews').textContent,/Fuera del Top/);
+  $('btnResearchShowAll').click();assert.deepEqual(visible().map(row=>({index:row.dataset.candidate,text:row.textContent})),firstTen);
+  assert.equal(calls.length,requests,'Cambiar alcance no repite consultas');
+  assert.equal($('researchStrategiesTitle').closest('section').previousElementSibling.id,'researchResultScope');
   $('researchMinRR').value='1.5';$('researchMinRR').dispatchEvent(new w.Event('input'));
   assert.equal($('researchEvidence').hidden,true);assert.match($('researchStatus').textContent,/Vuelve a analizar/);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
