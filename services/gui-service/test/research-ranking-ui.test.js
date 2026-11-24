@@ -118,13 +118,30 @@ test('las cuatro sugerencias se trasladan con empresa, fecha, patas, primas y ca
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
 
-test('vencimientos: catálogo real bajo demanda, selección sincronizada y sin fecha inventada',async()=>{
+test('vencimientos: catálogo real automático en un solo selector sincronizado',async()=>{
  const {dom,w,calls,expiration}=page();try{
-  const $=id=>w.document.getElementById(id);const host=$('researchExpiration').nextElementSibling;
-  host.querySelector('button').click();await until(()=>!host.querySelector('button').disabled);
-  const select=host.querySelector('select');assert.equal(select.hidden,false);select.value=expiration;select.dispatchEvent(new w.Event('change'));
+  const $=id=>w.document.getElementById(id),select=$('researchExpiration');
+  assert.equal(calls.filter(call=>call.url.pathname.endsWith('/options-chain/expirations')).length,0);
+  w.WorkspaceNavigation.navigate('comparar');
+  await until(()=>select.options.length>1&&!select.disabled);
+  assert.equal(select.tagName,'SELECT');assert.equal(select.parentElement.querySelector('input[type="date"]'),null);
+  assert.equal(select.parentElement.querySelector('button'),null);assert.equal(select.value,expiration);
   assert.equal($('expiration').value,expiration);assert.equal($('researchExpiration').value,expiration);
-  assert.ok(calls.some(call=>call.url.pathname.endsWith('/options-chain/expirations')));
+  assert.equal(calls.filter(call=>call.url.pathname.endsWith('/options-chain/expirations')).length,1);
+  $('researchCompany').value='MSFT';$('researchCompany').dispatchEvent(new w.Event('change'));
+  await until(()=>calls.some(call=>call.url.pathname.endsWith('/options-chain/expirations')&&call.url.searchParams.get('symbol')==='MSFT'));
+  await until(()=>select.options.length>1&&!select.disabled&&calls.filter(call=>call.url.pathname.endsWith('/options-chain/expirations')).length===2);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('Nueva operación conserva la consulta manual y comparte el vencimiento',async()=>{
+ const {dom,w,calls,expiration}=page();try{
+  const $=id=>w.document.getElementById(id),input=$('expiration'),host=input.nextElementSibling,button=host.querySelector('button');
+  button.click();await until(()=>!button.disabled);
+  const select=host.querySelector('select');assert.equal(select.hidden,false);
+  select.value=expiration;select.dispatchEvent(new w.Event('change'));
+  assert.equal(input.value,expiration);assert.equal($('researchExpiration').value,expiration);
+  assert.equal(calls.filter(call=>call.url.pathname.endsWith('/options-chain/expirations')).length,1);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
 
