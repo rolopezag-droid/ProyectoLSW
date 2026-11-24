@@ -10,7 +10,7 @@ async function until(predicate) {
   throw new Error('La interfaz no completó la operación esperada.');
 }
 
-function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false } = {}) {
+function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false, newsArticles = [] } = {}) {
   const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
   const dom=new JSDOM(html,{url:'http://localhost:3005',runScripts:'outside-only'}),w=dom.window,calls=[];
   w.structuredClone=structuredClone;Object.defineProperty(w,'crypto',{value:require('node:crypto').webcrypto});
@@ -32,7 +32,7 @@ function page({ evaluate, missingQuotes = false, missingMultiplier = false, quot
       return response({contracts,nextPageToken:null});
     }
     if(u.pathname.endsWith('/options-chain/expirations'))return response({expirations:[expiration],complete:true});
-    if(u.pathname.endsWith('/broker/news'))return response({articles:[],capturedAt:timestamp});
+    if(u.pathname.endsWith('/broker/news'))return response({articles:newsArticles,capturedAt:timestamp});
     if(u.pathname==='/api/research/fundamentals')return response({status:'available',provider:'simulado',capturedAt:timestamp,rows:u.searchParams.get('symbols').split(',').map(symbol=>({symbol,status:'available',metrics:{revenueGrowth:10,netIncomeGrowth:8,roe:.2,netMargin:.15,debtEquity:1,currentRatio:1.5,pe:20,pb:2}}))});
     if(u.pathname.endsWith('/strategies/evaluate')){
       const body=JSON.parse(options.body);
@@ -59,6 +59,23 @@ async function analyze(w) {
 function candidateButton(w,strategy) {
   return [...w.document.querySelectorAll('#researchCandidates tr[data-candidate]')].find(row=>row.cells[2].textContent.trim()===strategy)?.querySelector('button[data-explain-candidate]');
 }
+
+test('muestra la etiqueta de sentimiento recibida y filtra noticias por clasificación',async()=>{
+ const newsArticles=[
+  {headline:'AAPL beats estimates',summary:'Revenue grows.',source:'Example',symbols:['AAPL'],sentiment:{label:'bullish',confidence:'medium',signals:{bullish:['beats estimates'],bearish:[]}}},
+  {headline:'AAPL cuts guidance',summary:'',source:'Example',symbols:['AAPL'],sentiment:{label:'bearish',confidence:'low',signals:{bullish:[],bearish:['cuts guidance']}}},
+ ];
+ const {dom,w}=page({newsArticles});try{
+  await analyze(w);
+  const $=id=>w.document.getElementById(id);
+  assert.equal(w.document.querySelectorAll('#researchNews .research-news-item').length,2);
+  assert.match(w.document.querySelector('.research-sentiment-badge').textContent,/Alcista · nivel heurístico media/);
+  assert.match($('researchNewsStatus').textContent,/1 alcistas, 1 bajistas/);
+  $('researchNewsFilter').value='bearish';$('researchNewsFilter').dispatchEvent(new w.Event('change'));
+  assert.equal(w.document.querySelectorAll('#researchNews .research-news-item').length,1);
+  assert.match(w.document.querySelector('#researchNews .research-news-item').textContent,/AAPL cuts guidance/);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
 
 test('navegación simplificada sin calculadora, conexiones ni sondeo técnico en el cliente',async()=>{
  const {dom,w,calls}=page();try{

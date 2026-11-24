@@ -77,15 +77,6 @@
     if(!selected.length)throw new Error('Alpaca no devolvió cambios diarios para el S&P 500.');
     return {symbols:selected.map(item=>item.symbol),changes,universeCount:symbols.length,coveredCount:changes.length,capturedAt:snapshots.capturedAt||universe.capturedAt,provider:universe.provider};
   }
-  function assessNews(item){
-    const text=`${item.headline||''} ${item.summary||''}`.toLowerCase();
-    const positive=(text.match(/\b(beat|beats|beating|upgrade|upgraded|approval|approved|growth|grows|record|surge|surges|gain|gains|profit|profits|contract win|buyback|raises guidance|sube|subida|ganancia|crecimiento|aprobaci[oó]n|mejora)\b/g)||[]).length;
-    const negative=(text.match(/\b(miss|misses|missed|downgrade|downgraded|loss|losses|decline|declines|fall|falls|drops|drop|cut|cuts|lawsuit|probe|investigation|recall|warning|bankruptcy|layoffs|debt|plunge|plunges|cae|ca[ií]da|p[eé]rdida|recorte|demanda|investigaci[oó]n|quiebra)\b/g)||[]).length;
-    if(positive>negative)return {label:'Posible sesgo alcista',explanation:'El titular o resumen contiene más términos favorables que adversos.'};
-    if(negative>positive)return {label:'Posible sesgo bajista',explanation:'El titular o resumen contiene más términos adversos que favorables.'};
-    if(positive&&negative)return {label:'Señales mixtas',explanation:'Aparecen términos favorables y adversos en el mismo texto.'};
-    return {label:'Sin dirección clara',explanation:'El texto no contiene señales suficientes para asignar una dirección.'};
-  }
   function renderFinancialAndMovers(snapshot){
     const modules=snapshot.modules,fundamentals=snapshot.fundamentals;
     $('researchFinancialPanel').hidden=!modules.financial;
@@ -291,9 +282,12 @@
     renderSummary(snapshot);renderTechnical(snapshot);renderFinancialAndMovers(snapshot);
     const news=snapshot.news,newsPanel=$('researchNewsPanel');newsPanel.hidden=!snapshot.modules.news;
     if(snapshot.modules.news){
-      $('researchNewsStatus').textContent=news.status==='available'?`${news.articles.length} artículo(s) consultados para ${snapshot.underlyings.map(x=>x.symbol).join(', ')} · Captura ${new Date(news.capturedAt).toLocaleString('es-MX')}.`:`No se pudieron consultar noticias de Alpaca: ${news.error||'error no especificado'}.`;
+      const sentimentCounts=news.articles.reduce((counts,item)=>{const label=item.sentiment?.label||'unknown';counts[label]=(counts[label]||0)+1;return counts;},{});
+      $('researchNewsStatus').textContent=news.status==='available'?`${news.articles.length} artículo(s) para ${snapshot.underlyings.map(x=>x.symbol).join(', ')} · ${sentimentCounts.bullish||0} alcistas, ${sentimentCounts.bearish||0} bajistas, ${sentimentCounts.mixed||0} mixtas, ${sentimentCounts.neutral||0} sin señal clara · Captura ${new Date(news.capturedAt).toLocaleString('es-MX')}.`:`No se pudieron consultar noticias de Alpaca: ${news.error||'error no especificado'}.`;
       const articleUrl=value=>{try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)?url.href:null;}catch{return null;}};
-      $('researchNews').innerHTML=news.status==='available'&&news.articles.length?news.articles.slice(0,20).map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada',assessment=assessNews(item);return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}</strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div><p class="research-news-summary"><strong>${esc(assessment.label)}.</strong> ${esc(assessment.explanation)} Lectura automática por palabras clave, no confirma que la noticia haya causado un movimiento en el precio.</p>${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):'<p class="research-panel-description">No hay artículos disponibles para los tickers y periodo consultados.</p>';
+      const filter=$('researchNewsFilter').value,labels={bullish:'Alcista',bearish:'Bajista',mixed:'Mixta',neutral:'Sin señal clara',unknown:'Sin clasificar'},confidenceLabels={low:'baja',medium:'media',high:'alta'};
+      const articles=news.articles.slice(0,20).filter(item=>filter==='all'||(item.sentiment?.label||'unknown')===filter);
+      $('researchNews').innerHTML=news.status==='available'&&articles.length?articles.map(item=>{const url=articleUrl(item.url),date=item.created_at||item.updated_at,source=item.source||item.author||'Fuente no indicada',sentiment=item.sentiment||{label:'unknown',confidence:'low',signals:{bullish:[],bearish:[]}},label=labels[sentiment.label]||labels.unknown,confidence=confidenceLabels[sentiment.confidence]||confidenceLabels.low,signals=[...(sentiment.signals?.bullish||[]),...(sentiment.signals?.bearish||[])];return `<article class="research-news-item"><strong>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.headline||'Artículo sin titular')}</a>`:esc(item.headline||'Artículo sin titular')}<span class="research-sentiment-badge sentiment-${esc(sentiment.label)}">${esc(label)} · nivel heurístico ${esc(confidence)}</span></strong><div class="research-news-meta">${esc(source)} · ${esc(date?new Date(date).toLocaleString('es-MX'):'Fecha no indicada')} · ${(item.symbols||[]).map(esc).join(', ')}</div>${signals.length?`<p class="research-news-meta">Señales de texto: ${signals.map(esc).join(', ')}</p>`:''}${item.summary?`<p class="research-news-summary">${esc(item.summary)}</p>`:''}</article>`;}).join(''):`<p class="research-panel-description">${news.status==='available'?'No hay artículos disponibles para esa clasificación.':'No hay artículos disponibles para los tickers y periodo consultados.'}</p>`;
     }
     const filtered=filteredRows(snapshot),filters=filtered.filters;
     const allRows=filtered.rows,rows=$('researchMode').value==='top'?window.ResearchRanking.topCompanies(allRows):allRows.slice(0,100);
@@ -651,6 +645,7 @@
     document.querySelectorAll('.research-module-options input').forEach(input=>input.addEventListener('change',()=>{syncResearchControls();if(typeof refreshChartOverlays==='function')refreshChartOverlays();}));
 
     $('btnResearchAnalyze').addEventListener('click',runAnalysis);$('btnResearchSave').addEventListener('click',saveJournal);$('btnResearchHistory').addEventListener('click',loadJournal);
+    $('researchNewsFilter').addEventListener('change',()=>{if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchMinProb','researchMinRR','researchMaxSpread','researchTrendFilter','researchMaxLoss','researchStrategyFilter'])for(const event of ['input','change'])$(id).addEventListener(event,()=>{if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchModuleTechnical','researchModuleBlackScholes','researchModuleFinancial','researchModuleMovers','researchModuleNews'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['researchSymbols','expiration'])for(const eventName of ['input','change'])$(id).addEventListener(eventName,()=>{if(currentSnapshot||running)invalidateResearchContext();});
