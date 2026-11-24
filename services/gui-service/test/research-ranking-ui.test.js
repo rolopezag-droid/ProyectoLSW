@@ -10,7 +10,7 @@ async function until(predicate) {
   throw new Error('La interfaz no completó la operación esperada.');
 }
 
-function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false, universeSize = 0, scanFailures = false, articles = [], fundamentalsUnavailable = false } = {}) {
+function page({ evaluate, missingQuotes = false, missingMultiplier = false, quoteSymbol, barsCount = 260, waitForCandles, extraStrike = false, universeSize = 0, scanFailures = false, articles = [], fundamentalsUnavailable = false, fundamentalsMissingKey = false } = {}) {
   const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
   const dom=new JSDOM(html,{url:'http://localhost:3005',runScripts:'outside-only'}),w=dom.window,calls=[];
   w.structuredClone=structuredClone;Object.defineProperty(w,'crypto',{value:require('node:crypto').webcrypto});
@@ -36,6 +36,7 @@ function page({ evaluate, missingQuotes = false, missingMultiplier = false, quot
     }
     if(u.pathname.endsWith('/options-chain/expirations'))return response({expirations:[expiration],complete:true});
     if(u.pathname.endsWith('/broker/news'))return response({articles,capturedAt:timestamp});
+    if(u.pathname==='/api/research/fundamentals'&&fundamentalsMissingKey)return response({status:'unavailable',rows:[],error:'FMP_API_KEY no está configurada en el servidor.'});
     if(u.pathname==='/api/research/fundamentals')return response({status:'available',provider:'simulado',capturedAt:timestamp,rows:u.searchParams.get('symbols').split(',').map(symbol=>fundamentalsUnavailable?{symbol,status:'unavailable',error:'FMP alcanzó el límite de consultas.',metrics:{}}:({symbol,status:'available',metrics:{revenueGrowth:10,netIncomeGrowth:8,roe:.2,netMargin:.15,debtEquity:1,currentRatio:1.5,pe:20,pb:2}}))});
     if(u.pathname.endsWith('/strategies/evaluate')){
       const body=JSON.parse(options.body);
@@ -237,5 +238,14 @@ test('S&P con solo fundamental solicita otro core antes de consumir consultas',a
   $('researchModuleTechnical').checked=false;$('researchModuleBlackScholes').checked=false;$('researchModuleNews').checked=false;$('researchModuleFinancial').checked=true;
   const before=calls.length;$('btnResearchAnalyze').click();
   assert.equal(calls.length,before);assert.match($('researchStatus').textContent,/selecciona Técnico, Black-Scholes o Movimiento/);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});
+
+test('un ticker conserva el aviso real cuando FMP no devuelve filas por configuración faltante',async()=>{
+ const {dom,w}=page({fundamentalsMissingKey:true});try{
+  const $=id=>w.document.getElementById(id);$('researchModuleFinancial').checked=true;await analyze(w);
+  assert.match($('researchFinancialStatus').textContent,/FMP_API_KEY/);
+  assert.match($('researchFinancialRows').textContent,/no está configurada/);
+  assert.doesNotMatch($('researchStatus').textContent,/Cannot read/);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });

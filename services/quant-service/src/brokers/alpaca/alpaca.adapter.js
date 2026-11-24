@@ -22,6 +22,7 @@ class AlpacaAdapter extends BrokerAdapter {
     this.fetch = fetchImplementation;
     this.readIntervalMs = readIntervalMs;
     this.nextReadAt = 0;
+    this.readQueue = Promise.resolve();
   }
 
   async request(baseUrl, path, options = {}) {
@@ -29,9 +30,15 @@ class AlpacaAdapter extends BrokerAdapter {
     // Reservar el turno ANTES de esperar mantiene el límite con llamadas paralelas.
     // Las órdenes nunca se reintentan ni se mezclan con esta cola de lecturas.
     if ((!options.method || options.method === 'GET') && this.readIntervalMs > 0) {
-      const turn = Math.max(Date.now(), this.nextReadAt);
-      this.nextReadAt = turn + this.readIntervalMs;
-      if (turn > Date.now()) await new Promise(resolve => setTimeout(resolve, turn - Date.now()));
+      const previous = this.readQueue;
+      let release;
+      this.readQueue = new Promise(resolve => { release = resolve; });
+      await previous;
+      try {
+        const delay = this.nextReadAt - Date.now();
+        if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+        this.nextReadAt = Date.now() + this.readIntervalMs;
+      } finally { release(); }
     }
     const response = await this.fetch(`${baseUrl}${path}`, {
       method: options.method || 'GET',

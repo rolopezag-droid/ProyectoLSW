@@ -4,6 +4,28 @@ Fecha: 23 de noviembre de 2026. Base integrada: main `94e2ad3` (cambios de Pauli
 
 ## Qué cambió
 
+### Revisión del 24 de noviembre: FMP bloqueado con un ticker
+
+**Causa comprobada:** una lectura real de `profile` para AAPL respondió HTTP 429 con `Limit Reach`. No es que el ticker haya dejado de existir ni que Alpaca esté caído. [FMP documenta que exceder la cuota puede suspender las consultas de toda la cuenta hasta su renovación](https://site.financialmodelingprep.com/faqs). No se modificó la suscripción ni se conoce el instante de renovación de esta cuenta.
+
+**Protecciones nuevas:**
+
+- Cliente separado en `services/gui-service/src/fmp-client.js`: cola por credencial, solicitudes simultáneas idénticas compartidas y pausa de todas las lecturas FMP tras el primer 429. Respeta `Retry-After`; sin ese dato aplica 60 segundos de pausa local, que no equivale a prometer renovación de cuota en 60 segundos. No hay reintentos automáticos.
+- Caché independiente por recurso exitoso durante seis horas. Una fila parcialmente disponible ya no congela sus errores durante seis horas; los recursos faltantes pueden recuperarse al terminar su pausa. Los recursos vacíos se conservan brevemente para evitar consultas repetidas.
+- Ante un error, puede reutilizar datos reales previamente obtenidos de hasta 24 horas, mostrando advertencia y fecha original. Si nunca se obtuvieron datos, continúa informando indisponibilidad. La caché vive en cada proceso, no es almacenamiento persistente ni una cuota coordinada entre todas las instancias cloud.
+- Se evita que un 402 de una empresa bloquee otras; un 429 sí pausa la credencial completa. Se distinguen restricciones del plan, acceso, red y respuesta inválida.
+- El catálogo público del S&P 500 se consulta primero sin gastar cuota FMP. FMP queda como alternativa si el catálogo público no está disponible.
+- La interfaz conserva el motivo real aunque el proveedor no devuelva filas y muestra cuándo se obtuvieron los datos. Se conserva la consulta fundamental posterior al Top de diez empresas, el ranking, las cuatro estrategias y las rutas existentes.
+- La regresión detectó que temporizadores vencidos podían agrupar lecturas de Alpaca bajo carga. La cola ahora encadena turnos y calcula la espera desde la última salida real; las órdenes no se reintentan.
+
+**Verificación:**
+
+- Prueba real de AAPL, DELL e IBM: una llamada efectiva a FMP recibió 429; las otras once lecturas quedaron frenadas. Una consulta posterior de MSFT no generó llamadas adicionales durante la pausa. La misma prueba obtuvo el catálogo público de 503 símbolos. No se siguió probando FMP después del bloqueo.
+- Pruebas enfocadas: **82 aprobadas**, cubriendo protección global de cuota, aislamiento de claves, `Retry-After` numérico/fecha, `Limit Reach` con HTTP 200, recuperación de recursos parciales, deduplicación, caché antigua señalada, ticker único sin configuración, selección posterior al Top, gráfica, explicación y fórmulas.
+- Última batería general de esta revisión: 281 pruebas, 237 aprobadas y 44 fallidas en las pruebas heredadas de pantallas/controles retirados y aserciones antiguas del broker. No se declara la suite completa en verde. El test nuevo de aviso de configuración se ejecutó además en la batería enfocada posterior.
+- No se pudo verificar una respuesta real exitosa de fundamentales mientras la cuenta permanezca bloqueada; la recuperación se verificó con respuestas controladas. El código no puede liberar una cuota agotada ni desbloquear recursos premium.
+- Sin órdenes, cambios de BD, exposición de claves ni servicios de prueba dejados corriendo. Esta revisión queda local en la rama roberto hasta solicitar su publicación.
+
 ### Corrección posterior: cuota FMP y orden de apartados
 
 - La sección **05 Comparación de estrategias** vuelve a estar después de **04 Noticias**, respetando la secuencia numerada.

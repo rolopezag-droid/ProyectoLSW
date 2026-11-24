@@ -3,13 +3,13 @@ const assert=require('node:assert/strict');
 const {loadFundamentals,loadSp500,normalize,csvRows}=require('../src/fmp-fundamentals');
 const response=(body,status=200)=>({ok:status===200,status,json:async()=>body,text:async()=>body});
 
-test('402 del plan no bloquea el catálogo público completo y conserva procedencia',async()=>{
+test('el catálogo público completo no consume cuota FMP y conserva procedencia',async()=>{
  const calls=[];
  const result=await loadSp500('test-universe',{fetchImpl:async url=>{
   calls.push(String(url));return String(url).includes('financialmodelingprep')?response('',402):response('Symbol,Security\n'+Array.from({length:403},(_,i)=>`T${i},"Empresa, ${i}"`).join('\n'));
  }});
  assert.equal(result.constituents.length,403);assert.equal(result.constituents[0].name,'Empresa, 0');
- assert.match(result.warning,/402/);assert.match(result.sourceUrl,/githubusercontent/);assert.equal(calls.length,2);
+ assert.match(result.sourceUrl,/githubusercontent/);assert.equal(calls.length,1);assert.equal(calls.some(url=>url.includes('financialmodelingprep')),false);
  const cached=await loadSp500('test-universe',{fetchImpl:()=>{throw new Error('No debe repetir la red');}});assert.equal(cached,result);
 });
 test('CSV respeta comas y comillas escapadas y rechaza un registro sin cerrar',()=>{
