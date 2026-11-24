@@ -1,0 +1,4 @@
+- [x] Especificar retiro y límites.
+- [x] Eliminar bloque y lógica de entradas/salidas de candidata preservando selección del ranking.
+- [x] Actualizar guía y evidencia.
+- [x] Validar 53 pruebas focalizadas aprobadas y OpenSpec estricto.

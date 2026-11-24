@@ -581,11 +581,13 @@
         <h2><span class="card-title-text">Nueva operación</span> <button type="button" class="btn-order-toggle" id="btnToggleOrderPanel" aria-expanded="true" aria-controls="strategyForm" title="Oculta el panel para dar todo el ancho a la gráfica y la tabla comparativa">⟩ Ocultar</button></h2>
 
         <div class="strategy-grid" id="strategyGrid">
-          <div class="strategy-chip active" data-strategy="BULL_CALL_SPREAD">Bull Call</div>
-          <div class="strategy-chip" data-strategy="BEAR_CALL_SPREAD">Bear Call</div>
-          <div class="strategy-chip" data-strategy="BULL_PUT_SPREAD">Bull Put</div>
-          <div class="strategy-chip" data-strategy="BEAR_PUT_SPREAD">Bear Put</div>
+          <button type="button" class="strategy-chip active" data-strategy="BULL_CALL_SPREAD">Bull Call</button>
+          <button type="button" class="strategy-chip" data-strategy="BEAR_CALL_SPREAD">Bear Call</button>
+          <button type="button" class="strategy-chip" data-strategy="BULL_PUT_SPREAD">Bull Put</button>
+          <button type="button" class="strategy-chip" data-strategy="BEAR_PUT_SPREAD">Bear Put</button>
         </div>
+
+        <div id="preparedStrategyNotice" class="section-note" hidden><p id="preparedStrategyMessage" role="status"></p><button type="button" class="btn btn-secondary" id="btnUnlockStrategy">Elegir otra estrategia</button></div>
 
         <form id="strategyForm" class="row">
           <div class="full">
@@ -631,6 +633,7 @@
         <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
           <button type="button" class="btn btn-warning" id="btnFetchQuotes"> Obtener cotizaciones (Alpaca)</button>
           <button type="button" class="btn btn-primary btn-block" id="btnEvaluate"> Evaluar estrategia</button>
+          <button type="button" class="btn btn-secondary btn-block" id="btnGoToOrder" aria-controls="operationExecution">Ir al envío de orden (Paper)</button>
           <button type="button" class="btn btn-success btn-block" id="btnExecutePaper"> Ejecutar Bull/Bear en Paper</button>
 
         <div id="executionSummary" style="display:none;">
@@ -722,7 +725,8 @@
         <section class="signal-mode signal-mode-technical" aria-labelledby="technicalSignalsTitle">
           <fieldset aria-label="Indicadores y niveles de referencia" style="margin-bottom:16px">
             <legend>Indicadores y niveles de referencia</legend>
-            <p class="small-note">Selecciona las medias móviles, los soportes y el precio del último cierre que quieras mostrar. Las SMA y los soportes requieren el core técnico seleccionado; el último cierre es una referencia de precio independiente.</p>
+            <p class="small-note">Selecciona las medias móviles, los soportes y el precio del último cierre que quieras mostrar. Las SMA y los soportes activan el análisis técnico. Las señales del bloque siguiente activan el core independiente de indicadores. Al desactivar cada core se desmarcan sus controles. El último cierre es una referencia de precio independiente.</p>
+            <p id="chartTechnicalStatus" class="small-note" role="status" aria-live="polite"></p>
             <div class="signal-indicator-options">
               <label class="signal-indicator-option"><input type="checkbox" class="chart-layer-toggle" id="chShowSma20" /> SMA 20</label>
               <label class="signal-indicator-option"><input type="checkbox" class="chart-layer-toggle" id="chShowSma50" /> SMA 50</label>
@@ -733,7 +737,7 @@
           </fieldset>
           <fieldset aria-labelledby="technicalSignalsTitle">
             <legend id="technicalSignalsTitle">Señales técnicas independientes · velas diarias</legend>
-            <p class="small-note">Se calculan con las velas de la gráfica, sin seleccionar una candidata.</p>
+            <p class="small-note">Se calculan con las velas diarias de la gráfica, sin seleccionar una candidata. Al activar una señal se activa el core de indicadores. Estos controles filtran solo la visualización: el ranking usa las reglas fijas y las cinco últimas velas cerradas de su propia ventana diaria.</p>
             <div class="signal-indicator-options">
               <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="sma_up" checked /> SMA50 alcista + SMA20</label>
               <label class="signal-indicator-option"><input type="checkbox" class="technical-indicator" value="sma_down" checked /> SMA50 bajista + SMA20</label>
@@ -742,24 +746,12 @@
             </div>
           </fieldset>
         </section>
-        <section class="signal-mode signal-mode-candidate" aria-labelledby="candidateSignalsTitle">
-          <h3 id="candidateSignalsTitle">Entradas y salidas de candidata · opcional</h3>
-          <p class="small-note" id="candidateSignalStatus" role="status">Ninguna candidata seleccionada. El análisis técnico independiente sigue disponible.</p>
-          <div class="chart-trigger-controls">
-            <label class="candidate-toggle"><input type="checkbox" id="chShowTriggers" /> Mostrar entradas/salidas orientativas</label>
-            <label>Candidata evaluada
-              <select id="chTriggerStrategy" aria-label="Candidata evaluada para señales en la gráfica">
-                <option value="">— Ninguna seleccionada —</option>
-              </select>
-            </label>
-          </div>
-        </section>
         <div class="chart-trigger-controls">
           <label>Máximo de marcadores visibles <select id="chMarkerLimit"><option value="10">10</option><option value="50">50</option><option value="100" selected>100</option><option value="250">250</option><option value="all">Todos</option></select></label>
           <label>Consultar fecha UTC <input type="date" id="chSignalDate" /></label>
           <button type="button" class="btn btn-secondary" id="btnClearSignalDate">Ver todas las fechas</button>
         </div>
-        <p class="small-note">Marcadores: verde alcista, rojo bajista, amarillo salida; M = medias, R = RSI, Z = zona, E/X = entrada/salida de candidata. Las señales se confirman al cierre; el timestamp identifica el inicio de la vela del proveedor. Son observaciones históricas, no operaciones ejecutadas ni órdenes automáticas. ATR14 mide volatilidad y aporta el margen de ruptura. RSI 30/70 es heurístico.</p>
+        <p class="small-note">Marcadores: verde alcista, rojo bajista; M = medias, R = RSI, Z = zona. Las señales se confirman al cierre; el timestamp identifica el inicio de la vela del proveedor. Son observaciones históricas, no operaciones ejecutadas ni órdenes automáticas. ATR14 mide volatilidad y aporta el margen de ruptura. RSI 30/70 es heurístico.</p>
 
         <div id="candlesChartContainer" style="display:none;">
           <div class="small-note" id="candlesMeta" style="margin-bottom:0.75rem;"></div>
@@ -783,8 +775,8 @@
             <input id="researchSymbols" value="AAPL" maxlength="130" aria-label="Tickers a comparar" placeholder="AAPL, MSFT, NVDA" />
             <datalist id="tickerCatalog"><option value="AAPL" label="Apple"></option><option value="MSFT" label="Microsoft"></option><option value="TSLA" label="Tesla"></option><option value="AMZN" label="Amazon"></option><option value="GOOGL" label="Alphabet"></option><option value="NVDA" label="NVIDIA"></option><option value="META" label="Meta"></option><option value="NFLX" label="Netflix"></option><option value="AMD" label="AMD"></option><option value="INTC" label="Intel"></option></datalist>
             <fieldset class="research-module-options" aria-label="Módulos que incluir en el análisis">
-              <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Core técnico (tendencia e indicadores)</label>
-              <label class="research-module-option"><input id="researchModuleBlackScholes" type="checkbox" checked /> Core Black‑Scholes</label>
+              <label class="research-module-option"><input id="researchModuleTechnical" type="checkbox" checked /> Análisis técnico (tendencia)</label>
+              <label class="research-module-option"><input id="researchModuleIndicators" type="checkbox" /> Core de indicadores y señales de compra/venta</label>
               <label class="research-module-option"><input id="researchModuleMonteCarlo" type="checkbox" /> Core Monte Carlo (10,000 escenarios)</label>
               <label class="research-module-option"><input id="researchModuleFinancial" type="checkbox" /> Análisis fundamental (negocio y valoración)</label>
               <label class="research-module-option"><input id="researchModuleStatements" type="checkbox" /> Análisis financiero (estados y flujo de efectivo)</label>
@@ -795,7 +787,7 @@
             <div class="research-filter-grid">
               <div><label for="researchStrategyFilter">Operación sugerida</label><select id="researchStrategyFilter"><option value="all">Todas las estrategias</option><option value="BULL_CALL_SPREAD">Bull Call</option><option value="BEAR_CALL_SPREAD">Bear Call</option><option value="BULL_PUT_SPREAD">Bull Put</option><option value="BEAR_PUT_SPREAD">Bear Put</option></select></div>
               <div><label for="researchMaxLoss">Pérdida máxima por contrato (USD)</label><input id="researchMaxLoss" type="number" min="0" step="1" placeholder="Sin límite" /></div>
-              <div><label for="researchMinProb">Probabilidad mínima (%)</label><input id="researchMinProb" type="number" min="0" max="100" value="0" aria-label="Probabilidad histórica mínima en porcentaje" /></div>
+              <div><label for="researchMinProb">Frecuencia histórica mínima (%)</label><input id="researchMinProb" type="number" min="0" max="100" value="0" aria-label="Probabilidad histórica mínima en porcentaje" /></div>
               <div><label for="researchMinRR">Ganancia/riesgo mínimo</label><input id="researchMinRR" type="number" min="0" step="0.1" value="1" /></div>
               <div><label for="researchMaxSpread">Diferencial Bid/Ask máx. (suma relativa)</label><input id="researchMaxSpread" type="number" min="0" step="0.05" value="1" /></div>
               <div><label for="researchTrendFilter">Filtro de tendencia</label><select id="researchTrendFilter"><option value="all">Todas las tendencias</option><option value="aligned">Alineada con SMA20/50</option></select></div>
@@ -813,6 +805,7 @@
               <p class="research-panel-description">Indicadores calculados con velas diarias del último año, solo cuando seleccionas el core técnico.</p>
               <div id="researchMetrics" class="research-metrics"></div>
             </section>
+            <section id="researchIndicatorsPanel" class="research-panel research-panel-wide" hidden><div class="research-panel-heading"><h3>Indicadores y señales de compra/venta</h3></div><p class="research-panel-description">Revisa si hubo señales recientes de recuperación o debilidad y cómo se relacionan con Bull y Bear. Primero se muestra la conclusión; puedes abrir el detalle para consultar la puntuación y las reglas.</p><div id="researchIndicatorsResults"></div></section>
             <section id="researchMonteCarloPanel" class="research-panel research-panel-wide" aria-labelledby="researchMonteCarloTitle" hidden>
               <div class="research-panel-heading"><div><span class="research-panel-kicker">01B · Escenarios al vencimiento</span><h3 id="researchMonteCarloTitle">Análisis Monte Carlo</h3></div><span class="research-source-status">10,000 simulaciones</span></div>
               <p class="research-panel-description">Para cada spread, simula precios posibles al vencimiento con volatilidad histórica realizada y calcula su P&amp;L después de la prima. Cada tarjeta resume, por ticker, el spread con mayor frecuencia simulada de P&amp;L positivo; la tabla conserva las demás alternativas.</p>
@@ -843,9 +836,8 @@
             <section class="research-panel research-panel-wide" aria-labelledby="researchStrategiesTitle">
               <div class="research-panel-heading"><div><span class="research-panel-kicker">05 · Riesgo y strikes</span><h3 id="researchStrategiesTitle">Comparación de estrategias</h3></div><span class="research-source-status">Opciones Alpaca</span></div>
               <p class="research-panel-description">Ordenadas por score combinado orientativo. Las cifras del ranking son preliminares hasta contrastarlas con Quant en el detalle. Solo los cores seleccionados aportan al orden. El ranking no constituye una recomendación de inversión.</p>
-              <details class="research-method"><summary>Cómo se ordenan las sugerencias</summary><p>Puntuación de 0 a 100: promedio simple de los cores seleccionados. Técnico usa alineación de tendencia; Black-Scholes usa su estimación risk-neutral; Monte Carlo usa la frecuencia simulada de P&amp;L positivo; fundamental usa métricas FMP y movimiento diario usa variación alineada. Noticias es contexto y no puntúa. Si falta información de un core elegido, no se asigna posición. Primero se filtran todos los pares y después se elige la mejor estrategia de cada empresa. Desempates: ganancia/riesgo y diferencial Bid/Ask. Es una regla heurística, no una predicción de rentabilidad.</p></details>
-              <p class="strategy-validation" id="researchBsCaveat" hidden>Black-Scholes utiliza volatilidad histórica realizada como aproximación, no volatilidad implícita. Su estimación risk-neutral no es una probabilidad real de ganancia ni garantiza rentabilidad.</p>
-              <div class="research-table-wrap candidate-table-scroll" role="region" aria-label="Operaciones sugeridas; tabla con desplazamiento" tabindex="0"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th data-core-column="technical">Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th data-core-column="technical">Prob. histórica</th><th data-core-column="blackScholes">Prob. BS</th><th data-core-column="monteCarlo">Prob. MC</th><th data-core-column="technical">IC 95%</th><th data-core-column="technical">Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th><th id="researchMethodHead" hidden>Método</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
+              <details class="research-method"><summary>Cómo se ordenan las sugerencias</summary><p>Puntuación de 0 a 100: promedio simple de los cores seleccionados. Técnico usa alineación de tendencia; Monte Carlo usa la frecuencia simulada de P&amp;L positivo; fundamental usa métricas FMP y movimiento diario usa variación alineada. Noticias es contexto y no puntúa. Si falta información de un core elegido, no se asigna posición. Primero se filtran todos los pares y después se elige la mejor estrategia de cada empresa. Desempates: ganancia/riesgo y diferencial Bid/Ask. Es una regla heurística, no una predicción de rentabilidad.</p></details>
+              <div class="research-table-wrap candidate-table-scroll" role="region" aria-label="Operaciones sugeridas; tabla con desplazamiento" tabindex="0"><table class="research-table"><thead><tr><th>#</th><th>Ticker</th><th>Estrategia</th><th data-core-column="technical">Tendencia</th><th>Strikes largo/corto</th><th>Max ganancia</th><th>Max pérdida</th><th>Break-even</th><th data-core-column="technical">Prob. histórica</th><th data-core-column="monteCarlo">Prob. MC</th><th data-core-column="technical">IC 95%</th><th data-core-column="technical">Muestras</th><th>Score combinado</th><th>Cotizaciones</th><th>Detalle</th><th data-core-column="news">Noticias frente a la estrategia</th><th id="researchMethodHead" hidden>Método</th></tr></thead><tbody id="researchCandidates"></tbody></table></div>
               <p id="researchRankingStatus" class="small-note" role="status"></p>
               <section id="researchCandidateExplanation" class="strategy-explanation" aria-labelledby="researchCandidateTitle" hidden>
                 <h4 id="researchCandidateTitle">Candidata seleccionada</h4>
@@ -882,12 +874,16 @@
 <script src="/strategy-selection.js"></script>
 <script src="/research-analysis.js"></script>
 <script src="/strategy-triggers.js"></script>
+<script src="/indicator-core.js"></script>
 <script src="/strategy-explanation.js"></script>
 <script src="/research-ranking.js"></script>
 <script src="/news-context.js"></script>
+<script src="/news-confluence.js"></script>
+<script src="/research-computation.js"></script>
 <script src="/research-ui.js"></script>
 <script src="/collapsible-panels.js"></script>
 <script src="/workspace-navigation.js"></script>
+<script src="/analysis-workflow.js"></script>
 <script src="/option-expirations.js"></script>
 <script>
 const API_BASE = '';
@@ -938,9 +934,32 @@ function showAlert(msg, type = 'info') {
   setTimeout(() => div.remove(), 5000);
 }
 
+// Bloquear solo las estrategias alternativas de una sugerencia preparada.
+let preparedStrategyLock=null,preparedOperationVersion=0;
+function setPreparedStrategyLock(strategy){
+  preparedStrategyLock=strategy;
+  document.querySelectorAll('.strategy-chip').forEach(chip=>{
+    chip.disabled=Boolean(strategy&&chip.dataset.strategy!==strategy);
+    chip.setAttribute('aria-disabled',String(chip.disabled));
+    chip.tabIndex=chip.disabled?-1:0;
+  });
+  document.getElementById('preparedStrategyNotice').hidden=!strategy;
+  document.getElementById('preparedStrategyMessage').textContent=strategy?'Operación preparada: '+strategy.replace('_SPREAD','').replaceAll('_',' ')+'. Las otras estrategias están bloqueadas para conservar esta selección.':'';
+}
+document.getElementById('btnUnlockStrategy').addEventListener('click',()=>{
+  preparedOperationVersion++;strikeLoadVersion++;stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;
+  clearStrategyQuotes();document.getElementById('label').value='';setPreparedStrategyLock(null);
+  availableStrikes=[];selectedSpotForStrikes=null;
+  for(const id of ['strikeLong','strikeShort']){const select=document.getElementById(id);select.innerHTML='<option value="">Elige una estrategia para cargar strikes</option>';select.disabled=false;}
+  for(const id of ['strikeLongNote','strikeShortNote'])document.getElementById(id).textContent='Elige una estrategia para consultar sus contratos.';
+  document.querySelector('.strategy-chip.active')?.focus();
+});
+document.getElementById('btnGoToOrder').addEventListener('click',()=>window.WorkspaceNavigation.openExecution());
+
 // ── Selección de estrategia ──
 document.querySelectorAll('.strategy-chip').forEach(chip => {
   chip.addEventListener('click', () => {
+    if(chip.disabled||(preparedStrategyLock&&chip.dataset.strategy!==preparedStrategyLock))return;
     document.querySelectorAll('.strategy-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     if(selectedStrategy !== chip.dataset.strategy) {clearStrategyQuotes();stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;}
@@ -1746,7 +1765,6 @@ for (const id of ['chStart', 'chEnd']) {
 }
 for (const id of ['chCandleTimeframe', 'chLimit']) document.getElementById(id).addEventListener('change', () => { invalidateCandles(); updateRangePreview({ populatePreset: true }); });
 updateRangePreview({ populatePreset: true });
-document.getElementById('chShowTriggers').addEventListener('change', refreshChartOverlays);
 
 
 function renderExecutionSummary(result, orders) {
@@ -2033,8 +2051,9 @@ log('Dashboard listo. Estado de servicios comprobado mediante health checks.');
 window.prepareResearchOperation=async function(candidate,spot){
   const checked=window.StrategyExplanation.validateCandidate(candidate);
   if(!checked.valid)throw new Error(checked.issues.join(' '));
+  const preparationVersion=++preparedOperationVersion;
   stopAutoCycle();document.getElementById('chkAutoCycle').checked=false;clearStrategyQuotes();
-  selectedStrategy=candidate.strategy;
+  selectedStrategy=candidate.strategy;setPreparedStrategyLock(selectedStrategy);
   document.querySelectorAll('.strategy-chip').forEach(chip=>chip.classList.toggle('active',chip.dataset.strategy===selectedStrategy));
   document.body.dataset.direction=selectedStrategy.startsWith('BEAR')?'bear':'bull';
   const symbol=document.getElementById('symbol');
@@ -2043,7 +2062,7 @@ window.prepareResearchOperation=async function(candidate,spot){
   document.getElementById('label').value=candidate.symbol+' · '+selectedStrategy.replace('_SPREAD','').replaceAll('_',' ');
   document.getElementById('quantity').value='1';document.getElementById('multiplier').value=String(checked.evaluationRequest.multiplier);
   await loadStrikes();
-  if(selectedStrategy!==candidate.strategy||symbol.value!==candidate.symbol||document.getElementById('expiration').value!==candidate.expiration)throw new Error('Cambió la selección mientras se preparaba la operación.');
+  if(preparationVersion!==preparedOperationVersion||selectedStrategy!==candidate.strategy||symbol.value!==candidate.symbol||document.getElementById('expiration').value!==candidate.expiration)throw new Error('Cambió la selección mientras se preparaba la operación.');
   for(const [id,value] of [['strikeLong',candidate.longStrike],['strikeShort',candidate.shortStrike]]){
     const select=document.getElementById(id);if(![...select.options].some(option=>Number(option.value)===value))select.add(new Option(String(value),String(value)));select.value=String(value);
   }

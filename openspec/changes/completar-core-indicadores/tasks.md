@@ -1,0 +1,7 @@
+- [x] Especificar separación, reglas, score y límites.
+- [x] Implementar módulo puro y selección independiente.
+- [x] Incorporar score, panel, explicación y exclusión al desmarcar.
+- [x] Separar controles gráficos de señales y tendencia sin reintroducir entradas/salidas de candidata.
+- [x] Documentar fórmulas heurísticas y responsabilidades.
+- [x] Validar 71 pruebas focalizadas incluyendo reglas, indicador puro, ranking y GUI; OpenSpec estricto válido.
+- [ ] Verificación visual en navegador: limitación de acceso local previamente registrada.

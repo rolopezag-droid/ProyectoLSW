@@ -1,0 +1,2 @@
+## Diseño final
+Una pantalla continua con controles de comparación, gráfica, cores y resultados; sin etapas ni pestañas internas. Revisar orden es una pantalla independiente. Se conservan IDs y eventos existentes. El resumen de riesgo replica el evaluador y se invalida al editar entradas. La separación previa por etapas fue sustituida por indicación explícita del usuario. Sin cambios de fórmulas ni ejecución de órdenes al navegar.

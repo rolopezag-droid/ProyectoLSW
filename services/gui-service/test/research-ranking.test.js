@@ -5,11 +5,11 @@ const sample=(symbol,overrides={})=>({symbol,strategy:'BULL_CALL_SPREAD',side:'b
 test('un core desmarcado no altera el orden ni aparece en los componentes',()=>{
  const a=sample('AAPL',{blackScholes:{probability:.01}}),b=sample('MSFT',{technicalTrend:'bearish',blackScholes:{probability:.99}});
  assert.equal(rank([b,a],{technical:true})[0].symbol,'AAPL');
- assert.equal(rank([a,b],{blackScholes:true})[0].symbol,'MSFT');
- assert.deepEqual(Object.keys(rank([a],{blackScholes:true})[0].scoreComponents),['blackScholes']);
+ assert.equal(rank([b,a],{technical:true,blackScholes:true})[0].symbol,'AAPL');
+ assert.deepEqual(Object.keys(rank([a],{technical:true,blackScholes:true})[0].scoreComponents),['technical']);
 });
 test('promedio de cores seleccionados; no se premia un core sin datos',()=>{
- assert.equal(rank([sample('AAPL')],{technical:true,blackScholes:true})[0].score,80);
+ assert.equal(rank([sample('AAPL')],{technical:true,movers:true},{changes:[{symbol:'AAPL',changePct:0}]} )[0].score,75);
  const row=rank([sample('AAPL')],{technical:true,financial:true})[0];assert.equal(row.score,null);assert.deepEqual(row.scoreMissing,['Fundamental']);
 });
 test('noticias solas no inventan sentimiento ni un top',()=>{
@@ -24,8 +24,8 @@ test('una variación diaria bajista favorece el Bear solo si se selecciona movim
  const bullish=sample('AAPL'),bearish=sample('AAPL',{strategy:'BEAR_CALL_SPREAD',side:'bearish'});
  assert.equal(rank([bullish,bearish],{movers:true},{changes:[{symbol:'AAPL',changePct:-3}]})[0].side,'bearish');
 });
-test('no hay dependencia oculta de la frecuencia histórica con Black-Scholes solo',()=>{
- const rows=rank([sample('AAPL',{probability:{probability:null}})],{blackScholes:true});assert.equal(rows[0].score,60);
+test('el flag legacy Black-Scholes no produce puntuación ni un Top',()=>{
+ const rows=rank([sample('AAPL',{probability:{probability:null}})],{blackScholes:true});assert.equal(rows[0].score,null);assert.deepEqual(rows[0].scoreComponents,{});assert.equal(topCompanies(rows.map(candidate=>({candidate}))).length,0);
 });
 test('bitácora conserva el alcance filtrado sin duplicar el universo ni exceder 200 KB',()=>{
  const {journalSnapshot}=require('../public/research-ranking');

@@ -1,0 +1,4 @@
+- [x] Especificar causa y sincronización.
+- [x] Implementar controles coherentes y aviso visible.
+- [x] Probar SVG, invalidación y exclusión del último cierre: 4 pruebas focalizadas aprobadas.
+- [x] Documentar corrección y resultados: suite focalizada completa de 52 pruebas aprobada y OpenSpec estricto válido.

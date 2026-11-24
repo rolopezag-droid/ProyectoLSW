@@ -1,0 +1,9 @@
+- [x] Revisar composición, selección de módulos, mensajes y documentación.
+- [x] Colocar gráfica antes de filtros y resultados.
+- [x] Excluir señales técnicas de candidatas cuando el core está desmarcado.
+- [x] Documentar guía funcional y auditoría de pruebas.
+- [x] Ejecutar suite general con acceso local (260/305 aprobadas, 45 fallidas).
+- [x] Validar flujo vigente: 50 pruebas aprobadas; tras mover aviso de contexto, 2 focalizadas aprobadas; OpenSpec estricto válido.
+- [ ] Migrar pruebas antiguas de UI conservando cobertura equivalente (43 fallas).
+- [ ] Contrastar contrato position_intent antes de modificar instrucciones de órdenes (2 fallas).
+- [ ] Verificar visualmente cuando el navegador pueda acceder al proyecto local.

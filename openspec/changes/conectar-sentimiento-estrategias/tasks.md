@@ -1,0 +1,3 @@
+- [x] Especificar alcance y método.
+- [x] Implementar evidencia en columna de noticias y explicación con fuentes, sin cambiar scores.
+- [x] Probar relaciones, aislamiento, fechas y regresiones: 47 pruebas aprobadas; tras reutilizar cálculos por ticker/dirección, 3 pruebas focalizadas aprobadas. OpenSpec estricto válido.

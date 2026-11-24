@@ -1,0 +1,2 @@
+## Diseño
+Antes: fetchUnderlying ejecuta compareStrategies y señales de forma síncrona después de los fetch, bloqueando controles. Ahora: worker por empresa, con payload serializable, que reutiliza los módulos originales. Cliente resuelve Promise y termina worker al completar, fallar, abortar o superar 120 s. No reducir simulaciones ni truncar pares. Worker devuelve candidatos e indicadores, luego el hilo UI adjunta evidencia. Sin Web Worker disponible se informa incompatibilidad en navegador real; fallback síncrono solo en las pruebas JSDOM. FMP mantiene errores parciales.

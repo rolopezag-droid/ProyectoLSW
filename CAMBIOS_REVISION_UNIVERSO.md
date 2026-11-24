@@ -4,6 +4,27 @@ Fecha: 23 de noviembre de 2026. Base integrada: main `94e2ad3` (cambios de Pauli
 
 ## Qué cambió
 
+### Nueva operación: acceso al envío y estrategia preparada
+
+Solicitud confirmada: el botón debe llevar al envío de orden, y preparar una sugerencia debe bloquear las otras tres estrategias (no el menú de navegación).
+
+- Se añadió **Ir al envío de orden (Paper)** al panel principal. Abre el apartado existente Ejecución Paper y automatización, desplaza la vista y enfoca su encabezado. No evalúa ni envía una orden por sí mismo; el envío sigue en su botón explícito.
+- Al preparar una candidata desde Comparar, solo queda habilitada su estrategia. Las otras tres son botones nativos deshabilitados, también para teclado. Preparar otra sugerencia cambia el bloqueo a la nueva estrategia y conserva sus contratos y primas.
+- **Elegir otra estrategia** permite volver a selección manual. Limpia las primas, evaluación y strikes anteriores, detiene automatización e invalida cargas pendientes. Una preparación cancelada no puede reponer posteriormente sus datos.
+- Cambios en `public/index.html`, `public/workspace-navigation.js`, `public/workspace.css` y pruebas de flujo. Se conservan el aporte de Pau y el retiro pendiente del core Black-Scholes.
+
+Validación: **45 pruebas aprobadas**, incluyendo las cuatro estrategias, bloqueo por clic/teclado, reemplazo de sugerencia, desbloqueo, cancelación con respuesta tardía, navegación sin solicitudes de órdenes, vencimientos y regresiones financieras. Verificación en navegador: el botón abre el apartado Paper y enfoca su encabezado; no se activó Ejecutar. Se detuvieron los servicios temporales de verificación. Cambios locales, sin push ni despliegue.
+
+### Retiro del core Black-Scholes independiente
+
+Se retiró del comparador la casilla “Core Black-Scholes”, la columna “Prob. BS”, su aporte al score, sus explicaciones y los metadatos que anunciaban una estimación no ejecutada. Esa opción sí influía antes en la clasificación; por tanto, los rankings nuevos pueden cambiar al usar únicamente los otros cores elegidos. Un flag legacy blackScholes no puede volver a activarla en el motor de ranking.
+
+El filtro se llama “Frecuencia histórica mínima” y solo se ofrece cuando el análisis técnico está seleccionado. La preselección S&P 500 antes de consultar FMP requiere Técnico o Movimiento diario. Los snapshots nuevos conservan blackScholes=false únicamente como compatibilidad de formato.
+
+Se mantienen los cálculos financieros en Quant: precios Black-Scholes, griegas y volatilidad implícita. No se eliminaron sus servicios ni se presentó una casilla renombrada como si implementara todo un core financiero. El algoritmo de comparación se invoca con includeBlackScholes=false y sus candidatas no generan la probabilidad de ese modelo.
+
+Validación: **43 pruebas aprobadas**, incluyendo ausencia de selector y columna, score sin contribución del flag legacy, cuatro estrategias y transferencia a operación, recorrido simulado del universo, explicaciones, precios conocidos, paridad put-call, griegas y recuperación de volatilidad implícita. OpenSpec validado. Trabajo asistido por IA; sin órdenes ni cambios de BD. Modificación local, sin push ni despliegue.
+
 ### Integración y revisión de la rama Carlos
 
 Origen: `Carlos`, commit `aa8ce06` de CarlosMdza (“Cambio en noticias”). Aporte real: clasificación heurística de titulares/resúmenes en Quant, frases que sustentan la etiqueta, nivel heurístico, conteos y filtro de noticias en la GUI. No modifica el score de estrategias ni predice retornos.
@@ -93,3 +114,71 @@ Validación: prueba de recorrido simulado de 400 empresas (399 evaluadas y un fa
 
 Desde la raíz `ProyectoLSW`, ejecutar `npm start` y abrir `http://localhost:3005`.
 En Comparar estrategias, elegir Varias empresas e introducir `DELL; IBM AAPL`. Activar solamente los cores deseados. Para probar el universo completo, elegir Top y S&P 500; revisar el progreso y la cobertura, o cancelar. Para empresas con fundamentales restringidos, desmarcar ese core permite comparar con los demás, pero no equivale a haber obtenido sus fundamentales.
+
+## Mercado y comparación en una sección — 24/11/2026
+
+- Menú único **Análisis y estrategias**, con gráfica, filtros, cores y comparación en la misma página; accesos internos para recorrerla.
+- Los enlaces antiguos Mercado/candles siguen abriendo el análisis integrado.
+- Cambiar la empresa de la gráfica actualiza la empresa a comparar; seleccionar una empresa del ranking carga su gráfica sin invalidar los resultados ni preparar/enviar órdenes.
+- Se conserva la diferencia entre periodo visual y ventana diaria del core técnico; las fórmulas de ranking y spreads no cambian.
+- Archivos: `services/gui-service/public/workspace-navigation.js`, `research-ui.js`, `workspace.css` y `services/gui-service/test/research-ranking-ui.test.js`. Asistencia IA: Codex.
+- Validación: 41 pruebas focalizadas aprobadas; tras reforzar la prueba de carga real de velas simuladas, 3 pruebas de integración aprobadas. OpenSpec estricto aprobado. Navegador de revisión: no pudo acceder al servidor local (timeout); revisión visual pendiente. No se enviaron órdenes ni se modificó la BD.
+
+## Mesa por etapas basada en referencias del usuario — 24/11/2026
+
+- Tres pasos visibles dentro de Análisis y estrategias: Buscar oportunidades, Evaluación detallada y Revisar orden. Se mantiene identidad visual propia y Bull/Bear; no se incorporan CSP/CC ni proveedores extra.
+- La búsqueda presenta filtros y ranking; Ver explicación abre gráfica y explicación de la candidata. Cambiar de etapa conserva el ranking. Los paneles de cores identifican sus tickers y conservan el alcance original de finalistas.
+- Preparar operación abre revisión y conserva el bloqueo de las otras tres estrategias. Formulario con resumen de riesgo a la derecha en escritorio, apilado en pantallas pequeñas.
+- El resumen replica los resultados del evaluador existente, sin fórmulas paralelas; editar entradas retira los importes previos. Navegar no envía órdenes.
+- Nuevo módulo: `services/gui-service/public/analysis-workflow.js`; integración en `index.html`, estilos en `workspace.css` y pruebas en `test/research-ranking-ui.test.js`. Implementación asistida por IA: Codex.
+- 42 pruebas focalizadas aprobadas. Revisión visual pendiente: navegador integrado sin acceso local; Chrome no disponible. Sin modificaciones de BD ni órdenes al broker.
+
+### Corrección final del recorrido solicitado
+
+La separación por tres etapas descrita arriba fue retirada por indicación del usuario: filtros, mercado, gráfica, cores y comparación conviven en una sola pantalla continua. No hay pestañas internas ni botones de avanzar/volver por etapas. Revisar orden conserva su pantalla independiente y su entrada en el menú; Preparar operación traslada los contratos allí. Se conserva el resumen de riesgo y su invalidación. Validación final: 42 pruebas focalizadas aprobadas y OpenSpec estricto válido. Revisión visual sigue pendiente por la limitación de acceso local ya registrada.
+
+## Actualización de main de Paulina — 24/11/2026
+
+Integrado `3b1f2b0` (Paulina Martinez, Analisis Montecarl}o): simulación Monte Carlo opcional, panel, columna y contribución al ranking. Conservados cambios locales de pantalla continua, revisión independiente, bloqueo de estrategia y retiro del core Black-Scholes. Conflictos resueltos en README, index.html, research-ui.js y research-ranking.js; respaldo local retenido en stash. HEAD coincide con origin/main; modificaciones locales siguen sin publicar. Validación: 43 pruebas focalizadas aprobadas, incluida selección de Monte Carlo sin técnico, navegación, ranking y preparación sin enviar órdenes. No equivale a validar todo el proyecto ni sus proveedores reales.
+
+## Sentimiento de noticias conectado al análisis — 24/11/2026
+
+- Nuevo `services/gui-service/public/news-confluence.js`: relación por ticker entre sentimiento, dirección Bull/Bear y tendencia técnica solo si el core está seleccionado. Clasificación por reglas existente, sin LLM ni probabilidad inventada.
+- Columna contextual en ranking y explicación con recuentos, fechas y enlaces. Solo artículos recibidos de los últimos siete días, sin duplicados ni fechas futuras. Señales contrapuestas se muestran mixtas; faltantes no se convierten en neutrales ni apoyo direccional.
+- No altera precios, RSI, fundamentales, Monte Carlo ni puntuación del ranking; conecta conclusiones como evidencia explicable para la selección. El volumen de artículos recibido no representa cobertura completa de noticias. Se reutiliza la confluencia por ticker/dirección para evitar repetirla por cada par. Evidencia guardada con la candidata.
+- Asistencia IA: Codex. 47 pruebas focalizadas aprobadas; después de optimizar reutilización, 3 pruebas de integración aprobadas. OpenSpec estricto válido. No se enviaron órdenes ni se modificó la BD. Revisión visual no realizada por limitación del navegador local ya registrada.
+
+### Etiquetas explícitas por fila
+La columna de noticias ahora indica sentimiento, nombre de estrategia y dirección: por ejemplo, Noticias bajistas frente a Bull Call (alcista): direcciones opuestas. La reutilización incluye estrategia para no confundir Bull Call con Bull Put. El pie de tabla aclara que cada fila es una combinación de contratos y pueden repetirse estrategias con distintos strikes. Validación: 4 pruebas de confluencia y 3 de integración aprobadas; OpenSpec estricto válido.
+
+## Revisión de coherencia y documentación
+
+Gráfica al principio, explicación de módulos sin factores ficticios, señales de candidata también condicionadas al core técnico y etiquetas de fuentes en español. Guía: `GUIA_ANALISIS_Y_CORES.md`. Auditoría y pendientes: `REVISION_ANALISIS_RESULTADOS.md`. Suite de flujo vigente: 50 aprobadas; verificación final de posición y exclusión técnica: 2 aprobadas. Suite general con acceso local: 260/305 aprobadas, 45 fallas pendientes descritas sin ocultarlas. Asistencia IA Codex. Sin órdenes ni cambios de BD.
+
+## Corrección de indicadores bloqueados por core desmarcado
+
+Corregida inconsistencia confirmada por captura del usuario: seleccionar capa o señal técnica activa el core y redibuja; desactivar core limpia esas selecciones. Aviso junto a los controles y sincronización con invalidación del ranking. El último cierre es independiente. Implementación asistida por IA Codex. Documentación técnica en GUIA_ANALISIS_Y_CORES.md y evidencia en REVISION_ANALISIS_RESULTADOS.md.
+
+## Retiro del bloque de entradas/salidas de candidata
+
+Eliminados bloque, casilla, selector, listeners y cálculo de entradas/salidas orientativas; sin controles ocultos de compatibilidad. Se mantienen comparación, explicación, preparación, velas e indicadores técnicos independientes. Documentación actualizada. Suite focalizada: 53 aprobadas. Asistencia IA Codex.
+
+## Core independiente de indicadores y señales completado
+
+Nuevo `services/gui-service/public/indicator-core.js`, casilla independiente, panel con fechas/reglas, evidencia en explicación/bitácora y componente indicators del ranking. Usa reglas ya existentes sobre velas diarias cerradas y última señal por familia en cinco velas. Neutralidad 50 cuando no hay eventos e historial suficiente; sin 50 velas, datos no disponibles. Separado del core técnico de tendencia y sus controles gráficos. No ejecuta órdenes ni reintroduce entradas/salidas de candidata. Fórmula heurística del proyecto, no validación predictiva ni core IA. Documentado en GUIA_ANALISIS_Y_CORES.md y OpenSpec completar-core-indicadores. 71 pruebas focalizadas aprobadas, OpenSpec válido. IA pendiente; revisión visual y pendientes generales anteriores continúan registrados. Asistencia IA Codex; sin publicación Git ni cambios de BD.
+
+### Panel de indicadores comprensible
+
+Sustituido texto técnico inicial por conclusión e implicación Bull/Bear, eventos en lenguaje sencillo y fechas UTC legibles. Fórmulas y score permanecen bajo Ver puntuación y reglas del cálculo. Distinción explícita entre empate por señales contrapuestas y ausencia de señales. Puntuaciones no son probabilidades. Dos pruebas focalizadas aprobadas, incluida reproducción de una señal RSI alcista y ruptura de soporte bajista como en la captura; sin cambios de score ni órdenes.
+
+### Lectura cronológica de indicadores
+
+Aplicado el formato aprobado: qué pasó primero/después, implicación de cada señal para Bull/Bear, conclusión y lectura del empate; fórmulas desplegables. Mismo score y reglas. Dos pruebas focalizadas aprobadas, incluida secuencia soporte bajista antes de recuperación RSI. Documentación y OpenSpec actualizados.
+
+## Corrección de congelamiento con todos los cores
+
+Diagnóstico reproducido: Monte Carlo bloqueaba el hilo de interfaz al recorrer miles de pares. Añadidos research-computation.js y research-worker.js para mover comparación e indicadores a worker cancelable. Señal de cancelación capturada por trabajo y guardia de versión tras fetch; límite por empresa de 120 s. APIs y fórmulas sin cambios. 74 pruebas focalizadas aprobadas y 1 prueba HTTP de backend aprobada, con worker real, cancelación y FMP no disponible. Documentación actualizada. Asistencia IA Codex; sin órdenes, modificaciones de BD ni publicación.
+
+## Publicación en main — 24/11/2026
+
+Paquete final: pantalla continua de análisis con gráfica primero, revisión independiente, indicadores como core separado, confluencia de noticias con explicación por estrategia, controles de gráfica sincronizados y cálculo Monte Carlo/indicadores en worker cancelable. Se conserva la incorporación de Paulina 3b1f2b0. Documentación: GUIA_ANALISIS_Y_CORES.md y REVISION_ANALISIS_RESULTADOS.md. Verificación previa a publicación: 87 pruebas focalizadas aprobadas; prueba HTTP backend adicional aprobada durante esta sesión. Los pendientes de suite general y revisión visual documentados siguen abiertos. Desarrollo asistido por IA (Codex), no atribuido como optimización manual.

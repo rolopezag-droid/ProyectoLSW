@@ -1,0 +1,7 @@
+- [x] Reproducir bloqueo y distinguir hilo UI de API.
+- [x] Mover comparación e indicadores a worker usando algoritmos existentes.
+- [x] Terminar trabajo en éxito/error/timeout/cancelación y evitar contexto obsoleto.
+- [x] Validar worker real, interacción del hilo principal, todos los cores y FMP: 74 pruebas focalizadas aprobadas.
+- [x] Validar HTTP backend, scripts y disponibilidad de health: 1 prueba aprobada.
+- [x] Documentar causa, cambios y límites; OpenSpec estricto válido.
+- [ ] Validación visual en navegador del usuario: superficie local de revisión no disponible.

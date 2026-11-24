@@ -20,7 +20,7 @@
   const yearsToExpiration=expiration=>{const ms=Date.parse(expiration+'T00:00:00Z')-Date.now();return Number.isFinite(ms)&&ms>0?ms/31536000000:null;};
   const fmtWorkbenchMetric=(method,value)=>method==='prices'?money(value):method==='greeks'?value.toFixed(3):method==='iv'?(value*100).toFixed(1)+'%':String(value);
   const setStatus=(text,state='')=>{$('researchStatus').textContent=text;$('researchStatus').dataset.state=state;};
-  const readModules=()=>({technical:$('researchModuleTechnical').checked,blackScholes:$('researchModuleBlackScholes').checked,monteCarlo:$('researchModuleMonteCarlo').checked,financial:$('researchModuleFinancial').checked,statements:$('researchModuleStatements').checked,movers:$('researchModuleMovers').checked,news:$('researchModuleNews').checked});
+  const readModules=()=>({technical:$('researchModuleTechnical').checked,indicators:$('researchModuleIndicators').checked,blackScholes:false,monteCarlo:$('researchModuleMonteCarlo').checked,financial:$('researchModuleFinancial').checked,statements:$('researchModuleStatements').checked,movers:$('researchModuleMovers').checked,news:$('researchModuleNews').checked});
   async function json(url,options={}){
     const response=await fetch(url,{...options,signal:analysisController?AbortSignal.any([analysisController.signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)}),data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.detail?`${data.message||'Error del servidor.'} Detalle: ${data.detail}`:data.message||`Error del servidor (${response.status}).`);
@@ -33,25 +33,31 @@
     });
   }
   async function analyzeSymbol(symbol,expiration,modules,riskFreeRate,dividendYield,version){
+    const computationSignal=analysisController?.signal;
     const end=new Date(),start=new Date(end);start.setUTCDate(start.getUTCDate()-370);
     const params=new URLSearchParams({symbol,timeframe:'1Day',start:start.toISOString(),end:end.toISOString(),limit:'1000',sort:'asc'});
     const [barsData,quote,calls,puts]=await Promise.all([
-      (modules.technical||modules.blackScholes||modules.monteCarlo||modules.movers?json('/api/v1/broker/candles?'+params):Promise.resolve({bars:[],complete:true})),json('/api/v1/broker/quotes?symbol='+encodeURIComponent(symbol)).catch(()=>({})),allContracts(symbol,expiration,'call'),allContracts(symbol,expiration,'put')
+      (modules.technical||modules.indicators||modules.monteCarlo||modules.movers?json('/api/v1/broker/candles?'+params):Promise.resolve({bars:[],complete:true})),json('/api/v1/broker/quotes?symbol='+encodeURIComponent(symbol)).catch(()=>({})),allContracts(symbol,expiration,'call'),allContracts(symbol,expiration,'put')
     ]);
+    if(version!==researchVersion||computationSignal?.aborted)throw new DOMException('Análisis cancelado','AbortError');
     if (!Array.isArray(barsData.bars)) throw new Error('La respuesta de velas está incompleta.');
     if (barsData.complete === false) throw new Error('La consulta de velas quedó incompleta: ' + (barsData.partialReason || 'cobertura desconocida') + '.');
     const bars=barsData.bars||[],last=bars.at(-1),usesQuote=Number.isFinite(quote.referencePrice)&&quote.referencePrice>0,spot=usesQuote?quote.referencePrice:last?.close;
     if(!Number.isFinite(spot)||spot<=0)throw new Error('No hay precio de referencia válido.');
     const technical=modules.technical?ResearchAnalysis.technicalIndicators(bars):null;
     const levels=null; // Las resistencias no forman parte de esta comparación.
+
     const contracts=[...calls,...puts];
     const previous=bars.at(-2);
     const changePct=last&&previous&&Number.isFinite(last.close)&&Number.isFinite(previous.close)&&previous.close!==0?(last.close/previous.close-1)*100:null;
     if(version===researchVersion)window.__researchMarketCache[symbol]={bars,fetchedAt:new Date().toISOString(),realizedVolatility:technical?.annualizedVolatility??null,spot,expiration};
     const spotSource=usesQuote?(quote.referenceSource||'referencia de cotización sin método'):'último cierre de vela',spotTimestamp=usesQuote?(quote.referenceTimestamp||null):(last?.timestamp||null),spotSymbol=usesQuote?(quote.symbol||null):symbol;
     const underlying={symbol:spotSymbol,price:spot,source:spotSource,timestamp:spotTimestamp};
-    const candidates=ResearchAnalysis.compareStrategies(contracts,{symbol,expiration,spot,bars,includeTechnical:modules.technical,includeBlackScholes:modules.blackScholes,includeMonteCarlo:modules.monteCarlo,riskFreeRate,dividendYield}).map(candidate=>window.StrategyExplanation.attachEvidence(candidate,contracts,underlying));
-    return {symbol,spot,spotSource,spotTimestamp,spotSymbol,capturedAt:barsData.capturedAt,stockFeed:barsData.feed||'iex',dailyChangePct:changePct,dailyClose:last?.close??null,previousClose:previous?.close??null,dailyTimestamp:last?.timestamp??null,technical,supportResistance:levels,candidates};
+    if(version===researchVersion)setStatus('Calculando '+symbol+' en segundo plano. Puedes seguir usando la página o cancelar el análisis.','loading');
+    const computed=await window.ResearchComputation.run({contracts,context:{symbol,expiration,spot,bars,includeTechnical:modules.technical,includeBlackScholes:false,includeMonteCarlo:modules.monteCarlo,riskFreeRate,dividendYield},indicators:modules.indicators},{signal:computationSignal});
+    const indicatorEvidence=computed.indicatorEvidence;
+    const candidates=computed.candidates.map(candidate=>({...window.StrategyExplanation.attachEvidence(candidate,contracts,underlying),...(modules.indicators?{indicatorEvidence}: {})}));
+    return {symbol,spot,spotSource,spotTimestamp,spotSymbol,capturedAt:barsData.capturedAt,stockFeed:barsData.feed||'iex',dailyChangePct:changePct,dailyClose:last?.close??null,previousClose:previous?.close??null,dailyTimestamp:last?.timestamp??null,technical,indicatorEvidence,supportResistance:levels,candidates};
   }
   async function fetchNews(symbols){
     const end=new Date(),start=new Date(end);start.setUTCDate(start.getUTCDate()-7);
@@ -107,6 +113,27 @@
       }
     }
   }
+  function renderIndicators(snapshot){
+    const panel=$('researchIndicatorsPanel'),host=$('researchIndicatorsResults');panel.hidden=!snapshot.modules.indicators;
+    if(panel.hidden){host.replaceChildren();return;}
+    const date=value=>{const time=Date.parse(value);return Number.isFinite(time)?new Date(time).toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}):'Fecha no disponible';};
+    host.innerHTML=snapshot.underlyings.map(item=>{
+      const e=item.indicatorEvidence,signals=e?.signals||[],valid=e?.status==='available';
+      const up=signals.filter(signal=>signal.side==='bullish').length,down=signals.filter(signal=>signal.side==='bearish').length;
+      const label=!valid?'Datos insuficientes':!signals.length?'Sin señales recientes':e.bullScore===e.bearScore?'Señales contrapuestas':e.bullScore>e.bearScore?'Predominan las señales alcistas':'Predominan las señales bajistas';
+      const reading=!valid?'No hay suficientes velas diarias cerradas para evaluar este core. No aporta una puntuación válida.':!signals.length?'No se detectaron eventos nuevos de las reglas elegidas en las últimas cinco velas cerradas. Este core no favorece Bull ni Bear.':e.bullScore===e.bearScore?`Hay ${up} señal(es) alcista(s) y ${down} bajista(s). Se compensan: este core no favorece Bull ni Bear.`:e.bullScore>e.bearScore?`Hay ${up} señal(es) alcista(s) y ${down} bajista(s). Este core favorece la dirección de Bull Call y Bull Put; no confirma por sí solo que el precio vaya a subir.`:`Hay ${up} señal(es) alcista(s) y ${down} bajista(s). Este core favorece la dirección de Bear Call y Bear Put; no confirma por sí solo que el precio vaya a bajar.`;
+      const eventText=signal=>signal.rule==='rsi_cross'?(signal.side==='bullish'?'El RSI dejó atrás la zona de debilidad. Es una posible señal de recuperación; no confirma una subida.':'El RSI salió de la zona de fuerza elevada. Es una posible señal de pérdida de impulso; no confirma una caída.'):signal.rule==='sma_cross'?(signal.side==='bullish'?'El precio cruzó por encima de su media y otra media confirmó la dirección alcista.':'El precio cruzó por debajo de su media y otra media confirmó la dirección bajista.'):'El precio cerró por debajo de un soporte: una zona donde antes había encontrado apoyo. Es una señal de debilidad.';
+      const recent=signals.slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+      const chronological=recent.map((signal,index)=>{
+        const sameDay=index>0&&date(signal.timestamp)===date(recent[index-1].timestamp);
+        const heading=recent.length===1?'¿Qué ocurrió?':index===0?'¿Qué pasó primero?':sameDay?'¿Qué ocurrió ese mismo día?':'¿Qué pasó después?';
+        const meaning=signal.side==='bullish'?'Esta señal acompaña la dirección alcista de Bull Call y Bull Put.':'Esta señal acompaña la dirección bajista de Bear Call y Bear Put.';
+        return `<li><h5>${heading}</h5><strong>${esc(date(signal.timestamp))} · ${signal.side==='bullish'?'Señal alcista':'Señal bajista'}</strong><p>${esc(eventText(signal))}</p><p>${meaning}</p></li>`;
+      }).join('');
+      const interpretation=valid&&e.bullScore===e.bearScore?(signals.length?'Las señales tienen el mismo peso y se compensan. 50/50 significa empate de puntos entre Bull y Bear, no un 50 % de probabilidad de ganar.':'Sin señales nuevas, ambos reciben 50 puntos por neutralidad. No significa un 50 % de probabilidad de ganar.'):'La puntuación representa afinidad con cada dirección, no una probabilidad de ganancia.';
+      return `<article class="research-ticker-card indicator-reading"><div class="indicator-reading-heading"><h4>${esc(item.symbol)}: señales encontradas</h4><strong>${esc(label)}</strong></div>${recent.length?'<ol class="indicator-event-list">'+chronological+'</ol>':''}<h5>¿Qué significa para las estrategias?</h5><p class="indicator-conclusion">${esc(reading)}</p>${valid?`<h5>¿Cómo leer la puntuación?</h5><p>${esc(interpretation)}</p>`:''}<p class="research-panel-description">Se revisan las últimas cinco velas diarias cerradas. Última vela disponible: ${esc(date(e?.asOf))}. Estas señales no envían órdenes.</p><details class="research-method"><summary>Ver puntuación y reglas del cálculo</summary><p>Score Bull: ${Number.isFinite(e?.bullScore)?e.bullScore.toFixed(1):'No disponible'} · Score Bear: ${Number.isFinite(e?.bearScore)?e.bearScore.toFixed(1):'No disponible'}</p><p>Son puntos de afinidad con cada dirección, no porcentajes de ganancia. 50/50 significa empate; puede deberse a señales contrapuestas o a ausencia de señales nuevas. Si este core está seleccionado, su puntuación participa en el promedio del ranking.</p><p>Historial: ${e?.sampleBars||0} velas cerradas. ${esc(e?.reason||'Sin datos')} Cada familia presente pesa lo mismo; se usa su evento más reciente. Score Bull = 50 + 50 × media de votos (+1 alcista, −1 bajista). Score Bear = 100 − Score Bull.</p><ul>${recent.map(signal=>`<li>${esc(date(signal.timestamp))}: ${esc(signal.exactRule)}</li>`).join('')}</ul></details></article>`;
+    }).join('');
+  }
   function renderTechnical(snapshot){
     const selected=snapshot.modules.technical;$('researchTechnicalPanel').hidden=!selected;
     if(!selected){$('researchMetrics').innerHTML='';return;}
@@ -137,15 +164,15 @@
   }
   function renderSummary(snapshot){
     const modules=snapshot.modules,selected=[];
-    if(modules.technical)selected.push('Técnico');if(modules.blackScholes)selected.push('Black‑Scholes');if(modules.monteCarlo)selected.push('Monte Carlo');if(modules.financial)selected.push(snapshot.fundamentalScope?'Fundamentales de las finalistas (complementario)':'Fundamentales');if(modules.statements)selected.push(snapshot.financialStatementsScope?'Financiero de las finalistas (complementario)':'Financiero');if(modules.movers)selected.push('Ganadores/perdedores entre tickers elegidos');if(modules.news)selected.push('Noticias Alpaca');
+    if(modules.technical)selected.push('Técnico');if(modules.indicators)selected.push('Indicadores y señales');if(modules.monteCarlo)selected.push('Monte Carlo');if(modules.financial)selected.push(snapshot.fundamentalScope?'Fundamentales de las finalistas (complementario)':'Fundamentales');if(modules.statements)selected.push(snapshot.financialStatementsScope?'Financiero de las finalistas (complementario)':'Financiero');if(modules.movers)selected.push('Ganadores/perdedores entre tickers elegidos');if(modules.news)selected.push('Noticias Alpaca');
     $('researchCoreModules').textContent=selected.join(' · ')||'Solo opciones e histórico';
     const items=[...(snapshot.fundamentalScope?['FMP se consultó después de elegir las diez finalistas. El orden utiliza los otros cores seleccionados; el fundamental es contexto complementario y no cambia la puntuación.']:[]),...(snapshot.financialStatementsScope?['Los estados financieros de FMP se consultaron después de elegir las diez finalistas; son contexto y no cambian este Top.']:[]),`Comparé ${snapshot.viewScope?snapshot.viewScope.total+' empresas; mostrando '+snapshot.viewScope.visible+' clasificadas':snapshot.underlyings.map(item=>item.symbol).join(', ')} para vencimiento ${snapshot.expirationDate} con cotizaciones de opciones Alpaca.`,snapshot.screening?`Se intentaron todas las ${snapshot.screening.universeCount} empresas del S&P 500; ${snapshot.screening.evaluatedCount} tuvieron datos para evaluar opciones y ${snapshot.screening.failedCount} fallaron. Se conservó la mejor combinación de cada estrategia por empresa que cumplió los filtros. Fuente del universo: ${snapshot.screening.provider}. El orden corresponde al vencimiento y filtros elegidos, no a todos los vencimientos posibles.`:'El universo comparado proviene de la lista manual ingresada.','El orden usa exclusivamente los cores de puntuación seleccionados; noticias es contexto y no puntúa.'];
     if(modules.technical)for(const item of snapshot.underlyings)items.push(`${item.symbol}: tendencia ${item.technical?.trend||'sin datos'}.`);
-    if(modules.blackScholes)items.push('Black‑Scholes estima una probabilidad risk‑neutral independiente usando volatilidad realizada histórica como proxy, no IV de opciones.');
     if(modules.monteCarlo)items.push('Monte Carlo simula 10,000 precios al vencimiento con un modelo GBM y volatilidad realizada histórica; muestra probabilidad estimada de P&L positivo y distribución de P&L. Los escenarios son reproducibles y dependen de los supuestos del modelo.');
     if(modules.financial)items.push(snapshot.fundamentals?.status==='available'?snapshot.fundamentals.rows.filter(row=>row.status==='available').map(row=>row.fundamentalScore?.status==='available'?`${row.symbol}: score fundamental ${row.fundamentalScore.score.toFixed(1)}/100; ${snapshot.fundamentalScope?'información complementaria, no altera el Top':'aporta al promedio de cores seleccionados'}.`:`${row.symbol}: score fundamental no disponible por cobertura insuficiente.`).join(' '):snapshot.fundamentals?.error||'No hay fundamentales disponibles desde FMP.');
     if(modules.statements)items.push(snapshot.financialStatements?.status==='available'?snapshot.financialStatements.rows.filter(row=>row.status==='available').map(row=>row.financialScore?.status==='available'?`${row.symbol}: score de salud financiera ${row.financialScore.score.toFixed(1)}/100; ${snapshot.financialStatementsScope?'contexto de finalistas, no altera el Top':'aporta al promedio de cores seleccionados'}.`:`${row.symbol}: score financiero no disponible por cobertura insuficiente.`).join(' '):snapshot.financialStatements?.error||'No hay estados financieros disponibles desde FMP.');
     if(modules.movers)items.push(snapshot.movers?.status==='available'?'Ganadores/perdedores compara el cambio entre el cierre anterior y el cierre diario más reciente. Es una descripción del movimiento, no su causa ni una predicción.':'No hay cambio diario disponible para comparar los tickers elegidos.');
+    if(modules.news)items.push('El sentimiento se contrasta con cada estrategia y con la tendencia técnica seleccionada; coincidencias y contradicciones aparecen en la candidata. No altera el score ni las métricas de otros cores.');
     if(modules.news)items.push(snapshot.news.status==='available'?`${snapshot.news.articles.length} noticias recientes consultadas en Alpaca.`:'Noticias Alpaca no disponibles: '+(snapshot.news.error||'sin resultados.'));
     items.push('Puntuación de 0 a 100: promedio de los cores elegidos con datos disponibles. Si falta uno, no se asigna puntuación. No es una probabilidad de rentabilidad.');
     $('researchCoreSummary').innerHTML=`<ul class="research-summary-list">${items.map(item=>`<li>${esc(item)}</li>`).join('')}</ul>`;
@@ -154,7 +181,7 @@
   function filteredRows(snapshot){
     const minP=Number($('researchMinProb').value)/100,minRR=Number($('researchMinRR').value),maxSpread=Number($('researchMaxSpread').value),trendFilter=snapshot.modules.technical?$('researchTrendFilter').value:'all';
     const mode=$('researchMode').value,company=$('researchCompany').value.trim().toUpperCase(),strategy=$('researchStrategyFilter').value,maxLoss=$('researchMaxLoss').value===''?Infinity:Number($('researchMaxLoss').value);
-    const probabilityFor=c=>snapshot.modules.blackScholes?c.blackScholes?.probability:snapshot.modules.monteCarlo?c.monteCarlo?.probability:snapshot.modules.technical?c.probability?.probability:null;
+    const probabilityFor=c=>snapshot.modules.monteCarlo?c.monteCarlo?.probability:snapshot.modules.technical?c.probability?.probability:null;
     const rows=snapshot.candidates.map((candidate,index)=>({candidate,index})).filter(({candidate:c})=>(mode!=='company'||c.symbol===company)&&(strategy==='all'||c.strategy===strategy)&&c.maxLoss<=maxLoss&&(minP===0||Number.isFinite(probabilityFor(c))&&probabilityFor(c)>=minP)&&c.riskReward>=minRR&&c.liquidityScore<=maxSpread&&(trendFilter==='all'||c.technicalTrend===c.side));
     return {rows,filters:{minProbability:minP,minRiskReward:minRR,maxRelativeBidAsk:maxSpread,technicalAlignment:trendFilter,strategy,maxLoss:Number.isFinite(maxLoss)?maxLoss:null}};
   }
@@ -186,17 +213,15 @@
   }
   function candidateWhy(candidate,snapshot,underlying,verified){
     const trend=underlying?.technical?.trend||'No disponible',aligned=candidate.technicalTrend===candidate.side;
-    const trendText=!snapshot.modules.technical?'Análisis técnico no seleccionado; el score usa factor 1.':trend==='insufficient_data'?'No hay suficientes datos para determinar la tendencia o el factor técnico.':trend==='mixed'?'La tendencia es mixta; el factor técnico es neutral.':aligned?'La tendencia calculada está alineada con la dirección de la estrategia.':'La tendencia calculada es contraria a la dirección de la estrategia.';
+    const trendText=!snapshot.modules.technical?'Análisis técnico no seleccionado; no participa en el score.':trend==='insufficient_data'?'No hay suficientes datos para determinar la tendencia o el factor técnico.':trend==='mixed'?'La tendencia es mixta; el factor técnico es neutral.':aligned?'La tendencia calculada está alineada con la dirección de la estrategia.':'La tendencia calculada es contraria a la dirección de la estrategia.';
     const spotTime=evidenceDate(underlying?.spotTimestamp),spotSource=underlying?.spotSource||'No disponible';
     const spotWarning=!underlying?.spotSymbol?'El proveedor no identificó el ticker de la referencia.':underlying.spotSymbol!==candidate.symbol?`La referencia identificó ${underlying.spotSymbol}, distinto del ticker de la candidata.`:'';
     const timeMs=Date.parse(underlying?.spotTimestamp),ageWarning=!Number.isFinite(timeMs)?'La referencia del subyacente no tiene fecha verificable.':Date.now()-timeMs>72*3600000||timeMs>Date.now()+60000?'La referencia del subyacente está desactualizada o tiene una fecha futura.':'';
     const t=underlying?.technical;
     const historical=candidate.probability;
-    const bs=candidate.blackScholes;
-    const bsInfo=!snapshot.modules.blackScholes?'Black-Scholes no seleccionado.':Number.isFinite(bs?.probability)?`Valor risk-neutral existente ${pct(bs.probability)}; CDF normal estándar verificada; aporta al ranking si se selecciona este core. Volatilidad realizada proxy ${pct(bs.assumptions?.volatility)}, horizonte ${evidenceNumber(bs.assumptions?.timeToMaturityYears)} años, tasa ${evidenceNumber(bs.assumptions?.rate)}, dividendos ${evidenceNumber(bs.assumptions?.dividendYield)}.`:`Black-Scholes no disponible: ${bs?.reason||'faltan datos'}. No se le asigna puntuación cuando falta información.`;
     const mc=candidate.monteCarlo,mcInfo=!snapshot.modules.monteCarlo?'Monte Carlo no seleccionado.':Number.isFinite(mc?.probability)?`Monte Carlo: ${mc.simulations} escenarios al vencimiento; ${pct(mc.probability)} terminaron con P&L positivo. P&L medio ${money(mc.expectedPnl)}, mediano ${money(mc.medianPnl)}, percentil 5 ${money(mc.p05)} y percentil 95 ${money(mc.p95)}. Volatilidad realizada ${pct(mc.assumptions?.volatility)}. Aporta al ranking si se selecciona este core.`:`Monte Carlo no disponible: ${mc?.reason||'faltan datos'}. No se asigna puntuación cuando falta información.`;
     const technicalContext=t?`SMA20 ${evidenceNumber(t.sma20)}, SMA50 ${evidenceNumber(t.sma50)}, RSI14 ${evidenceNumber(t.rsi14)}, ATR14 ${evidenceNumber(t.atr14)}. RSI y ATR son contexto, no factores directos del score.`:'Indicadores técnicos no disponibles o no seleccionados.';
-    const fundamental=snapshot.fundamentalScope?'Fundamentales consultados después de elegir las finalistas; son contexto y no participan en este ranking.':snapshot.modules.financial?(Number.isFinite(candidate.fundamentalScore)?`El score fundamental ${evidenceNumber(candidate.fundamentalScore)} aportó ${evidenceNumber(candidate.fundamentalScore)}/100 al promedio de cores.`:'Fundamentales sin cobertura suficiente; la candidata no recibe puntuación.'):'Fundamentales no seleccionados; factor de ranking 1.';
+    const fundamental=snapshot.fundamentalScope?'Fundamentales consultados después de elegir las finalistas; son contexto y no participan en este ranking.':snapshot.modules.financial?(Number.isFinite(candidate.fundamentalScore)?`El score fundamental ${evidenceNumber(candidate.fundamentalScore)} aportó ${evidenceNumber(candidate.fundamentalScore)}/100 al promedio de cores.`:'Fundamentales sin cobertura suficiente; la candidata no recibe puntuación.'):'Fundamentales no seleccionados; no participan en el score.';
     const statements=snapshot.financialStatementsScope?'Estados financieros consultados después de elegir las finalistas; son contexto y no participan en este ranking.':snapshot.modules.statements?(Number.isFinite(candidate.financialScore)?`El score de salud financiera ${evidenceNumber(candidate.financialScore)} aportó ${evidenceNumber(candidate.financialScore)}/100 al promedio de cores.`:'Estados financieros sin cobertura suficiente; la candidata no recibe puntuación.'):'Análisis financiero no seleccionado.';
     const news=snapshot.modules.news?`Noticias: ${snapshot.news?.status||'No disponible'}; son contexto y no modifican el score.`:'Noticias no seleccionadas; no modifican el score.';
     const result=verified?.status==='verified'?verified.evaluation:null;
@@ -205,7 +230,9 @@
     const history=Number.isFinite(historical?.probability)?(historical.probability<.5?'Menos de la mitad de las ventanas históricas evaluadas alcanzaron el criterio de equilibrio.':'Al menos la mitad de las ventanas históricas evaluadas alcanzaron el criterio de equilibrio.'):'No hay muestra histórica suficiente para evaluar la frecuencia.';
     const outcome=result?`Al vencimiento, la ganancia máxima corresponde a un subyacente ${candidate.side==='bullish'?'igual o superior':'igual o inferior'} al strike corto ${evidenceNumber(candidate.shortStrike)}; un movimiento contrario puede alcanzar la pérdida máxima.`:'Las condiciones de ganancia y pérdida requieren validar primero las patas y los resultados con Quant.';
     return `${evidenceList([['Empresa y ticker',companyName(candidate.symbol)],['Subyacente de referencia',money(underlying?.spot)],['Fuente y fecha',`${spotSource} · ${spotTime}`],['Vencimiento',candidate.expiration],['Estrategia',strategyLabel(candidate.strategy)],['Dirección',candidate.side==='bullish'?'Alcista':'Bajista'],['Contratos',`${candidate.longSymbol||'No disponible'} / ${candidate.shortSymbol||'No disponible'}`],...(snapshot.modules.technical?[['Tendencia',trend]]:[]),['Prima neta total',result?money(result.spreadCategory==='debit'?result.netDebit:result.netCredit):pendingValue],['Beneficio máximo',result?money(result.maxProfit):pendingValue],['Pérdida máxima',result?money(result.maxLoss):pendingValue],['Break-even (USD/acción)',result?evidenceNumber(result.breakEven):pendingValue],['Ganancia / riesgo',result?evidenceNumber(result.riskRewardRatio):pendingValue],...(snapshot.modules.technical?[['Probabilidad histórica',`${pct(historical?.probability)} · ${historical?.sampleSize??'No disponible'} muestras`]]:[])])}
-      <p>${snapshot.modules.technical?esc(trendText+" "+technicalContext):""}</p><p>${snapshot.modules.blackScholes?esc(bsInfo):""}</p><p>${snapshot.modules.monteCarlo?esc(mcInfo):""}</p><p>${snapshot.modules.financial?esc(fundamental):""} ${snapshot.modules.statements?esc(statements):""} ${snapshot.modules.news?esc(news):""}</p>
+      <p>${snapshot.modules.technical?esc(trendText+" "+technicalContext):""}</p><p>${snapshot.modules.monteCarlo?esc(mcInfo):""}</p><p>${snapshot.modules.financial?esc(fundamental):""} ${snapshot.modules.statements?esc(statements):""} ${snapshot.modules.news?esc(news):""}</p>
+      ${snapshot.modules.news?`<section class="news-confluence-detail"><h4>Noticias frente a esta estrategia y al core técnico</h4><p>${esc(candidate.newsConfluence?.explanation||'Sin datos de confluencia para esta candidata.')}</p><ul>${(candidate.newsConfluence?.sources||[]).slice(0,10).map(source=>{const url=(()=>{try{const value=new URL(source.url);return ['https:','http:'].includes(value.protocol)?value.href:null;}catch{return null;}})();return `<li>${esc(source.timestamp)} · ${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(source.headline)}</a>`:esc(source.headline)} · ${esc(({bullish:'Alcista',bearish:'Bajista',mixed:'Mixta',neutral:'Sin dirección clara',unknown:'Sin clasificar'})[source.label]||'Sin clasificar')}</li>`;}).join('')}</ul></section>`:''}
+      ${snapshot.modules.indicators?`<p>Core de indicadores: ${esc(candidate.indicatorEvidence?.reason||'Sin datos')}. Score para esta dirección: ${esc(evidenceNumber(candidate.side==='bullish'?candidate.indicatorEvidence?.bullScore:candidate.indicatorEvidence?.bearScore))}. Se consideran las últimas cinco velas diarias cerradas; las señales y sus reglas están en el panel de indicadores.</p>`:''}
       <p>${esc(outcome)} No se incluyen comisiones, deslizamiento ni garantías de ejecución.</p>
       <p>${esc(payoff)} ${snapshot.modules.technical?esc(history)+" La frecuencia histórica no es un pronóstico calibrado.":""} ${snapshot.modules.monteCarlo?'Monte Carlo usa precios lognormales, volatilidad y tasa constantes; no incluye comisiones, deslizamiento ni ejercicio anticipado. Es una estimación condicionada por esos supuestos, no una probabilidad garantizada. ':''}Las griegas de las patas y del spread no se calcularon en este ranking. ${esc(spotWarning)} ${esc(ageWarning)}</p>
       <p>Si la opción admite ejercicio anticipado, la pata vendida puede ser asignada antes del vencimiento. El análisis no modela comisiones, deslizamiento ni ejecución.</p>`;
@@ -227,7 +254,7 @@
   }
   function candidateScore(candidate,snapshot,rows,filters){
     const components=Object.entries(candidate.scoreComponents||{}).map(([key,value])=>[window.ResearchRanking.labels[key],Number.isFinite(value)?value.toFixed(2)+'/100':'Sin datos']);
-    return '<p>Puntuación = promedio simple de los cores de puntuación seleccionados. Cada uno pesa lo mismo. Noticias es contexto, no aporta puntuación.</p>'+ (snapshot.fundamentalScope||snapshot.financialStatementsScope?'<p>En este recorrido del S&P 500, los análisis FMP se consultan después de elegir el Top y no forman parte del promedio.</p>':'') +evidenceList([['Puntuación',Number.isFinite(candidate.score)?candidate.score.toFixed(2)+'/100':'No clasificable'],...components])+`<p>${candidate.scoreMissing?.length?'Faltan datos de: '+esc(candidate.scoreMissing.join(', ')):Object.keys(candidate.scoreComponents||{}).length?'Todos los cores que participan en la puntuación tienen datos.':'Selecciona al menos un core de puntuación para ordenar.'}</p><p>${snapshot.modules.technical?'Técnico: alineación de tendencia 100, mixta 50, contraria 0. ':''}${snapshot.modules.blackScholes?'Black-Scholes: estimación risk-neutral × 100. ':''}${snapshot.modules.monteCarlo?'Monte Carlo: frecuencia simulada de P&L positivo × 100. ':''}${snapshot.modules.financial&&!snapshot.fundamentalScope?'Fundamental: score de métricas FMP. ':''}${snapshot.modules.statements&&!snapshot.financialStatementsScope?'Financiero: salud de liquidez, deuda y flujos FMP. ':''}${snapshot.modules.movers?'Movimiento: 50 + variación diaria alineada × 5, limitado a 0–100. ':''}</p><p>Desempates: mayor ganancia/riesgo y menor diferencial Bid/Ask; después ticker, estrategia y strikes. Los filtros se aplican antes del top. Es una clasificación heurística, no una garantía de ganancia.</p>`;
+    return '<p>Puntuación = promedio simple de los cores de puntuación seleccionados. Cada uno pesa lo mismo. Noticias es contexto, no aporta puntuación.</p>'+ (snapshot.fundamentalScope||snapshot.financialStatementsScope?'<p>En este recorrido del S&P 500, los análisis FMP se consultan después de elegir el Top y no forman parte del promedio.</p>':'') +evidenceList([['Puntuación',Number.isFinite(candidate.score)?candidate.score.toFixed(2)+'/100':'No clasificable'],...components])+`<p>${candidate.scoreMissing?.length?'Faltan datos de: '+esc(candidate.scoreMissing.join(', ')):Object.keys(candidate.scoreComponents||{}).length?'Todos los cores que participan en la puntuación tienen datos.':'Selecciona al menos un core de puntuación para ordenar.'}</p><p>${snapshot.modules.technical?'Técnico: alineación de tendencia 100, mixta 50, contraria 0. ':''}${snapshot.modules.indicators?'Indicadores: media direccional de la última señal reciente por familia; sin eventos, neutral 50. ':''}${snapshot.modules.monteCarlo?'Monte Carlo: frecuencia simulada de P&L positivo × 100. ':''}${snapshot.modules.financial&&!snapshot.fundamentalScope?'Fundamental: score de métricas FMP. ':''}${snapshot.modules.statements&&!snapshot.financialStatementsScope?'Financiero: salud de liquidez, deuda y flujos FMP. ':''}${snapshot.modules.movers?'Movimiento: 50 + variación diaria alineada × 5, limitado a 0–100. ':''}</p><p>Desempates: mayor ganancia/riesgo y menor diferencial Bid/Ask; después ticker, estrategia y strikes. Los filtros se aplican antes del top. Es una clasificación heurística, no una garantía de ganancia.</p>`;
   }
   function financialCalculations(candidate,evaluation){
     const long=evaluation.legs.find(leg=>leg.side==='buy'),short=evaluation.legs.find(leg=>leg.side==='sell'),debit=evaluation.spreadCategory==='debit';
@@ -314,7 +341,7 @@
     const rankedCompanies=mode==='top'?window.ResearchRanking.topCompanies(allRows):[];
     // Si ningún candidato tiene score completo, conserva el análisis por empresa
     // y muestra candidatos sin clasificar en vez de dejar vacíos todos los paneles.
-    const hasRankingCore=snapshot.modules.technical||snapshot.modules.blackScholes||(!snapshot.fundamentalScope&&snapshot.modules.financial)||(!snapshot.financialStatementsScope&&snapshot.modules.statements)||snapshot.modules.movers;
+    const hasRankingCore=snapshot.modules.technical||(!snapshot.fundamentalScope&&snapshot.modules.financial)||(!snapshot.financialStatementsScope&&snapshot.modules.statements)||snapshot.modules.movers;
     const unrankedSeen=new Set();
     const unrankedCompanies=mode==='top'&&hasRankingCore&&!rankedCompanies.length?allRows.filter(({candidate})=>{if(unrankedSeen.has(candidate.symbol))return false;unrankedSeen.add(candidate.symbol);return true;}):[];
     const rows=mode==='top'?(rankedCompanies.length?(showAllRankedCompanies?rankedCompanies:rankedCompanies.slice(0,10)):unrankedCompanies.slice(0,10)):mode==='list'?allRows.filter(({candidate})=>{const count=perCompany.get(candidate.symbol)||0;perCompany.set(candidate.symbol,count+1);return count<25;}):allRows.slice(0,100);
@@ -335,7 +362,7 @@
     // Respetar la secuencia numerada: 05 Comparación después de 04 Noticias.
     const resultPanel=$('researchStrategiesTitle').closest('section');
     $('researchNewsPanel').after(resultPanel);
-    renderSummary(view);renderTechnical(view);renderMonteCarlo(view);renderFinancialAndMovers(view);
+    renderIndicators(view);renderSummary(view);renderTechnical(view);renderMonteCarlo(view);renderFinancialAndMovers(view);
     const news=view.news,newsPanel=$('researchNewsPanel');newsPanel.hidden=!snapshot.modules.news;
     if(snapshot.modules.news){
       const sentimentCounts=news.articles.reduce((counts,item)=>{const label=sentimentOf(item).label;counts[label]=(counts[label]||0)+1;return counts;},{});
@@ -350,12 +377,11 @@
     const wbHead=$('researchMethodHead');
     wbHead.hidden=!wbActive;if(wbActive)wbHead.textContent=wbMetrics.label;
     const wbCell=index=>!wbActive?'':!Number.isFinite(wbMetrics.values[index])?'<td>—</td>':`<td title="${esc(wbMetrics.label+' calculada con el método del Quant Workbench. Métrica informativa; no es pronóstico ni recomendación.')}">${esc(fmtWorkbenchMetric(wbMetrics.method,wbMetrics.values[index]))}</td>`;
-    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const bsLabel=!snapshot.modules.blackScholes?'No incluido':c.blackScholes?.probability===null?(c.blackScholes?.reason==='insufficient_realized_volatility'?'Sin vol. histórica':'Sin datos'):pct(c.blackScholes.probability),bsTitle=c.blackScholes?.assumptions?`Vol. realizada ${(c.blackScholes.assumptions.volatility*100).toFixed(1)}% · ${c.blackScholes.assumptions.volatilitySampleBars} velas · r ${(c.blackScholes.assumptions.rate*100).toFixed(2)}% · CDF normal estándar verificada`:`${c.blackScholes?.reason||''}`,mc=c.monteCarlo,mcTitle=mc?.assumptions?`${mc.simulations} escenarios · vol. realizada ${(mc.assumptions.volatility*100).toFixed(1)}% · P&L medio ${money(mc.expectedPnl)} · P05 ${money(mc.p05)} · P95 ${money(mc.p95)}`:mc?.reason||'Monte Carlo no disponible',mcLabel=!snapshot.modules.monteCarlo?'No incluido':Number.isFinite(mc?.probability)?pct(mc.probability):'Sin datos',scoreTitle=c.scoreMissing?.length?'Sin puntuación: faltan '+c.scoreMissing.join(', '):'Promedio de los cores seleccionados (0–100); no es probabilidad de ganancia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${Number.isFinite(c.score)?position+1:"—"}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td data-core-column="technical">${esc(c.technicalTrend||'Sin datos')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td data-core-column="technical">${pct(c.probability.probability)}</td><td data-core-column="blackScholes" title="${esc(bsTitle)}">${esc(bsLabel)}</td><td data-core-column="monteCarlo" title="${esc(mcTitle)}">${esc(mcLabel)}</td><td data-core-column="technical">${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td data-core-column="technical">${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-primary" data-prepare-candidate="${index}">Preparar operación</button> <button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td>${wbCell(index)}</tr>`;}).join('')||`<tr><td colspan="${wbActive?17:16}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
+    $('researchCandidates').innerHTML=rows.map(({candidate:c,index},position)=>{const mc=c.monteCarlo,mcTitle=mc?.assumptions?`${mc.simulations} escenarios · vol. realizada ${(mc.assumptions.volatility*100).toFixed(1)}% · P&L medio ${money(mc.expectedPnl)} · P05 ${money(mc.p05)} · P95 ${money(mc.p95)}`:mc?.reason||'Monte Carlo no disponible',mcLabel=!snapshot.modules.monteCarlo?'No incluido':Number.isFinite(mc?.probability)?pct(mc.probability):'Sin datos',scoreTitle=c.scoreMissing?.length?'Sin puntuación: faltan '+c.scoreMissing.join(', '):'Promedio de los cores seleccionados (0–100); no es probabilidad de ganancia';return `<tr data-candidate="${index}" title="Selecciona para ver señales, niveles y explicación"><td>${Number.isFinite(c.score)?position+1:"—"}</td><td>${esc(c.symbol)}</td><td>${esc(c.strategy.replace('_SPREAD','').replaceAll('_',' '))}</td><td data-core-column="technical">${esc(c.technicalTrend||'Sin datos')}</td><td>${esc(c.longStrike)} / ${esc(c.shortStrike)}</td><td>${money(c.maxProfit)}</td><td>${money(c.maxLoss)}</td><td>${money(c.breakEven)}</td><td data-core-column="technical">${pct(c.probability.probability)}</td><td data-core-column="monteCarlo" title="${esc(mcTitle)}">${esc(mcLabel)}</td><td data-core-column="technical">${c.probability.interval?`${pct(c.probability.interval.lower)}–${pct(c.probability.interval.upper)}`:'—'}</td><td data-core-column="technical">${c.probability.sampleSize}</td><td title="${esc(scoreTitle)}">${Number.isFinite(c.score)?c.score.toFixed(3):'—'}</td><td>${esc(new Date(c.longQuoteTimestamp).toLocaleString('es-MX'))}<br>${esc(new Date(c.shortQuoteTimestamp).toLocaleString('es-MX'))}</td><td><button type="button" class="btn btn-primary" data-prepare-candidate="${index}">Preparar operación</button> <button type="button" class="btn btn-secondary strategy-explain-button" data-explain-candidate="${index}">Ver explicación</button></td><td data-core-column="news">${snapshot.modules.news?`<small class="news-confluence" data-state="${esc(c.newsConfluence?.state||'unavailable')}" title="${esc(c.newsConfluence?.explanation||'Sin datos de confluencia')}">${esc(c.newsConfluence?.label||'Sin datos de confluencia')}</small>`:''}</td>${wbCell(index)}</tr>`;}).join('')||`<tr><td colspan="${wbActive?17:16}">No hay candidatas que cumplan los filtros seleccionados.</td></tr>`;
     document.querySelectorAll('[data-core-column]').forEach(cell=>{cell.hidden=!snapshot.modules[cell.dataset.coreColumn];});
-    $('researchRankingStatus').textContent=$('researchMode').value==='top'?rankedCompanies.length?`${showAllRankedCompanies?"Todas las clasificadas":"Top 10"}: ${rows.length} de ${rankedCompanies.length} empresas, con una estrategia por empresa, después de filtrar ${allRows.length} pares. Sin datos completos en un core seleccionado no se asigna posición.`:hasRankingCore?`No hay scores completos después de filtrar ${allRows.length} pares. Mostrando ${rows.length} empresas sin clasificar.`:`No hay cores de puntuación seleccionados; no se genera un top de empresas.`:`${rows.length} de ${allRows.length} operaciones que cumplen los filtros para ${$('researchMode').value==='list'?snapshot.underlyings.map(item=>item.symbol).join(', '):$('researchCompany').value}${$('researchMode').value==='list'?' (hasta 25 por empresa)':''}. Orden: cores seleccionados, ganancia/riesgo y diferencial.`;
+    $('researchRankingStatus').textContent=$('researchMode').value==='top'?rankedCompanies.length?`${showAllRankedCompanies?"Todas las clasificadas":"Top 10"}: ${rows.length} de ${rankedCompanies.length} empresas, con una estrategia por empresa, después de filtrar ${allRows.length} pares. Sin datos completos en un core seleccionado no se asigna posición.`:hasRankingCore?`No hay scores completos después de filtrar ${allRows.length} pares. Mostrando ${rows.length} empresas sin clasificar.`:`No hay cores de puntuación seleccionados; no se genera un top de empresas.`:`${rows.length} de ${allRows.length} combinaciones de contratos que cumplen los filtros para ${$('researchMode').value==='list'?snapshot.underlyings.map(item=>item.symbol).join(', '):$('researchCompany').value}${$('researchMode').value==='list'?' (hasta 25 por empresa)':''}. Orden: cores seleccionados, ganancia/riesgo y diferencial. Varias filas pueden corresponder a la misma estrategia con strikes distintos.`;
     $('researchEvidence').hidden=false;
     snapshot.filters=filters;
-    $('researchBsCaveat').hidden=!snapshot.modules.blackScholes;
     syncComparisonSymbols(view);
     if(selectedCandidateIndex!==null&&!rows.some(row=>row.index===selectedCandidateIndex))selectCandidate(null);
     else {
@@ -370,8 +396,6 @@
     window.__researchMarketCache={};window.__workbenchTableMetrics=null;
     $('researchEvidence').hidden=true;$('researchCandidateExplanation').hidden=true;
     $('researchCandidates').innerHTML='';$('researchCompareResults').innerHTML='';
-    $('chTriggerStrategy').innerHTML='<option value="">— Ninguna seleccionada —</option>';
-    updateCandidateStatus();
     if(typeof refreshChartOverlays==='function')refreshChartOverlays();
     if(showMessage)setStatus('Cambió la empresa, el vencimiento o los módulos. Vuelve a analizar para actualizar las explicaciones.','info');
   }
@@ -385,7 +409,7 @@
     const deferredFundamentals=useSp500&&modules.financial,deferredStatements=useSp500&&modules.statements;
     const deferredFinancial=deferredFundamentals||deferredStatements;
     const rankingModules=deferredFinancial?{...modules,financial:false,statements:false}:modules;
-    if(deferredFinancial&&!['technical','blackScholes','monteCarlo','movers'].some(key=>rankingModules[key]))return setStatus('Para elegir el Top del S&P 500 antes de consultar FMP, selecciona Técnico, Black-Scholes, Monte Carlo o Movimiento diario. Los análisis financieros se consultan después para las diez finalistas.','error');
+    if(deferredFinancial&&!['technical','indicators','monteCarlo','movers'].some(key=>rankingModules[key]))return setStatus('Para elegir el Top del S&P 500 antes de consultar FMP, selecciona Técnico, Indicadores, Monte Carlo o Movimiento diario. Los análisis financieros se consultan después para las diez finalistas.','error');
     invalidateResearchContext(false);const version=researchVersion;
     const btn=$('btnResearchAnalyze');analysisController=new AbortController();$('btnResearchCancel').hidden=false;running=true;btn.disabled=true;btn.textContent='Consultando mercado…';$('researchEvidence').hidden=true;
     try{
@@ -447,13 +471,14 @@
       }catch(error){financialStatements={status:'unavailable',provider:'Financial Modeling Prep',capturedAt:new Date().toISOString(),error:error.message,rows:[]};}
       if(version!==researchVersion)return;
       const candidates=deferredFinancial?preliminary:ResearchRanking.rank(underlyings.flatMap(x=>x.candidates),modules,{fundamentals:fundamentals?.rows||[],financialStatements:financialStatements?.rows||[],changes});
+      const classifiedNews={...news,articles:(news.articles||[]).map(item=>({...item,sentiment:sentimentOf(item)}))};
+      const confluenceCache=new Map();
+      for(const candidate of candidates){const key=[candidate.symbol,candidate.strategy,candidate.side,candidate.technicalTrend].join('|');if(!confluenceCache.has(key))confluenceCache.set(key,window.NewsConfluence.assess(candidate,classifiedNews,{enabled:modules.news,technical:modules.technical}));candidate.newsConfluence=confluenceCache.get(key);}
       const fundamentalScope=deferredFundamentals?{phase:'post-selection',symbols:finalists,affectsRanking:false}:null;
       const financialStatementsScope=deferredStatements?{phase:'post-selection',symbols:finalists,affectsRanking:false}:null;
       const movers=modules.movers?{status:changes.length?'available':'unavailable',provider:screening?'Alpaca market snapshots':'Alpaca daily bars',capturedAt:screening?.capturedAt||new Date().toISOString(),coveredCount:screening?.coveredCount,universeCount:screening?.universeCount,gainers:changes.filter(x=>x.changePct>=0).sort((a,b)=>b.changePct-a.changePct),losers:changes.filter(x=>x.changePct<0).sort((a,b)=>a.changePct-b.changePct)}:null;
-      currentSnapshot={generatedAt:new Date().toISOString(),provider:'Alpaca',expirationDate:expiration,modules,screening,fundamentalScope,financialStatementsScope,marketData:{capturedAt:new Date().toISOString(),stocksFeed:underlyings.map(x=>({symbol:x.symbol,feed:x.stockFeed})),spotMethod:'midpoint quote, latest trade fallback, then last daily close',candidateRules:'valid bid/ask with timestamp no older than 72h; strikes within 30% of spot; same expiration; vertical width and premium checked'},underlyings,candidates,news,fundamentals,financialStatements,movers,estimation:{historical:{method:'historical-overlapping-returns',confidenceLevel:.95,minSampleSize:20,disclaimer:'Historical frequency is not a calibrated forecast. Rolling windows overlap and the Wilson interval may understate uncertainty.'},blackScholes:{method:'black-scholes-risk-neutral',volatilitySource:'annualized-realized-historical-proxy-not-option-implied',rate:riskFreeRate,dividendYield,disclaimer:'Risk-neutral model estimate; not a calibrated real-world forecast.'},monteCarlo:{method:'monte-carlo-gbm-expiration',simulations:10000,volatilitySource:'annualized-realized-historical',disclaimer:'Model-dependent estimate. Assumes lognormal prices, constant volatility and rates; excludes fees, slippage, early exercise and changing volatility.'}},filters:{},decision:''};
+      currentSnapshot={generatedAt:new Date().toISOString(),provider:'Alpaca',expirationDate:expiration,modules,screening,fundamentalScope,financialStatementsScope,marketData:{capturedAt:new Date().toISOString(),stocksFeed:underlyings.map(x=>({symbol:x.symbol,feed:x.stockFeed})),spotMethod:'midpoint quote, latest trade fallback, then last daily close',candidateRules:'valid bid/ask with timestamp no older than 72h; strikes within 30% of spot; same expiration; vertical width and premium checked'},underlyings,candidates,news,fundamentals,financialStatements,movers,estimation:{historical:{method:'historical-overlapping-returns',confidenceLevel:.95,minSampleSize:20,disclaimer:'Historical frequency is not a calibrated forecast. Rolling windows overlap and the Wilson interval may understate uncertainty.'},monteCarlo:{method:'monte-carlo-gbm-expiration',simulations:10000,volatilitySource:'annualized-realized-historical',disclaimer:'Model-dependent estimate. Assumes lognormal prices, constant volatility and rates; excludes fees, slippage, early exercise and changing volatility.'}},filters:{},decision:''};
       render(currentSnapshot);modulesDirty=false;setStatus(`Análisis listo: ${underlyings.length}/${symbols.length} tickers de opciones; ${screening?`exploración diaria ${screening.coveredCount}/${screening.universeCount} del S&P 500; `:''}${candidates.length} spreads válidos.${failures.length?' Cobertura parcial: '+failures.length+' errores. Primeros: '+failures.slice(0,5).join(' · '):''}${empty?' '+empty+' empresas sin pares que cumplan los filtros.':''} Las probabilidades son estimaciones separadas, no calibradas.`,'info');
-      const triggerSelect=$('chTriggerStrategy');
-      triggerSelect.innerHTML='<option value="">— Ninguna seleccionada —</option>'+candidates.map((c,i)=>`<option value="${i}">${esc(c.symbol+' · '+c.strategy.replace('_SPREAD','').replaceAll('_',' ')+' · '+c.longStrike+'/'+c.shortStrike)}</option>`).join('');
       selectCandidate(null);
     }catch(error){if(version===researchVersion)setStatus(error.message,'error');}
     finally{analysisController=null;$('btnResearchCancel').hidden=true;running=false;btn.disabled=false;btn.textContent='Analizar y comparar los cuatro spreads';}
@@ -486,28 +511,14 @@
     if (selectedCandidateIndex === null || !currentSnapshot) return null;
     return currentSnapshot.candidates[selectedCandidateIndex] ?? null;
   }
-  function updateCandidateStatus(state = window.__candlesChartState) {
-    const candidate = getSelectedCandidate();
-    const status = $('candidateSignalStatus');
-    if (!candidate) {
-      status.textContent = 'Ninguna candidata seleccionada. El análisis técnico independiente sigue disponible.';
-    } else if (state?.symbol && candidate.symbol !== state.symbol) {
-      status.textContent = `Candidata ${candidate.symbol}; la gráfica muestra ${state.symbol}. Sus niveles y señales requieren el mismo ticker.`;
-    } else {
-      const name = candidate.strategy.replace('_SPREAD', '').replaceAll('_', ' ');
-      status.textContent = `Candidata seleccionada: ${candidate.symbol} · ${name}. ${$('chShowTriggers').checked ? 'Entradas y salidas orientativas activadas.' : 'Activa la casilla para mostrar sus entradas y salidas orientativas.'}`;
-    }
-  }
   function selectCandidate(index, rowElement) {
     const previous=selectedCandidateIndex;
     selectedCandidateIndex = Number.isInteger(index) && currentSnapshot && currentSnapshot.candidates[index] ? index : null;
     document.querySelectorAll('#researchCandidates tr.is-selected').forEach(row => row.classList.remove('is-selected'));
     const row = rowElement || (selectedCandidateIndex !== null ? document.querySelector('#researchCandidates tr[data-candidate="' + selectedCandidateIndex + '"]') : null);
     if (row) row.classList.add('is-selected');
-    const select = $('chTriggerStrategy');
-    if (select) select.value = selectedCandidateIndex === null ? '' : String(selectedCandidateIndex);
+    if(selectedCandidateIndex!==null&&previous!==selectedCandidateIndex)document.dispatchEvent(new CustomEvent('research:company-selected',{detail:{symbol:currentSnapshot.candidates[selectedCandidateIndex].symbol}}));
     if(previous!==selectedCandidateIndex)document.querySelectorAll('#researchCandidateExplanation details').forEach(details=>{details.open=false;});
-    updateCandidateStatus();
     if (typeof refreshChartOverlays === 'function') refreshChartOverlays();
     if(currentSnapshot){
       const {rows,filters}=filteredRows(currentSnapshot);
@@ -603,21 +614,22 @@
     const state = window.__candlesChartState;
     if (!state || !Array.isArray(state.candles) || !state.candles.length) return null;
     const candidate = getSelectedCandidate();
-    updateCandidateStatus(state);
-    const showSignals = $('chShowTriggers') && $('chShowTriggers').checked;
     const method = workbenchMethodOverlay(state);
     const methodDraws = !!(method && (method.lines.length || method.band));
     const matches = candidate && candidate.symbol === state.symbol;
-    const overlays = { levels: matches ? window.StrategyTriggers.strategyLevels(candidate) : null, entries: [], exits: [], technicalSignals: [], method: methodDraws ? method : null, note: '' };
+    const overlays = { levels: null, entries: [], exits: [], technicalSignals: [], method: methodDraws ? method : null, note: '' };
     const notes = [];
     if (method && method.note) notes.push(method.note);
     if (candidate && !matches) notes.push('La candidata corresponde a ' + candidate.symbol + ' y la gráfica muestra ' + state.symbol + '.');
-    if (showSignals && !candidate) notes.push('Selecciona una candidata evaluada para ver sus entradas y salidas orientativas.');
     if (state.timeframe !== '1Day') {
       notes.push('Señales desactivadas: solo se calculan con velas 1Day; no se asignan señales diarias a velas intradía u otras temporalidades.');
       overlays.note = notes.join(' ');
       renderSignalTable([], state, overlays.note);
       return overlays;
+    }
+    if(!$('researchModuleIndicators').checked){
+      notes.push('Core de indicadores no seleccionado: se omiten sus señales. Las SMA y los soportes visuales dependen del análisis técnico.');
+      overlays.note=notes.join(' ');renderSignalTable([],state,overlays.note);return overlays;
     }
     const today = marketDate(Date.now());
     const closed = state.candles.filter(bar => marketDate(bar.timestamp) < today);
@@ -626,19 +638,9 @@
       technicalCache = { state, today, signals: window.StrategyTriggers.computeTechnicalSignals(closed, { symbol: state.symbol, timeframe: '1Day' }) };
     }
     const enabled = new Set([...document.querySelectorAll('.technical-indicator:checked')].map(input => input.value));
-    if(!$('researchModuleTechnical').checked)enabled.clear();
+    if(!$('researchModuleIndicators').checked)enabled.clear();
     const selected = signal => signal.rule === 'sma_cross' ? enabled.has(signal.side === 'bullish' ? 'sma_up' : 'sma_down') : signal.rule === 'rsi_cross' ? enabled.has('rsi') : enabled.has(signal.side === 'bullish' ? 'resistance' : 'support');
     overlays.technicalSignals = technicalCache.signals.filter(selected);
-    if (showSignals && matches) {
-      const triggers = window.StrategyTriggers.computeTriggers(closed, candidate);
-      const decorate = (signal, exit) => ({ ...signal, ticker: state.symbol, timeframe: '1Day', category: 'candidate',
-        indicator: signal.rule === 'sma20_against' ? 'SMA20' : signal.rule === 'sma_cross' ? 'SMA50 + SMA20' : (signal.side === 'bullish' ? 'Resistencia + ATR14' : 'Soporte + ATR14'),
-        type: exit ? 'salida' : (signal.side === 'bullish' ? 'alcista' : 'bajista'),
-        explanation: window.StrategyTriggers.describeSignal(signal),
-        exactRule: signal.rule === 'sma20_against' ? (signal.side === 'bullish' ? 'Cierre anterior ≥ SMA20 anterior y cierre actual < SMA20 actual.' : 'Cierre anterior ≤ SMA20 anterior y cierre actual > SMA20 actual.') : signal.rule === 'sma_cross' ? (signal.side === 'bullish' ? 'Cierre anterior ≤ SMA50 anterior; cierre actual > SMA50 y SMA20 > SMA50.' : 'Cierre anterior ≥ SMA50 anterior; cierre actual < SMA50 y SMA20 < SMA50.') : (signal.side === 'bullish' ? 'Cierre anterior ≤ resistencia previa + 0.25 ATR14 previo; cierre actual > umbral.' : 'Cierre anterior ≥ soporte previo − 0.25 ATR14 previo; cierre actual < umbral.') });
-      overlays.entries = triggers.entries.map(signal => decorate(signal, false));
-      overlays.exits = triggers.exits.map(signal => decorate(signal, true));
-    }
     const all = [...overlays.technicalSignals, ...overlays.entries, ...overlays.exits].sort((a,b) => Date.parse(a.timestamp)-Date.parse(b.timestamp) || a.indicator.localeCompare(b.indicator));
     const markerLimit = $('chMarkerLimit').value === 'all' ? all.length : Number($('chMarkerLimit').value);
     overlays.visibleSignals = all.slice(-markerLimit || all.length);
@@ -733,10 +735,10 @@
     $('researchCompanyField').hidden=!single;$('researchUniverseField').hidden=single||list;
     $('researchSymbols').hidden=single||!custom;document.querySelector('label[for="researchSymbols"]').hidden=single||!custom;
     $('researchTrendFilter').closest('div').hidden=!$('researchModuleTechnical').checked;
-    const hasProbability=$('researchModuleTechnical').checked||$('researchModuleBlackScholes').checked||$('researchModuleMonteCarlo').checked;
+    const hasProbability=$('researchModuleTechnical').checked||$('researchModuleMonteCarlo').checked;
     $('researchMinProb').closest('div').hidden=!hasProbability;
     if(!hasProbability)$('researchMinProb').value='0';
-    document.querySelector('label[for="researchMinProb"]').textContent=$('researchModuleBlackScholes').checked?'Prob. Black-Scholes mínima (%)':$('researchModuleMonteCarlo').checked?'Prob. Monte Carlo mínima (%)':'Frecuencia histórica mínima (%)';
+    document.querySelector('label[for="researchMinProb"]').textContent=$('researchModuleMonteCarlo').checked?'Prob. Monte Carlo mínima (%)':'Frecuencia histórica mínima (%)';
     $('researchMinProb').setAttribute('aria-label',document.querySelector('label[for="researchMinProb"]').textContent);
     document.querySelectorAll('[data-core-column]').forEach(cell=>{cell.hidden=!readModules()[cell.dataset.coreColumn];});
   }
@@ -751,11 +753,11 @@
     $('btnResearchAnalyze').addEventListener('click',runAnalysis);$('btnResearchSave').addEventListener('click',saveJournal);$('btnResearchHistory').addEventListener('click',loadJournal);
     $('researchNewsFilter').addEventListener('change',()=>{if(currentSnapshot)render(currentSnapshot);});
     for(const id of ['researchMinProb','researchMinRR','researchMaxSpread','researchTrendFilter','researchMaxLoss','researchStrategyFilter'])for(const event of ['input','change'])$(id).addEventListener(event,()=>{if(currentSnapshot?.screening){invalidateResearchContext(false);setStatus('Cambiaste filtros del recorrido completo. Vuelve a analizar el S&P 500 con estos filtros.','info');}else if(currentSnapshot)render(currentSnapshot);});
-    for(const id of ['researchModuleTechnical','researchModuleBlackScholes','researchModuleMonteCarlo','researchModuleFinancial','researchModuleStatements','researchModuleMovers','researchModuleNews'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
+    for(const id of ['researchModuleTechnical','researchModuleIndicators','researchModuleMonteCarlo','researchModuleFinancial','researchModuleStatements','researchModuleMovers','researchModuleNews'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['researchSymbols','expiration'])for(const eventName of ['input','change'])$(id).addEventListener(eventName,()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['symbol','chSymbol'])$(id).addEventListener('change',()=>{if(currentSnapshot||running)invalidateResearchContext();});
     for(const id of ['symbol','chSymbol','researchCompany'])$(id).addEventListener('input',event=>{const start=event.target.selectionStart;event.target.value=event.target.value.toUpperCase();if(start!==null)event.target.setSelectionRange(start,start);});
-    $('chSymbol').addEventListener('change',()=>{if($('researchSymbols').value.trim()==='AAPL')$('researchSymbols').value=$('chSymbol').value;updateCandidateStatus();});
+    $('chSymbol').addEventListener('change',()=>{if($('researchSymbols').value.trim()==='AAPL')$('researchSymbols').value=$('chSymbol').value;});
     $('researchCandidates').addEventListener('click',async event=>{
       const prepare=event.target.closest('[data-prepare-candidate]');
       if(prepare){const snapshot=currentSnapshot,candidate=snapshot?.candidates[Number(prepare.dataset.prepareCandidate)];if(!candidate)return;prepare.disabled=true;
@@ -770,11 +772,32 @@
         }
       }
     });
-    $('chTriggerStrategy').addEventListener('change',()=>{const value=$('chTriggerStrategy').value;selectCandidate(value===''?null:Number(value));});
     $('researchComparison').addEventListener('toggle',()=>{if(!$('researchComparison').open){comparisonVersion++;return;}if(currentSnapshot)renderStrategyComparison(currentSnapshot,filteredRows(currentSnapshot).rows);});
     $('researchCompareSymbol').addEventListener('change',()=>{if(!currentSnapshot)return;const candidate=getSelectedCandidate();if(candidate&&candidate.symbol!==$('researchCompareSymbol').value)selectCandidate(null);if($('researchComparison').open)renderStrategyComparison(currentSnapshot,filteredRows(currentSnapshot).rows);});
-    $('chShowTriggers').addEventListener('change',()=>updateCandidateStatus());
-    document.querySelectorAll('.technical-indicator, .chart-layer-toggle').forEach(input=>input.addEventListener('change',()=>refreshChartOverlays()));
+    // A checked technical layer must never silently remain blocked by an unchecked core.
+    const technicalCore=$('researchModuleTechnical');
+    const technicalControls=[...document.querySelectorAll('.chart-layer-toggle:not(#chShowLastPrice)')];
+    function syncTechnicalControls(){
+      if(!technicalCore.checked)technicalControls.forEach(input=>{input.checked=false;});
+      $('chartTechnicalStatus').textContent=technicalCore.checked?'Análisis técnico activo: SMA y soportes seleccionados visibles con datos suficientes. Las señales tienen su propio core de indicadores.':'Core técnico desactivado. Selecciona un indicador para activarlo; el último cierre funciona por separado.';
+    }
+    technicalCore.addEventListener('change',()=>{syncTechnicalControls();refreshChartOverlays();});
+    technicalControls.forEach(input=>input.addEventListener('change',()=>{
+      if(input.checked&&!technicalCore.checked){
+        technicalCore.checked=true;
+        // Reuse the same invalidation path as the core checkbox. No broker action.
+        technicalCore.dispatchEvent(new Event('change',{bubbles:true}));
+        $('chartTechnicalStatus').textContent='Se activó el core técnico al seleccionar este indicador. Si ya tenías resultados, vuelve a analizar para actualizar la comparación.';
+      }
+      refreshChartOverlays();
+    }));
+    const indicatorsCore=$('researchModuleIndicators'),signalControls=[...document.querySelectorAll('.technical-indicator')];
+    const syncSignals=()=>{if(!indicatorsCore.checked)signalControls.forEach(input=>{input.checked=false;});refreshChartOverlays();};
+    indicatorsCore.addEventListener('change',syncSignals);
+    signalControls.forEach(input=>input.addEventListener('change',()=>{if(input.checked&&!indicatorsCore.checked){indicatorsCore.checked=true;indicatorsCore.dispatchEvent(new Event('change',{bubbles:true}));}refreshChartOverlays();}));
+    if(!indicatorsCore.checked)signalControls.forEach(input=>{input.checked=false;});
+    $('chShowLastPrice').addEventListener('change',()=>refreshChartOverlays());
+    syncTechnicalControls();
     $('chMarkerLimit').addEventListener('change',()=>refreshChartOverlays());
     $('chSignalDate').addEventListener('change',()=>refreshChartOverlays());
     $('btnClearSignalDate').addEventListener('click',()=>{$('chSignalDate').value='';refreshChartOverlays();});

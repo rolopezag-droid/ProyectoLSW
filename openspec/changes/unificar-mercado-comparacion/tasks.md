@@ -1,0 +1,4 @@
+- [x] Especificar alcance y diseño.
+- [x] Integrar navegación y selección.
+- [x] Validar regresiones y registrar evidencia (41 pruebas; 3 focalizadas reforzadas y OpenSpec).
+- [ ] Revisión visual en navegador: acceso local bloqueado por timeout en el entorno de revisión.

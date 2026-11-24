@@ -1,0 +1,2 @@
+## Diseño
+Conservar gate técnico del renderer y sincronizar los controles con una única casilla fuente researchModuleTechnical. Escuchar cambios de capas y señales antes de redibujar. Activar desde indicador emite change al core para reutilizar invalidación y actualización de columnas. Desactivar core limpia selección de SMA/soportes/señales y chShowTriggers; no toca último cierre. Mostrar estado junto a controles. No asumir indicadores disponibles en cualquier temporalidad o con pocas velas.

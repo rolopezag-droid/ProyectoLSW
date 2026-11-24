@@ -77,7 +77,7 @@ test('las cuatro candidatas muestran patas y cálculos del evaluador sin enviar 
       assert.ok(text.includes('$'+evaluated.maxProfit.toFixed(2)));assert.ok(text.includes('$'+evaluated.maxLoss.toFixed(2)));
       assert.ok(text.includes(String(evaluated.breakEven)));assert.match(text,/acciones\/contrato.*contrato\(s\)/);
       assert.match(w.document.getElementById('researchCandidateScore').textContent,/promedio simple.*cores de puntuación/i);
-      assert.match(w.document.getElementById('researchCandidateWhy').textContent,/CDF normal estándar verificada|Black-Scholes no disponible/i);
+      assert.doesNotMatch(w.document.getElementById('researchCandidateWhy').textContent,/risk-neutral|CDF normal estándar verificada|Black-Scholes/i);
     }
     assert.equal(calls.some(call=>/\/broker\/(orders|spreads)$/.test(call.url.pathname)),false);
   }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
@@ -108,7 +108,7 @@ test('la explicación compara patas con alternativas visibles sin atribuirles cr
   }finally{await new Promise(resolve=>setTimeout(resolve,0));dom.window.close();}
 });
 
-test('el score explica pesos fundamentales reales y separa Black-Scholes y noticias',async()=>{
+test('el score explica pesos fundamentales y noticias sin añadir un core Black-Scholes',async()=>{
   const {dom,w}=page();try{
     w.document.getElementById('researchModuleFinancial').checked=true;await analyze(w);candidateButton(w,'BULL CALL').click();
     await until(()=>w.document.getElementById('researchCandidateValidation').dataset.state==='verified');

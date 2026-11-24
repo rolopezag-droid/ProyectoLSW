@@ -1,0 +1,5 @@
+- [x] Especificar pantalla continua y revisión independiente según aclaración del usuario.
+- [x] Retirar etapas internas y conservar gráfico, filtros y comparación juntos.
+- [x] Conservar resumen de riesgo junto a la revisión independiente.
+- [x] Validar 42 pruebas focalizadas y OpenSpec estricto.
+- [ ] Revisión visual: entorno de navegador sin acceso al servidor local.
