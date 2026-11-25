@@ -24,3 +24,17 @@ test('cancelación y timeout terminan workers sin publicar respuestas tardías',
  await assert.rejects(api.run(payload(),{timeoutMs:1}),/tiempo máximo/);assert.equal(instances[1].terminated,true);
 });
 test('error de cálculo no deja worker vivo',async()=>{const {api,instances}=client();await assert.rejects(api.run({context:null}),/null|context|bars/);assert.equal(instances[0].terminated,true);});
+
+test('worker resuelve más de 120000 combinaciones sin recortar escenarios ni bloquear la interfaz',async()=>{
+ const job=payload(),count=250;
+ job.indicators=false;
+ job.contracts=['call','put'].flatMap(type=>Array.from({length:count},(_,i)=>({type,underlyingSymbol:'AAPL',expiration:job.context.expiration,strike:80+i*40/count,contractSymbol:type+i,bid:40+(type==='call'?-1:1)*i*20/count,ask:40+(type==='call'?-1:1)*i*20/count+.01,timestamp:new Date().toISOString(),multiplier:100})));
+ const {api,instances}=client();let ticks=0;const pulse=setInterval(()=>ticks++,5),start=performance.now();
+ try{
+  const result=await api.run(job);
+  assert.ok(result.candidates.length>120000);
+  assert.ok(result.candidates.every(c=>c.monteCarlo?.simulations===10000));
+  assert.ok(ticks>1);assert.equal(instances[0].terminated,true);
+  console.log(JSON.stringify({workerCandidates:result.candidates.length,elapsedMs:Math.round(performance.now()-start),uiHeartbeats:ticks}));
+ }finally{clearInterval(pulse);for(const instance of instances)instance.terminate();}
+});

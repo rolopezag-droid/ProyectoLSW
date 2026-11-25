@@ -22,7 +22,7 @@
     worker.onerror=event=>{event.preventDefault?.();finish(new Error('Falló el cálculo en segundo plano: '+(event.message||'worker no disponible')));};
     signal?.addEventListener('abort',abort,{once:true});
     if(signal?.aborted){abort();return;}
-    timer=setTimeout(()=>finish(new Error('El cálculo superó el tiempo máximo por empresa. Reduce el universo o vuelve a intentarlo.')),timeoutMs);
+    timer=setTimeout(()=>finish(new Error('El cálculo de esta empresa superó el tiempo máximo de 120 segundos. Su cadena puede tener demasiadas combinaciones para este equipo. Vuelve a intentarlo; no se publicaron resultados parciales.')),timeoutMs);
     worker.postMessage(payload);
    }catch(error){finish(new Error('No se pudo iniciar el cálculo en segundo plano: '+error.message));}
   });
