@@ -600,3 +600,14 @@ test('IA no configurada no borra el ranking existente',async()=>{
   $('btnResearchAi').click();await until(()=>!$('btnResearchAi').disabled);assert.match($('researchAiStatus').textContent,/Configura/);assert.equal($('researchCandidates').children.length,count);assert.equal($('researchEvidence').hidden,false);
  }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
 });
+
+
+test('IA informa backend antiguo ante 404 y conserva el análisis',async()=>{
+ const {dom,w}=page();try{
+  const $=id=>w.document.getElementById(id);$('researchModuleAi').checked=true;await analyze(w);
+  const count=$('researchCandidates').children.length,previous=w.fetch;
+  w.fetch=async(url,options)=>url==='/api/research/ai'?{ok:false,status:404,json:async()=>({message:'Endpoint API no encontrado.'})}:previous(url,options);
+  $('btnResearchAi').click();await until(()=>!$('btnResearchAi').disabled);
+  assert.match($('researchAiStatus').textContent,/Reinicia la aplicación/);assert.equal($('researchCandidates').children.length,count);assert.equal($('researchEvidence').hidden,false);
+ }finally{await new Promise(resolve=>setImmediate(resolve));dom.window.close();}
+});

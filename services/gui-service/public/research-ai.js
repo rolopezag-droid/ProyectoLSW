@@ -37,6 +37,10 @@
   clear();const requestVersion=version,state=snapshot,symbol=$('researchAiCompany').value;controller=new AbortController();$('btnResearchAi').disabled=true;$('researchAiStatus').textContent='Consultando interpretación de '+symbol+'…';
   try{
    const response=await fetch('/api/research/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(state,symbol)),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(25000)])});
+   if(response.status===404){
+    if(requestVersion===version)$('researchAiStatus').textContent='El servidor que está ejecutándose todavía no reconoce el core de IA. Reinicia la aplicación desde la carpeta actualizada del proyecto; recargar la página no actualiza el backend.';
+    return;
+   }
    const data=await response.json();if(requestVersion!==version||snapshot!==state)return;
    if(!response.ok||data.status!=='available'){ $('researchAiStatus').textContent=data.message||'La IA no está disponible. Los otros cores conservan sus resultados.';return;}
    const result=data.interpretation;if(!result||typeof result.summary!=='string'||typeof result.conclusion!=='string'||!['agreements','contradictions','missingData'].every(key=>Array.isArray(result[key])&&result[key].every(item=>typeof item==='string')))throw new Error('Respuesta de IA incompleta.');
@@ -45,7 +49,7 @@
     const heading=document.createElement('h4');heading.textContent=title;host.append(heading);
     if(Array.isArray(value)){const list=document.createElement('ul');for(const text of value){const li=document.createElement('li');li.textContent=text;list.append(li);}if(!value.length){const li=document.createElement('li');li.textContent='Ninguna identificada por el modelo.';list.append(li);}host.append(list);}else{const p=document.createElement('p');p.textContent=value;host.append(p);}
    }
-   $('researchAiStatus').textContent='Interpretación generada por IA · OpenRouter · '+(data.model||'modelo configurado')+(data.fromCache?' · recuperada de caché':'')+'. Puede contener errores; no cambia el ranking ni ejecuta operaciones.';
+   $('researchAiStatus').textContent='Interpretación generada por IA · OpenRouter · '+(data.servedModel||data.model||'modelo configurado')+(data.fromCache?' · recuperada de caché':'')+'. Puede contener errores; no cambia el ranking ni ejecuta operaciones.';
   }catch(error){if(requestVersion===version)$('researchAiStatus').textContent=error.name==='AbortError'?'Consulta de IA cancelada o tiempo de espera agotado.':'No se pudo generar la interpretación. Los otros cores siguen disponibles.';}
   finally{if(requestVersion===version){controller=null;$('btnResearchAi').disabled=false;}}
  });

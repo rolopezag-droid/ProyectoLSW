@@ -1,5 +1,5 @@
 const test=require('node:test');const assert=require('node:assert/strict');const {createAiCore,cleanInput}=require('../src/openrouter-core');
-const input={symbol:'AAPL',selected:['technical'],cores:{technical:{trend:'bullish',sma20:100,password:'never-send'},news:{headlines:['unselected']}},accessToken:'never-send'};
+const input={symbol:'AAPL',selected:['technical'],cores:{technical:{trend:'bullish',latestClose:100,sma20:100,sma50:99,rsi14:50,atr14:1,password:'never-send'},news:{headlines:['unselected']}},accessToken:'never-send'};
 const output={summary:'Datos mixtos',agreements:['Tendencia alcista'],contradictions:[],missingData:[],conclusion:'No garantiza dirección.'};
 const response=(body,status=200)=>({ok:status===200,status,json:async()=>body});
 test('falta configuración no consulta proveedor; whitelist excluye credenciales y cores no seleccionados',async()=>{
@@ -17,4 +17,25 @@ test('errores, JSON incompleto y límites no se convierten en interpretación fa
   const run=createAiCore({fetchImpl:async()=>provider});await assert.rejects(run(input,{apiKey:'fake-test-key',model:'test/model'}),error=>error.status===502&&!error.message.includes('fake-secret'));
  }
  const run=createAiCore({now:()=>100,fetchImpl:async()=>response({choices:[{message:{content:JSON.stringify(output)}}]})});await run(input,{apiKey:'fake',model:'test/model'});await assert.rejects(run({...input,symbol:'MSFT'},{apiKey:'fake',model:'test/model'}),error=>error.status===429);
+});
+
+
+test('valores de ejemplo se diagnostican sin contactar OpenRouter',async()=>{
+ const run=createAiCore({fetchImpl:()=>{throw new Error('No debe consultar');}});
+ const result=await run(input,{apiKey:'tu_clave',model:'identificador_del_modelo'});
+ assert.equal(result.code,'example_configuration');assert.match(result.message,/valores de ejemplo/);assert.match(result.message,/reinicia/);
+});
+
+
+test('datos faltantes se limitan a cores seleccionados aunque el modelo invente otros',async()=>{
+ const run=createAiCore({fetchImpl:async()=>response({choices:[{message:{content:JSON.stringify({...output,missingData:['Faltan noticias y fundamentales']})}}]})});
+ const value=await run(input,{apiKey:'fake',model:'test/model'});assert.deepEqual(value.interpretation.missingData,[]);
+ const missing=cleanInput({symbol:'QQQ',selected:['technical'],cores:{technical:{status:'unavailable'}}});assert.deepEqual(missing.missingData,['Técnico: datos no disponibles.']);assert.equal(missing.cores.news,undefined);
+});
+
+
+test('normaliza un bloque JSON sin aceptar texto libre y rechaza respuesta truncada',async()=>{
+ const run=createAiCore({fetchImpl:async(_url,options)=>{const request=JSON.parse(options.body);assert.equal(request.reasoning.enabled,false);assert.equal(request.max_tokens,1600);return response({model:'actual/model',choices:[{finish_reason:'stop',message:{content:'```json\n'+JSON.stringify(output)+'\n```'}}]});}});
+ assert.equal((await run(input,{apiKey:'fake',model:'openrouter/free'})).servedModel,'actual/model');
+ const truncated=createAiCore({fetchImpl:async()=>response({choices:[{finish_reason:'length',message:{content:JSON.stringify(output)}}]})});await assert.rejects(truncated(input,{apiKey:'fake',model:'test/model'}),/agotó su límite/);
 });

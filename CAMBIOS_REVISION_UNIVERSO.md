@@ -190,3 +190,14 @@ Endpoint POST /api/research/ai, servicio openrouter-core.js, módulo visual rese
 ### Publicación de Core de IA en main
 
 Etiqueta final: Core de IA, sin paréntesis. Incluye prompt editable, plantilla sin clave, endpoint backend y guía. Validación previa: 5 pruebas focalizadas de IA aprobadas y OpenSpec estricto válido; se conserva evidencia previa de 70 pruebas. No se configuró ni se publica una clave real; falta configurar OPENROUTER_API_KEY y OPENROUTER_MODEL para probar al proveedor.
+
+## Diagnóstico y corrección del core IA local
+
+El usuario confirmó localhost:3005/#comparar. La ruta local reconoce POST; OpenRouter rechazó la configuración existente con 401 y la verificación de la clave también devolvió 401. Inspección solo de indicadores booleanos confirmó valores de ejemplo, sin mostrar ni cambiar sus valores. Añadido rechazo preventivo de plantilla antes de consultar el modelo y mensaje específico para backend antiguo con 404. Reiniciado solo GUI local y verificado HTTP 200/example_configuration; otros servicios conservados. 4 pruebas backend simuladas y 3 de UI aprobadas, OpenSpec válido. Falta una clave real y modelo válido para acreditar generación real. No se editaron credenciales. Durante el diagnóstico también se actualizó el despliegue Vercel de la versión antigua a main 7fd02f1, antes de que el usuario aclarara el entorno local. Correcciones actuales permanecen locales.
+
+## Prueba real de OpenRouter con configuración del usuario
+
+Cargada nueva configuración sin mostrar ni modificar la clave. Reiniciados servicios mediante npm start al detectar Quant apagado. Flujo final: 254 velas reales QQQ, interpretación HTTP 200 con openrouter/free (modelo servido particle-ai/particle-1:free), repetición idéntica desde caché. Detectada y corregida atribución de datos faltantes a cores no seleccionados: ahora el backend determina esos faltantes. Manejo de JSON cercado y rechazo de respuesta truncada, 1600 tokens y reasoning desactivado cuando se permite. 6 pruebas backend y 3 UI aprobadas. Sin órdenes ni publicación de claves. Cambios locales.
+
+## Encabezados de los bloques de análisis
+Se uniformaron los encabezados de IA e indicadores y se numeran consecutivamente los bloques visibles, incluyendo IA. No se cambió el lugar de IA ni el cálculo de los cores. Resumen y bitácora tienen rótulos propios sin números de core. Implementación: `services/gui-service/public/research-sections.js`, cargada después de `research-ai.js`; procesa `research:snapshot` cuando ya está definida la visibilidad. Validación: 44 pruebas de IA, comparación y encabezados aprobadas; interpretación real QQQ y caché verificadas previamente.

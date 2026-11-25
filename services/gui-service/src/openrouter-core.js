@@ -15,7 +15,10 @@ function cleanInput(input){
   if(key==='news')cores[key].headlines=Array.isArray(value.headlines)?value.headlines.slice(0,3).map(text=>String(text).slice(0,250)):[];
   if(key==='indicators')cores[key].signals=Array.isArray(value.signals)?value.signals.slice(0,3).map(signal=>({side:['bullish','bearish'].includes(signal.side)?signal.side:null,rule:String(signal.rule||'').slice(0,80),timestamp:String(signal.timestamp||'').slice(0,40)})):[];
  }
- return {symbol:input.symbol,generatedAt:String(input.generatedAt||'').slice(0,40),selected,cores};
+ const labels={technical:'Técnico',indicators:'Indicadores',financial:'Fundamental',statements:'Financiero',monteCarlo:'Monte Carlo',movers:'Movimiento diario',news:'Noticias'};
+ const missingData=selected.flatMap(key=>{const core=cores[key];if(core.status==='unavailable')return [labels[key]+': datos no disponibles.'];const missing=numeric[key].filter(field=>core[field]===null);return missing.length?[labels[key]+': no se recibieron '+missing.join(', ')+'.']:[];});
+ const gaps=missingData.length<=5?missingData:[...missingData.slice(0,4),missingData.slice(4).join(' ')];
+ return {symbol:input.symbol,generatedAt:String(input.generatedAt||'').slice(0,40),selected,cores,missingData:gaps};
 }
 function validateOutput(value){
  if(!value||typeof value.summary!=='string'||!value.summary.trim()||value.summary.length>2000||typeof value.conclusion!=='string'||!value.conclusion.trim()||value.conclusion.length>2000)throw error(502,'La IA devolvió una interpretación incompleta.');
@@ -27,17 +30,23 @@ function createAiCore({fetchImpl=global.fetch,now=Date.now}={}){
  const cache=new Map();let active=false,lastStart=-Infinity;
  return async function interpret(input,{apiKey=process.env.OPENROUTER_API_KEY,model=process.env.OPENROUTER_MODEL}={}){
   const payload=cleanInput(input);
+  apiKey=typeof apiKey==='string'?apiKey.trim():'';model=typeof model==='string'?model.trim():'';
   if(!apiKey||!model)return {status:'unavailable',message:'Configura OPENROUTER_API_KEY y OPENROUTER_MODEL en el servidor para usar la IA.'};
+  const exampleKey=/^(tu_|your_|reemplaza|sk-or-v1-x{3,})/i.test(apiKey),exampleModel=/^(identificador|tu_|your_|reemplaza)/i.test(model);
+  if(exampleKey||exampleModel)return {status:'unavailable',code:'example_configuration',message:'La IA todavía tiene valores de ejemplo. Configura una clave real de OpenRouter y el identificador de un modelo disponible; después reinicia la aplicación.'};
   const prompt=fs.readFileSync(PROMPT_PATH,'utf8'),id=createHash('sha256').update(apiKey+model+prompt+JSON.stringify(payload)).digest('hex'),previous=cache.get(id);
   if(previous&&now()-previous.at<300000)return {...previous.value,fromCache:true};
   if(active||now()-lastStart<5000)throw error(429,'La IA está procesando o acaba de recibir una consulta. Espera unos segundos.');
   active=true;lastStart=now();
   try{
-   const response=await fetchImpl('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({model,messages:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(payload)}],response_format:{type:'json_object'},max_tokens:1000,temperature:0.2})});
+   const response=await fetchImpl('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000),body:JSON.stringify({model,messages:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(payload)}],response_format:{type:'json_object'},max_tokens:1600,reasoning:{enabled:false},temperature:0.2})});
    let data;try{data=await response.json();}catch{throw error(502,'OpenRouter devolvió una respuesta no válida.');}
-   if(!response.ok||data?.error||data?.choices?.[0]?.error){const status=response.status;throw error(status===429?429:502,status===401||status===403?'OpenRouter rechazó la clave o los permisos.':status===402?'OpenRouter no tiene saldo disponible para esta consulta.':status===429?'OpenRouter alcanzó un límite de consultas.':'No se pudo generar la interpretación. Revisa modelo, compatibilidad JSON y disponibilidad de OpenRouter.');}
-   let parsed;try{parsed=JSON.parse(data?.choices?.[0]?.message?.content);}catch{throw error(502,'La IA no devolvió el JSON esperado. No se mostrará contenido incompleto.');}
-   const result={status:'available',provider:'OpenRouter',model,generatedAt:new Date(now()).toISOString(),interpretation:validateOutput(parsed),affectsRanking:false,fromCache:false};
+   if(!response.ok||data?.error||data?.choices?.[0]?.error){const status=response.status;throw error(status===429?429:502,status===401||status===403?'OpenRouter rechazó la clave o sus permisos. Revisa que sea una clave activa de OpenRouter, actualízala en el .env de la raíz y reinicia la aplicación.':status===402?'OpenRouter no tiene saldo disponible para esta consulta.':status===429?'OpenRouter alcanzó un límite de consultas.':'No se pudo generar la interpretación. Revisa modelo, compatibilidad JSON y disponibilidad de OpenRouter.');}
+   if(data?.choices?.[0]?.finish_reason==='length')throw error(502,'El modelo agotó su límite antes de completar la respuesta. Intenta nuevamente o usa otro modelo; no se mostrará una interpretación recortada.');
+   const content=data?.choices?.[0]?.message?.content;
+   const text=typeof content==='string'?content.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i,'$1'):'';
+   let parsed;try{parsed=JSON.parse(text);}catch{throw error(502,'El modelo devolvió un formato no válido. Intenta nuevamente; el resto del análisis sigue disponible.');}
+   const result={status:'available',provider:'OpenRouter',model,servedModel:typeof data.model==='string'?data.model:model,generatedAt:new Date(now()).toISOString(),interpretation:{...validateOutput(parsed),missingData:payload.missingData},affectsRanking:false,fromCache:false};
    if(cache.size>=100)cache.delete(cache.keys().next().value);cache.set(id,{at:now(),value:result});return result;
   }catch(cause){if(cause.status)throw cause;throw error(502,'No se pudo contactar a OpenRouter o venció el tiempo de espera. El resto del análisis sigue disponible.');}
   finally{active=false;}

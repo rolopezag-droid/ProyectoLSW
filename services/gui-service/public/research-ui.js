@@ -359,7 +359,7 @@
       const components=Object.entries(c.scoreComponents||{}).map(([key,value])=>`${window.ResearchRanking.labels[key]}: ${Number.isFinite(value)?value.toFixed(1):'sin dato'}/100`).join(' · ');
       return `<li><strong>${esc(c.symbol)} · ${esc(strategyLabel(c.strategy))} · ${c.score.toFixed(2)}/100</strong>. ${esc(comparison)} ${esc(components)}. Ganancia/riesgo ${c.riskReward.toFixed(2)}; diferencial ${c.liquidityScore.toFixed(3)}. En empate se prioriza ganancia/riesgo y después menor diferencial.</li>`;
     }).join('')+'</ol>':'';
-    // Respetar la secuencia numerada: 05 Comparación después de 04 Noticias.
+    // La comparación sigue al contexto de noticias; research-sections numera los bloques visibles.
     const resultPanel=$('researchStrategiesTitle').closest('section');
     $('researchNewsPanel').after(resultPanel);
     renderIndicators(view);renderSummary(view);renderTechnical(view);renderMonteCarlo(view);renderFinancialAndMovers(view);
